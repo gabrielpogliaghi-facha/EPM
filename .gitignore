@@ -1,0 +1,24 @@
+# Dependencias
+node_modules/
+
+# Base de datos (datos de usuario — nunca subir al repo)
+*.db
+*.db-shm
+*.db-wal
+
+# Variables de entorno con secretos
+.env
+
+# Fotos de estudiantes (datos de usuario)
+uploads/
+
+# Backups locales
+backups/
+
+# Claude Code
+.claude/
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini

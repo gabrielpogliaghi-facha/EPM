@@ -1,0 +1,242 @@
+function runSchema(db) {
+  // ── INSTITUCIONES ──────────────────────────────────────────────────────────
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS instituciones (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      nombre      TEXT NOT NULL,
+      tipo        TEXT NOT NULL DEFAULT 'primaria' CHECK(tipo IN ('primaria','secundaria','otro')),
+      config_json TEXT DEFAULT '{}',
+      activo      INTEGER DEFAULT 1,
+      created_at  TEXT DEFAULT (datetime('now'))
+    )
+  `);
+
+  // ── CURSOS ─────────────────────────────────────────────────────────────────
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS cursos (
+      id             INTEGER PRIMARY KEY AUTOINCREMENT,
+      institucion_id INTEGER NOT NULL REFERENCES instituciones(id),
+      nombre         TEXT NOT NULL,
+      descripcion    TEXT,
+      color          TEXT DEFAULT '#6366f1',
+      activo         INTEGER DEFAULT 1,
+      created_at     TEXT DEFAULT (datetime('now')),
+      UNIQUE(institucion_id, nombre)
+    )
+  `);
+
+  // ── MATERIAS (futuro UNSAM) ────────────────────────────────────────────────
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS materias (
+      id             INTEGER PRIMARY KEY AUTOINCREMENT,
+      institucion_id INTEGER NOT NULL REFERENCES instituciones(id),
+      nombre         TEXT NOT NULL,
+      descripcion    TEXT,
+      activo         INTEGER DEFAULT 1,
+      created_at     TEXT DEFAULT (datetime('now'))
+    )
+  `);
+
+  // ── ROLES ─────────────────────────────────────────────────────────────────
+  // institucion_id NULL = rol de sistema global; NOT NULL = rol personalizado de institución
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS roles (
+      id             INTEGER PRIMARY KEY AUTOINCREMENT,
+      institucion_id INTEGER REFERENCES instituciones(id),
+      nombre         TEXT NOT NULL,
+      descripcion    TEXT,
+      es_sistema     INTEGER DEFAULT 0,
+      created_at     TEXT DEFAULT (datetime('now'))
+    )
+  `);
+
+  // ── PERMISOS (catálogo) ────────────────────────────────────────────────────
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS permisos (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      codigo      TEXT UNIQUE NOT NULL,
+      descripcion TEXT NOT NULL,
+      grupo       TEXT
+    )
+  `);
+
+  // ── MATRIZ ROL → PERMISOS ─────────────────────────────────────────────────
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS roles_permisos (
+      rol_id    INTEGER NOT NULL REFERENCES roles(id) ON DELETE CASCADE,
+      permiso_id INTEGER NOT NULL REFERENCES permisos(id) ON DELETE CASCADE,
+      PRIMARY KEY (rol_id, permiso_id)
+    )
+  `);
+
+  // ── USUARIOS ───────────────────────────────────────────────────────────────
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS usuarios (
+      id             INTEGER PRIMARY KEY AUTOINCREMENT,
+      institucion_id INTEGER NOT NULL REFERENCES instituciones(id),
+      nombre         TEXT NOT NULL,
+      email          TEXT UNIQUE NOT NULL,
+      password_hash  TEXT NOT NULL,
+      rol_id         INTEGER NOT NULL REFERENCES roles(id),
+      activo         INTEGER DEFAULT 1,
+      created_at     TEXT DEFAULT (datetime('now')),
+      updated_at     TEXT DEFAULT (datetime('now'))
+    )
+  `);
+
+  // ── ASIGNACIÓN DOCENTE-CURSO (un docente puede tener múltiples cursos) ─────
+  // materia_id NULL = EPM (sin materias); NOT NULL = futuro UNSAM
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS usuarios_cursos (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      usuario_id INTEGER NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+      curso_id   INTEGER NOT NULL REFERENCES cursos(id) ON DELETE CASCADE,
+      materia_id INTEGER REFERENCES materias(id) ON DELETE CASCADE
+    )
+  `);
+  db.exec(`
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_ucursos_general
+      ON usuarios_cursos(usuario_id, curso_id) WHERE materia_id IS NULL
+  `);
+  db.exec(`
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_ucursos_materia
+      ON usuarios_cursos(usuario_id, curso_id, materia_id) WHERE materia_id IS NOT NULL
+  `);
+
+  // ── ESTUDIANTES ────────────────────────────────────────────────────────────
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS estudiantes (
+      id               INTEGER PRIMARY KEY AUTOINCREMENT,
+      institucion_id   INTEGER NOT NULL REFERENCES instituciones(id),
+      curso_id         INTEGER REFERENCES cursos(id),
+      nombre           TEXT NOT NULL,
+      apellido         TEXT NOT NULL,
+      dni              TEXT NOT NULL,
+      cuit             TEXT,
+      fecha_nacimiento TEXT,
+      tutor_nombre     TEXT,
+      tutor_dni        TEXT,
+      direccion        TEXT,
+      auth_imagen      INTEGER DEFAULT 0,
+      auth_general     INTEGER DEFAULT 0,
+      auth_boleto      INTEGER DEFAULT 0,
+      activo           INTEGER DEFAULT 1,
+      created_at       TEXT DEFAULT (datetime('now')),
+      updated_at       TEXT DEFAULT (datetime('now')),
+      UNIQUE(dni, institucion_id)
+    )
+  `);
+
+  // ── USUARIOS-ESTUDIANTES (futuro: acceso de padres/tutores) ────────────────
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS usuarios_estudiantes (
+      usuario_id    INTEGER NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+      estudiante_id INTEGER NOT NULL REFERENCES estudiantes(id) ON DELETE CASCADE,
+      relacion      TEXT DEFAULT 'tutor',
+      PRIMARY KEY (usuario_id, estudiante_id)
+    )
+  `);
+
+  // ── CICLOS LECTIVOS ────────────────────────────────────────────────────────
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS ciclos_lectivos (
+      id             INTEGER PRIMARY KEY AUTOINCREMENT,
+      institucion_id INTEGER NOT NULL REFERENCES instituciones(id),
+      nombre         TEXT NOT NULL,
+      anio           INTEGER NOT NULL,
+      fecha_inicio   TEXT NOT NULL,
+      fecha_fin      TEXT NOT NULL,
+      activo         INTEGER DEFAULT 1,
+      created_at     TEXT DEFAULT (datetime('now'))
+    )
+  `);
+
+  // ── SEMESTRES (hijos del ciclo lectivo, usados para reportes) ─────────────
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS semestres (
+      id                INTEGER PRIMARY KEY AUTOINCREMENT,
+      ciclo_lectivo_id  INTEGER NOT NULL REFERENCES ciclos_lectivos(id) ON DELETE CASCADE,
+      nombre            TEXT NOT NULL,
+      numero            INTEGER NOT NULL CHECK(numero IN (1,2)),
+      fecha_inicio      TEXT NOT NULL,
+      fecha_fin         TEXT NOT NULL
+    )
+  `);
+
+  // ── PERÍODOS DE PLANIFICACIÓN (independientes de semestres) ───────────────
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS periodos_planificacion (
+      id             INTEGER PRIMARY KEY AUTOINCREMENT,
+      institucion_id INTEGER NOT NULL REFERENCES instituciones(id),
+      nombre         TEXT NOT NULL,
+      fecha_inicio   TEXT NOT NULL,
+      fecha_fin      TEXT NOT NULL,
+      activo         INTEGER DEFAULT 1,
+      created_at     TEXT DEFAULT (datetime('now'))
+    )
+  `);
+
+  // ── PLANIFICACIONES DE CONTENIDOS ─────────────────────────────────────────
+  // materia_id NULL = EPM; NOT NULL = futuro UNSAM (planificación por materia)
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS planificaciones (
+      id             INTEGER PRIMARY KEY AUTOINCREMENT,
+      institucion_id INTEGER NOT NULL REFERENCES instituciones(id),
+      curso_id       INTEGER NOT NULL REFERENCES cursos(id),
+      docente_id     INTEGER NOT NULL REFERENCES usuarios(id),
+      periodo_id     INTEGER REFERENCES periodos_planificacion(id),
+      materia_id     INTEGER REFERENCES materias(id),
+      titulo         TEXT,
+      descripcion    TEXT,
+      created_at     TEXT DEFAULT (datetime('now')),
+      updated_at     TEXT DEFAULT (datetime('now'))
+    )
+  `);
+
+  // ── CONTENIDOS DE PLANIFICACIONES (ítems ordenables) ─────────────────────
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS planificacion_contenidos (
+      id               INTEGER PRIMARY KEY AUTOINCREMENT,
+      planificacion_id INTEGER NOT NULL REFERENCES planificaciones(id) ON DELETE CASCADE,
+      titulo           TEXT NOT NULL,
+      descripcion      TEXT,
+      orden            INTEGER DEFAULT 0,
+      created_at       TEXT DEFAULT (datetime('now'))
+    )
+  `);
+
+  // ── ASISTENCIAS ────────────────────────────────────────────────────────────
+  // tipo_asistencia: 'general' (EPM) o 'materia' (futuro UNSAM)
+  // materia_id NULL cuando tipo = 'general'
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS asistencias (
+      id               INTEGER PRIMARY KEY AUTOINCREMENT,
+      institucion_id   INTEGER NOT NULL REFERENCES instituciones(id),
+      estudiante_id    INTEGER NOT NULL REFERENCES estudiantes(id),
+      curso_id         INTEGER NOT NULL REFERENCES cursos(id),
+      fecha            TEXT NOT NULL,
+      estado           TEXT NOT NULL CHECK(estado IN ('presente','ausente','tarde')),
+      observacion      TEXT,
+      tipo_asistencia  TEXT NOT NULL DEFAULT 'general' CHECK(tipo_asistencia IN ('general','materia')),
+      materia_id       INTEGER REFERENCES materias(id),
+      registrado_por   INTEGER REFERENCES usuarios(id),
+      created_at       TEXT DEFAULT (datetime('now')),
+      updated_at       TEXT DEFAULT (datetime('now'))
+    )
+  `);
+  // Índices parciales: un registro por alumno/fecha para asistencia general
+  db.exec(`
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_asis_general
+      ON asistencias(estudiante_id, fecha) WHERE tipo_asistencia = 'general'
+  `);
+  // Un registro por alumno/fecha/materia para asistencia por materia
+  db.exec(`
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_asis_materia
+      ON asistencias(estudiante_id, fecha, materia_id) WHERE tipo_asistencia = 'materia'
+  `);
+
+  // Migraciones acumulativas (se ignoran si ya existen)
+  try { db.exec("ALTER TABLE estudiantes ADD COLUMN foto_path TEXT"); } catch(e) {}
+}
+
+module.exports = { runSchema };

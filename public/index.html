@@ -1,0 +1,3778 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+  <title>EPM – Sistema de Gestión Escolar</title>
+  <script src="https://cdn.jsdelivr.net/npm/react@18.3.1/umd/react.production.min.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/react-dom@18.3.1/umd/react-dom.production.min.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@babel/standalone@7.24.7/babel.min.js"></script>
+  <style>
+    /* ── VARIABLES ─────────────────────────────────────────────────────────── */
+    :root {
+      --sidebar-w: 256px;
+      --bg:        #f0f2ff;
+      --bg2:       #ffffff;
+      --bg3:       #e8ebff;
+      --sidebar:   #1e1b4b;
+      --sidebar2:  #312e81;
+      --primary:   #6366f1;
+      --primary-d: #4f46e5;
+      --primary-l: #a5b4fc;
+      --accent:    #8b5cf6;
+      --text:      #1e1b4b;
+      --text2:     #6b7280;
+      --text-inv:  #ffffff;
+      --border:    #c7d2fe;
+      --danger:    #ef4444;
+      --success:   #22c55e;
+      --warning:   #f59e0b;
+      --card:      #ffffff;
+      --shadow:    0 2px 8px rgba(99,102,241,.12);
+      --radius:    12px;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg:#0f0e1a; --bg2:#1a1830; --bg3:#252344;
+        --sidebar:#0a0918; --sidebar2:#1a1830;
+        --primary:#818cf8; --primary-d:#6366f1; --primary-l:#4f46e5;
+        --accent:#a78bfa; --text:#e2e8f0; --text2:#94a3b8;
+        --border:#2d2b54; --card:#1a1830;
+        --shadow:0 2px 12px rgba(0,0,0,.4);
+      }
+    }
+
+    /* ── RESET ─────────────────────────────────────────────────────────────── */
+    *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+    body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+           background:var(--bg); color:var(--text); min-height:100vh; }
+    #root { min-height:100vh; }
+
+    /* ── LAYOUT ────────────────────────────────────────────────────────────── */
+    .layout { display:flex; min-height:100vh; }
+    .main   { margin-left:var(--sidebar-w); flex:1; display:flex;
+               flex-direction:column; min-height:100vh; }
+
+    /* ── SIDEBAR ───────────────────────────────────────────────────────────── */
+    .sidebar {
+      width:var(--sidebar-w); background:var(--sidebar); color:var(--text-inv);
+      display:flex; flex-direction:column; position:fixed; height:100vh;
+      z-index:200; transition:transform .3s;
+    }
+    .sidebar-logo   { padding:20px; border-bottom:1px solid rgba(255,255,255,.1); }
+    .sidebar-logo h1{ font-size:19px; font-weight:800; color:var(--primary-l); }
+    .sidebar-logo p { font-size:11px; color:rgba(255,255,255,.45); margin-top:2px; }
+    .sidebar-nav    { flex:1; padding:12px 0; overflow-y:auto; }
+
+    .nav-item {
+      display:flex; align-items:center; gap:10px; padding:11px 18px;
+      cursor:pointer; color:rgba(255,255,255,.65); font-size:14px; font-weight:500;
+      border-left:3px solid transparent; transition:all .18s; user-select:none;
+    }
+    .nav-item:hover  { background:rgba(255,255,255,.07); color:#fff; }
+    .nav-item.active { background:rgba(99,102,241,.25); color:var(--primary-l);
+                       border-left-color:var(--primary-l); }
+    .nav-icon  { font-size:17px; width:22px; text-align:center; flex-shrink:0; }
+
+    .sidebar-user {
+      padding:14px 18px; border-top:1px solid rgba(255,255,255,.1);
+      display:flex; align-items:center; gap:10px;
+    }
+    .user-avatar {
+      width:34px; height:34px; border-radius:50%; flex-shrink:0;
+      background:linear-gradient(135deg,var(--primary),var(--accent));
+      display:flex; align-items:center; justify-content:center;
+      font-weight:700; font-size:13px; color:#fff;
+    }
+    .user-info  { flex:1; min-width:0; }
+    .user-name  { font-size:13px; font-weight:600; color:#fff;
+                  white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .user-role  { font-size:11px; color:rgba(255,255,255,.45); }
+    .btn-logout { background:none; border:none; cursor:pointer; font-size:17px;
+                  color:rgba(255,255,255,.35); padding:4px; }
+    .btn-logout:hover { color:var(--danger); }
+
+    .sidebar-overlay { display:none; position:fixed; inset:0;
+                       background:rgba(0,0,0,.45); z-index:199; }
+
+    /* ── TOPBAR ────────────────────────────────────────────────────────────── */
+    .topbar {
+      background:var(--bg2); border-bottom:1px solid var(--border);
+      padding:14px 24px; display:flex; align-items:center; gap:12px;
+      position:sticky; top:0; z-index:100;
+    }
+    .topbar-menu  { background:none; border:none; font-size:21px; cursor:pointer;
+                    color:var(--text); display:none; padding:2px 6px; }
+    .topbar-title { font-size:18px; font-weight:700; color:var(--text); }
+
+    /* ── PAGE ──────────────────────────────────────────────────────────────── */
+    .page { padding:24px; flex:1; }
+
+    /* ── CARD ──────────────────────────────────────────────────────────────── */
+    .card       { background:var(--card); border-radius:var(--radius);
+                  box-shadow:var(--shadow); padding:24px; border:1px solid var(--border); }
+    .card-title { font-size:15px; font-weight:700; margin-bottom:16px;
+                  display:flex; align-items:center; gap:8px; }
+
+    /* ── DASHBOARD ─────────────────────────────────────────────────────────── */
+    .dash-welcome {
+      background:linear-gradient(135deg,var(--primary),var(--accent));
+      border-radius:var(--radius); padding:24px; color:#fff; margin-bottom:20px;
+    }
+    .dash-welcome h2 { font-size:20px; font-weight:800; }
+    .dash-welcome p  { font-size:13px; opacity:.85; margin-top:4px; }
+    .modules-grid    { display:grid;
+                       grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:12px; }
+    .module-card {
+      background:var(--card); border:1px solid var(--border); border-radius:var(--radius);
+      padding:18px; cursor:pointer; transition:all .18s; text-align:center;
+    }
+    .module-card:hover { border-color:var(--primary); box-shadow:var(--shadow);
+                         transform:translateY(-2px); }
+    .module-icon  { font-size:28px; margin-bottom:8px; }
+    .module-label { font-size:13px; font-weight:600; }
+
+    /* ── PLACEHOLDER ───────────────────────────────────────────────────────── */
+    .placeholder {
+      display:flex; flex-direction:column; align-items:center;
+      justify-content:center; padding:64px 24px; text-align:center; gap:16px;
+    }
+    .placeholder-icon  { font-size:56px; }
+    .placeholder-title { font-size:22px; font-weight:800; }
+    .placeholder-sub   { font-size:14px; color:var(--text2); max-width:320px; line-height:1.6; }
+    .badge-wip {
+      background:var(--bg3); color:var(--text2); border:1px solid var(--border);
+      border-radius:20px; padding:4px 14px; font-size:12px; font-weight:600;
+    }
+
+    /* ── LOGIN ─────────────────────────────────────────────────────────────── */
+    .login-page {
+      min-height:100vh; display:flex; align-items:center; justify-content:center;
+      background:linear-gradient(135deg,#1e1b4b 0%,#312e81 50%,#4c1d95 100%); padding:20px;
+    }
+    .login-card {
+      background:var(--card); border-radius:20px; padding:40px;
+      width:100%; max-width:400px; box-shadow:0 20px 60px rgba(0,0,0,.3);
+    }
+    .login-logo    { text-align:center; margin-bottom:32px; }
+    .login-logo h1 { font-size:30px; font-weight:900;
+                     background:linear-gradient(135deg,var(--primary),var(--accent));
+                     -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
+    .login-logo p  { font-size:13px; color:var(--text2); margin-top:4px; }
+    .login-error   { background:#fee2e2; color:var(--danger); padding:10px 14px;
+                     border-radius:8px; font-size:13px; margin-bottom:14px; }
+
+    /* ── FORM ──────────────────────────────────────────────────────────────── */
+    .form-group   { margin-bottom:14px; }
+    .form-label   { display:block; font-size:12px; font-weight:600;
+                    color:var(--text2); margin-bottom:5px; }
+    .form-control {
+      width:100%; padding:11px 14px; border:1.5px solid var(--border); border-radius:8px;
+      background:var(--bg); color:var(--text); font-size:14px; outline:none;
+      transition:border-color .2s;
+    }
+    .form-control:focus { border-color:var(--primary); }
+
+    /* ── BUTTON ────────────────────────────────────────────────────────────── */
+    .btn {
+      display:inline-flex; align-items:center; justify-content:center; gap:6px;
+      padding:10px 18px; border-radius:8px; font-size:14px; font-weight:600;
+      border:none; cursor:pointer; transition:all .18s; width:100%;
+    }
+    .btn-primary { background:var(--primary); color:#fff; }
+    .btn-primary:hover { background:var(--primary-d); }
+    .btn:disabled { opacity:.55; cursor:not-allowed; }
+
+    /* ── SPINNER ───────────────────────────────────────────────────────────── */
+    .spinner { display:flex; align-items:center; justify-content:center; padding:48px; }
+    .spin    { width:30px; height:30px; border:3px solid var(--border);
+               border-top-color:var(--primary); border-radius:50%;
+               animation:spin .7s linear infinite; }
+    @keyframes spin { to { transform:rotate(360deg); } }
+
+    /* ── MOBILE ────────────────────────────────────────────────────────────── */
+    @media (max-width:768px) {
+      .sidebar              { transform:translateX(-100%); }
+      .sidebar.open         { transform:translateX(0); }
+      .sidebar-overlay.open { display:block; }
+      .main                 { margin-left:0; }
+      .topbar-menu          { display:block; }
+      .page                 { padding:16px; }
+      .modules-grid         { grid-template-columns:1fr 1fr; }
+    }
+
+    /* ── BOTONES SECUNDARIO / PELIGRO ──────────────────────────────────────── */
+    .btn-secondary       { background:var(--bg3); color:var(--text); border:1.5px solid var(--border); }
+    .btn-secondary:hover { background:var(--border); }
+    .btn-danger          { background:var(--danger); color:#fff; border:none; }
+    .btn-danger:hover    { opacity:.85; }
+    .btn-auto            { width:auto; }
+
+    /* ── MODAL ──────────────────────────────────────────────────────────────── */
+    .modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:300;
+                     display:flex; align-items:center; justify-content:center; padding:16px; }
+    .modal         { background:var(--card); border-radius:var(--radius); padding:24px;
+                     width:100%; max-width:460px; max-height:90vh; overflow-y:auto;
+                     box-shadow:0 20px 60px rgba(0,0,0,.3); }
+    .modal-header  { display:flex; justify-content:space-between; align-items:center; margin-bottom:18px; }
+    .modal-title   { font-size:16px; font-weight:700; }
+    .modal-close   { background:none; border:none; font-size:20px; cursor:pointer;
+                     color:var(--text2); padding:2px 8px; border-radius:6px; line-height:1; }
+    .modal-close:hover { background:var(--bg3); color:var(--text); }
+    .modal-footer  { display:flex; gap:8px; justify-content:flex-end; margin-top:18px; }
+
+    /* ── ALERTS ─────────────────────────────────────────────────────────────── */
+    .alert         { padding:10px 14px; border-radius:8px; font-size:13px; margin-bottom:14px; line-height:1.5; }
+    .alert-success { background:#dcfce7; color:#166534; border:1px solid #86efac; }
+    .alert-error   { background:#fee2e2; color:#991b1b; border:1px solid #fca5a5; }
+    .alert-warning { background:#fef9c3; color:#854d0e; border:1px solid #fde047; }
+
+    /* ── LISTA DE CURSOS ────────────────────────────────────────────────────── */
+    .list-row {
+      display:flex; align-items:center; gap:12px; padding:14px 16px;
+      border:1.5px solid var(--border); border-radius:var(--radius);
+      background:var(--card); margin-bottom:8px; transition:border-color .18s;
+    }
+    .list-row:hover       { border-color:var(--primary-l); }
+    .list-row-label       { flex:1; font-size:15px; font-weight:600; }
+    .badge-count          { background:var(--bg3); color:var(--text2); border:1px solid var(--border);
+                            border-radius:20px; padding:3px 10px; font-size:12px; font-weight:600; white-space:nowrap; }
+    .row-actions          { display:flex; gap:6px; flex-shrink:0; }
+    .btn-icon             { background:none; border:1.5px solid var(--border); border-radius:8px;
+                            padding:6px 10px; cursor:pointer; font-size:14px; color:var(--text2);
+                            transition:all .18s; line-height:1; }
+    .btn-icon:hover             { border-color:var(--primary); color:var(--primary); background:var(--bg3); }
+    .btn-icon-danger:hover      { border-color:var(--danger) !important; color:var(--danger) !important; background:#fee2e2 !important; }
+    .section-header       { display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; }
+    .empty-state          { text-align:center; padding:40px 0; color:var(--text2); }
+    .empty-state-icon     { font-size:40px; margin-bottom:8px; }
+
+    /* ── FICHA DE ESTUDIANTE ────────────────────────────────────────────────── */
+    .ficha-wrap     { max-width:700px; margin:0 auto; }
+    .ficha-section  {
+      background:var(--card); border:1.5px solid var(--border);
+      border-radius:var(--radius); padding:20px; margin-bottom:14px;
+      box-shadow:var(--shadow);
+    }
+    .ficha-section-title {
+      font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:.07em;
+      color:var(--text2); margin-bottom:16px; padding-bottom:10px;
+      border-bottom:1px solid var(--border); display:flex; align-items:center; gap:6px;
+    }
+    .ficha-autorizaciones { background:linear-gradient(135deg,#fffbeb,#fef3c7); border-color:#f59e0b !important; }
+    .ficha-autorizaciones .ficha-section-title { color:#92400e; border-bottom-color:#fde68a; }
+    @media (prefers-color-scheme:dark) {
+      .ficha-autorizaciones { background:linear-gradient(135deg,#2d1f08,#3d2a0a); border-color:#b45309 !important; }
+      .ficha-autorizaciones .ficha-section-title { color:#fbbf24; border-bottom-color:#78350f; }
+    }
+    .form-grid  { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+    .col-full   { grid-column:1/-1; }
+
+    .auth-list  { display:flex; flex-direction:column; gap:8px; }
+    .auth-row {
+      display:flex; align-items:center; gap:14px; padding:14px 16px;
+      background:rgba(255,255,255,.75); border-radius:10px; cursor:pointer;
+      border:2px solid transparent; transition:all .18s; user-select:none;
+    }
+    .auth-row:hover { border-color:#fbbf24; background:rgba(255,255,255,.95); }
+    .auth-row.on    { border-color:#22c55e; background:rgba(240,253,244,.9); }
+    @media (prefers-color-scheme:dark) {
+      .auth-row { background:rgba(255,255,255,.07); }
+      .auth-row:hover { background:rgba(255,255,255,.12); }
+      .auth-row.on { background:rgba(20,83,45,.4); }
+    }
+    .auth-check {
+      width:28px; height:28px; border-radius:7px; border:2.5px solid #d1d5db; flex-shrink:0;
+      display:flex; align-items:center; justify-content:center;
+      font-size:17px; font-weight:700; background:#fff; transition:all .18s;
+    }
+    .auth-row.on .auth-check { background:#22c55e; border-color:#22c55e; color:#fff; }
+    .auth-label { font-size:15px; font-weight:700; color:var(--text); line-height:1.2; }
+    .auth-sub   { font-size:11px; color:var(--text2); margin-top:2px; }
+
+    .dirty-bar {
+      display:flex; align-items:center; gap:8px; padding:9px 14px; margin-bottom:12px;
+      background:#fff7ed; border:1px solid #fed7aa; border-radius:8px;
+      font-size:13px; font-weight:600; color:#9a3412;
+    }
+    .ficha-header { display:flex; align-items:center; gap:12px; margin-bottom:18px; flex-wrap:wrap; }
+    .ficha-avatar {
+      width:50px; height:50px; border-radius:13px; flex-shrink:0;
+      background:linear-gradient(135deg,var(--primary),var(--accent));
+      display:flex; align-items:center; justify-content:center;
+      font-size:19px; font-weight:800; color:#fff;
+    }
+    .ficha-meta h2 { font-size:18px; font-weight:800; line-height:1.2; }
+    .ficha-meta p  { font-size:12px; color:var(--text2); margin-top:3px; }
+    .ficha-footer  { display:flex; gap:8px; padding:6px 0 4px; flex-wrap:wrap; }
+
+    /* ── LISTA DE ESTUDIANTES ───────────────────────────────────────────────── */
+    .curso-tabs { display:flex; gap:6px; overflow-x:auto; margin-bottom:14px; scrollbar-width:none; padding-bottom:2px; }
+    .curso-tabs::-webkit-scrollbar { display:none; }
+    .curso-tab {
+      padding:7px 16px; border-radius:20px; font-size:13px; font-weight:600;
+      cursor:pointer; white-space:nowrap; border:1.5px solid var(--border);
+      background:var(--card); color:var(--text2); transition:all .18s; flex-shrink:0;
+    }
+    .curso-tab:hover:not(.active) { border-color:var(--primary); color:var(--primary); }
+    .curso-tab.active { background:var(--primary); color:#fff; border-color:var(--primary); }
+    .est-row {
+      display:flex; align-items:center; gap:12px; padding:11px 14px;
+      border:1.5px solid var(--border); border-radius:var(--radius);
+      background:var(--card); margin-bottom:6px; transition:all .18s;
+    }
+    .est-row:hover { border-color:var(--primary-l); }
+    .est-avatar {
+      width:38px; height:38px; border-radius:10px; flex-shrink:0;
+      background:linear-gradient(135deg,var(--primary),var(--accent));
+      display:flex; align-items:center; justify-content:center;
+      font-size:13px; font-weight:800; color:#fff;
+    }
+    .est-nombre { font-size:14px; font-weight:700; }
+    .est-sub    { font-size:11px; color:var(--text2); margin-top:1px; }
+    .est-tag    {
+      font-size:11px; font-weight:600; background:var(--bg3); color:var(--primary);
+      border-radius:12px; padding:2px 9px; white-space:nowrap; flex-shrink:0;
+    }
+
+    /* ── FOTO ───────────────────────────────────────────────────────────────── */
+    .foto-avatar-wrap {
+      width:50px; height:50px; border-radius:13px; flex-shrink:0; cursor:pointer;
+      background:linear-gradient(135deg,var(--primary),var(--accent));
+      display:flex; align-items:center; justify-content:center;
+      font-size:19px; font-weight:800; color:#fff; overflow:hidden; position:relative;
+    }
+    .foto-avatar-wrap:hover::after {
+      content:'📷'; position:absolute; inset:0; background:rgba(0,0,0,.45);
+      display:flex; align-items:center; justify-content:center; font-size:22px;
+    }
+    .foto-avatar-wrap img { width:100%; height:100%; object-fit:cover; }
+    .foto-hint  { font-size:10px; color:var(--text2); margin-top:3px; }
+
+    /* ── BULK / SELECCIÓN ───────────────────────────────────────────────────── */
+    .est-check {
+      width:22px; height:22px; border-radius:5px; border:2px solid var(--border);
+      display:flex; align-items:center; justify-content:center; cursor:pointer;
+      flex-shrink:0; transition:all .15s; background:var(--bg); font-size:13px;
+    }
+    .est-check.on { background:var(--primary); border-color:var(--primary); color:#fff; }
+    .est-row.sel  { border-color:var(--primary); background:var(--bg3); }
+    .bulk-bar {
+      display:flex; align-items:center; gap:8px; padding:10px 14px; flex-wrap:wrap;
+      background:var(--bg3); border:1.5px solid var(--primary-l);
+      border-radius:var(--radius); margin-bottom:10px;
+    }
+    .bulk-count { font-size:13px; font-weight:700; color:var(--primary); flex:1; }
+
+    /* ── TOMAR ASISTENCIA ───────────────────────────────────────────────────── */
+    .asis-row {
+      padding:14px 16px; border:1.5px solid var(--border); border-radius:var(--radius);
+      background:var(--card); margin-bottom:8px;
+      display:flex; flex-direction:column; gap:10px; transition:all .15s;
+    }
+    .asis-row-presente { border-color:#86efac; background:#f0fdf4; }
+    .asis-row-ausente  { border-color:#fca5a5; background:#fef2f2; }
+    .asis-row-tarde    { border-color:#93c5fd; background:#eff6ff; }
+    @media (prefers-color-scheme:dark) {
+      .asis-row-presente { background:rgba(20,83,45,.22); }
+      .asis-row-ausente  { background:rgba(127,29,29,.22); }
+      .asis-row-tarde    { background:rgba(30,58,138,.22); }
+    }
+    .asis-nombre { font-size:15px; font-weight:700; }
+    .asis-btns   { display:grid; grid-template-columns:1fr 1fr 1fr; gap:6px; }
+    .asis-btn {
+      padding:14px 6px; border:2px solid var(--border); border-radius:10px;
+      font-size:13px; font-weight:700; cursor:pointer; text-align:center;
+      background:var(--bg3); color:var(--text2); transition:all .15s;
+      -webkit-tap-highlight-color:transparent; user-select:none;
+    }
+    .asis-btn:active { opacity:.75; transform:scale(.97); }
+    .asis-btn.asis-presente.sel { background:#dcfce7; border-color:#22c55e; color:#166534; }
+    .asis-btn.asis-ausente.sel  { background:#fee2e2; border-color:#ef4444; color:#991b1b; }
+    .asis-btn.asis-tarde.sel    { background:#dbeafe; border-color:#3b82f6; color:#1e40af; }
+    .asis-obs {
+      width:100%; padding:8px 10px; border:1.5px solid var(--border); border-radius:6px;
+      font-size:12px; background:var(--bg); color:var(--text); font-family:inherit;
+    }
+    .asis-obs:focus { outline:none; border-color:var(--primary); }
+    .asis-counter {
+      display:flex; align-items:center; gap:14px; flex-wrap:wrap;
+      padding:10px 14px; background:var(--bg3); border-radius:10px;
+      margin-bottom:10px; font-size:13px; font-weight:700;
+    }
+    .asis-success {
+      background:linear-gradient(135deg,#22c55e,#16a34a); color:#fff;
+      border-radius:var(--radius); padding:32px 24px; text-align:center;
+    }
+    .asis-success h3 { font-size:22px; font-weight:800; margin-bottom:4px; }
+
+    /* ── IMPORTAR CSV ───────────────────────────────────────────────────────── */
+    .import-drop {
+      border:2px dashed var(--border); border-radius:var(--radius);
+      padding:28px 16px; text-align:center; cursor:pointer; transition:all .2s;
+      background:var(--bg); display:flex; flex-direction:column; align-items:center; gap:6px;
+    }
+    .import-drop:hover, .import-drop.over { border-color:var(--primary); background:var(--bg3); }
+    .import-drop p { font-size:13px; color:var(--text2); margin:0; }
+    .preview-scroll { overflow:auto; max-height:280px; border-radius:8px; border:1px solid var(--border); }
+    .preview-table  { width:100%; border-collapse:collapse; font-size:12px; }
+    .preview-table th { background:var(--bg3); padding:6px 8px; text-align:left; font-size:11px;
+                        font-weight:700; text-transform:uppercase; white-space:nowrap; }
+    .preview-table td { padding:5px 8px; border-bottom:1px solid var(--border); vertical-align:top; }
+    .preview-table tr.pr-ok   td { background:#f0fdf4; }
+    .preview-table tr.pr-err  td { background:#fef2f2; }
+    .pr-error-msg { color:var(--danger); font-size:11px; }
+
+    /* ── REPORTES ───────────────────────────────────────────────────────────── */
+    .report-stats { display:grid; grid-template-columns:repeat(auto-fill,minmax(140px,1fr)); gap:12px; margin-bottom:16px; }
+    .rstat        { background:var(--card); border:1.5px solid var(--border); border-radius:var(--radius); padding:16px; text-align:center; }
+    .rstat-value  { font-size:28px; font-weight:800; color:var(--primary); line-height:1; }
+    .rstat-label  { font-size:12px; color:var(--text2); margin-top:6px; }
+    .rstat-alert  .rstat-value { color:var(--warning); }
+    .rstat-danger .rstat-value { color:var(--danger); }
+
+    .rpt-table    { width:100%; border-collapse:collapse; font-size:14px; }
+    .rpt-th       { background:var(--bg3); padding:10px 12px; text-align:left; font-size:11px;
+                    font-weight:700; text-transform:uppercase; letter-spacing:.05em;
+                    white-space:nowrap; border-bottom:1px solid var(--border); }
+    .rpt-th:hover { background:var(--border); }
+    .rpt-table td { padding:10px 12px; border-bottom:1px solid var(--border); }
+    .rpt-table tr:last-child td { border-bottom:none; }
+    .rpt-table tr:hover td      { background:var(--bg3); }
+    .rpt-row-alerta td          { background:rgba(239,68,68,.04); }
+    .rpt-nombre    { font-weight:600; }
+    .rpt-num       { text-align:right; font-variant-numeric:tabular-nums; }
+    .rpt-aus-alta  { color:var(--danger); font-weight:700; }
+    .rpt-aus-media { color:var(--warning); font-weight:600; }
+    .rpt-sin-datos { font-size:10px; color:var(--text2); margin-left:6px; font-weight:400; }
+    .pie-legend    { font-size:13px; margin-bottom:5px; display:flex; align-items:center; gap:6px; }
+    .pie-wrap      { display:flex; align-items:center; gap:20px; flex-wrap:wrap; }
+
+    .pct-badge { border-radius:6px; padding:3px 9px; font-weight:700; font-size:12px; }
+    .pct-alta  { background:#dcfce7; color:#166534; }
+    .pct-media { background:#fef9c3; color:#854d0e; }
+    .pct-baja  { background:#fee2e2; color:#991b1b; }
+
+    .print-header { display:none; margin-bottom:16px; }
+    @media print {
+      .no-print, .sidebar, .sidebar-overlay, .topbar { display:none !important; }
+      .main          { margin-left:0 !important; }
+      .page          { padding:10px !important; }
+      .print-header  { display:block !important; }
+      .rpt-table     { font-size:11px; }
+      .card          { box-shadow:none; border:1px solid #ddd; }
+    }
+
+    @media (max-width:600px) {
+      .form-grid   { grid-template-columns:1fr; }
+      .ficha-footer{ flex-direction:column; }
+      .ficha-footer .btn { width:100%; justify-content:center; }
+    }
+
+    /* ── USUARIOS Y ROLES ─────────────────────────────────────────────────────── */
+    .usr-row    { display:flex; align-items:center; gap:12px; padding:12px 14px; border:1.5px solid var(--border); border-radius:var(--radius); background:var(--card); margin-bottom:6px; transition:border-color .15s; }
+    .usr-row:hover { border-color:var(--primary-l); }
+    .usr-avatar { width:38px; height:38px; border-radius:10px; flex-shrink:0; background:linear-gradient(135deg,var(--accent),var(--primary)); display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:800; color:#fff; }
+    .usr-nombre { font-size:14px; font-weight:700; }
+    .usr-meta   { font-size:11px; color:var(--text2); margin-top:1px; }
+    .usr-self   { font-size:10px; background:var(--bg3); border:1px solid var(--border); border-radius:10px; padding:1px 6px; color:var(--text2); margin-left:6px; font-weight:400; }
+    .rol-badge  { display:inline-block; background:var(--bg3); color:var(--primary); border-radius:10px; padding:1px 8px; font-size:11px; font-weight:700; }
+    .role-header { display:flex; align-items:center; gap:10px; padding:14px 16px; border:1.5px solid var(--border); border-radius:var(--radius); background:var(--card); cursor:pointer; user-select:none; margin-bottom:2px; transition:all .15s; }
+    .role-header:hover  { border-color:var(--primary-l); }
+    .role-header.open   { border-color:var(--primary); border-bottom-left-radius:0; border-bottom-right-radius:0; }
+    .role-body  { padding:16px; border:1.5px solid var(--primary); border-top:none; border-bottom-left-radius:var(--radius); border-bottom-right-radius:var(--radius); background:var(--card); margin-bottom:10px; }
+    .role-sistema { font-size:10px; background:#ede9fe; color:#5b21b6; border-radius:10px; padding:1px 7px; font-weight:700; flex-shrink:0; }
+    .perm-group { margin-bottom:14px; }
+    .perm-group-title { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.07em; color:var(--text2); margin-bottom:8px; padding-bottom:4px; border-bottom:1px solid var(--border); }
+    .perm-grid  { display:grid; grid-template-columns:1fr 1fr; gap:5px; }
+    .perm-item  { display:flex; align-items:flex-start; gap:8px; padding:8px 10px; border:1.5px solid var(--border); border-radius:8px; cursor:pointer; transition:all .15s; user-select:none; }
+    .perm-item:hover   { border-color:var(--primary-l); }
+    .perm-item.on      { border-color:var(--primary); background:rgba(99,102,241,.06); }
+    .perm-chk   { width:18px; height:18px; border-radius:4px; border:2px solid var(--border); flex-shrink:0; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:800; margin-top:1px; transition:all .15s; }
+    .perm-item.on .perm-chk { background:var(--primary); border-color:var(--primary); color:#fff; }
+    .perm-desc  { font-size:12px; color:var(--text); line-height:1.3; }
+
+    @media (max-width:600px) {
+      .perm-grid { grid-template-columns:1fr; }
+    }
+
+    /* ── MEJORAS MÓVIL GENERAL ──────────────────────────────────────────────── */
+    @media (max-width:480px) {
+      .section-header { flex-wrap:wrap; gap:8px; }
+      .report-stats   { grid-template-columns:1fr 1fr; }
+      .modules-grid   { grid-template-columns:1fr 1fr; }
+      .modal          { padding:18px; }
+    }
+
+    /* ── PLANIFICACIONES ────────────────────────────────────────────────────── */
+    .plan-item     { background:var(--card); border:1.5px solid var(--border); border-radius:var(--radius); padding:16px; margin-bottom:8px; cursor:pointer; transition:border-color .15s; }
+    .plan-item:hover { border-color:var(--primary-l); }
+    .plan-item-hd  { display:flex; justify-content:space-between; align-items:flex-start; gap:8px; margin-bottom:4px; }
+    .plan-titulo   { font-size:15px; font-weight:700; }
+    .plan-meta     { font-size:12px; color:var(--text2); margin-top:2px; }
+    .plan-detail-hd  { display:flex; align-items:center; gap:10px; padding:10px 0 14px; border-bottom:1px solid var(--border); margin-bottom:16px; flex-wrap:wrap; }
+    .plan-detail-title { font-size:18px; font-weight:800; line-height:1.2; }
+    .plan-detail-meta  { font-size:12px; color:var(--text2); margin-top:3px; }
+
+    .contenido-row { display:flex; align-items:flex-start; gap:8px; padding:12px; border:1.5px solid var(--border); border-radius:var(--radius); background:var(--card); margin-bottom:6px; }
+    .contenido-num { width:26px; height:26px; background:var(--primary); color:#fff; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:800; flex-shrink:0; margin-top:2px; }
+    .contenido-body  { flex:1; min-width:0; }
+    .contenido-titulo{ font-size:14px; font-weight:700; }
+    .contenido-desc  { font-size:12px; color:var(--text2); margin-top:3px; white-space:pre-wrap; }
+    .contenido-orden { display:flex; flex-direction:column; gap:3px; flex-shrink:0; }
+    .btn-ord  { background:none; border:1.5px solid var(--border); border-radius:6px; width:38px; height:38px; display:flex; align-items:center; justify-content:center; cursor:pointer; font-size:16px; color:var(--text2); transition:all .15s; padding:0; }
+    .btn-ord:hover:not(:disabled) { border-color:var(--primary); color:var(--primary); background:var(--bg3); }
+    .btn-ord:disabled { opacity:.25; cursor:not-allowed; }
+    .plan-add-form { background:var(--bg3); border:1.5px dashed var(--border); border-radius:var(--radius); padding:16px; margin-top:10px; }
+    .periodo-tag { display:inline-block; background:var(--bg3); color:var(--text2); border:1px solid var(--border); border-radius:8px; padding:2px 8px; font-size:11px; }
+
+    /* ── CALENDARIO DE ASISTENCIA ───────────────────────────────────────────── */
+    .cal-nav     { display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; }
+    .cal-nav-btn { background:none; border:1.5px solid var(--border); border-radius:8px; padding:6px 14px; cursor:pointer; font-size:17px; color:var(--text2); transition:all .15s; }
+    .cal-nav-btn:hover:not(:disabled) { border-color:var(--primary); color:var(--primary); }
+    .cal-nav-btn:disabled { opacity:.3; cursor:default; }
+    .cal-month-label { font-size:15px; font-weight:700; }
+    .cal-summary { display:flex; gap:12px; flex-wrap:wrap; margin-bottom:10px; }
+    .cal-sum-item { display:flex; align-items:center; gap:6px; font-size:13px; }
+    .cal-sum-dot  { width:12px; height:12px; border-radius:3px; flex-shrink:0; }
+    .cal-header   { display:grid; grid-template-columns:repeat(7,1fr); gap:3px; margin-bottom:3px; }
+    .cal-dow      { text-align:center; font-size:10px; font-weight:700; color:var(--text2); padding:3px 0; }
+    .cal-grid     { display:grid; grid-template-columns:repeat(7,1fr); gap:3px; }
+    .cal-cell {
+      aspect-ratio:1; border-radius:6px; display:flex; flex-direction:column;
+      align-items:center; justify-content:center; position:relative;
+      border:1.5px solid transparent; cursor:pointer; transition:all .15s;
+      background:var(--bg3); -webkit-tap-highlight-color:transparent;
+    }
+    .cal-cell:hover:not(.cal-empty):not(.cal-weekend) { border-color:var(--primary); }
+    .cal-cell.cal-selected { border-color:var(--primary) !important; box-shadow:0 0 0 2px rgba(99,102,241,.3); }
+    .cal-day-num  { font-size:12px; font-weight:600; color:var(--text); }
+    .cal-obs-dot  { font-size:5px; position:absolute; bottom:3px; color:var(--primary); }
+    .cal-empty    { background:transparent; cursor:default; border:none; }
+    .cal-weekend  { background:var(--bg3); opacity:.25; cursor:default; }
+    .cal-nodata   { background:var(--bg3); opacity:.55; }
+    /* Colores sólidos y vívidos — sin !important innecesario gracias al orden */
+    .cal-presente { background:#22c55e; border-color:#16a34a; }
+    .cal-presente .cal-day-num  { color:#fff; font-weight:800; }
+    .cal-presente .cal-status   { color:rgba(255,255,255,.9); }
+    .cal-ausente  { background:#ef4444; border-color:#dc2626; }
+    .cal-ausente  .cal-day-num  { color:#fff; font-weight:800; }
+    .cal-ausente  .cal-status   { color:rgba(255,255,255,.9); }
+    .cal-tarde    { background:#f59e0b; border-color:#d97706; }
+    .cal-tarde    .cal-day-num  { color:#fff; font-weight:800; }
+    .cal-tarde    .cal-status   { color:rgba(255,255,255,.9); }
+    .cal-status   { font-size:9px; font-weight:700; line-height:1; margin-top:1px; }
+    @media (prefers-color-scheme:dark) {
+      .cal-presente { background:#16a34a; border-color:#15803d; }
+      .cal-ausente  { background:#dc2626; border-color:#b91c1c; }
+      .cal-tarde    { background:#d97706; border-color:#b45309; }
+    }
+    .cal-obs-card { background:var(--bg3); border:1.5px solid var(--border); border-radius:var(--radius); padding:12px 14px; margin-top:8px; font-size:13px; line-height:1.5; }
+    .cal-obs-fecha { font-weight:700; margin-bottom:4px; color:var(--text); }
+
+    /* ── BACKUP ─────────────────────────────────────────────────────────────── */
+    .backup-item { display:flex; align-items:center; gap:10px; padding:14px 16px; border:1.5px solid var(--border); border-radius:var(--radius); background:var(--card); margin-bottom:6px; transition:border-color .15s; }
+    .backup-item:hover { border-color:var(--primary-l); }
+    .backup-fecha  { flex:1; min-width:0; }
+    .backup-nombre { font-size:14px; font-weight:700; }
+    .backup-meta   { font-size:11px; color:var(--text2); margin-top:2px; }
+    .restore-warning { background:#fef2f2; border:2px solid var(--danger); border-radius:var(--radius); padding:18px; margin-bottom:16px; }
+    .restore-warning strong { color:var(--danger); }
+  </style>
+</head>
+<body>
+<div id="root">
+  <div style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#1e1b4b,#312e81)">
+    <div style="color:#a5b4fc;text-align:center;font-family:sans-serif">
+      <div style="font-size:48px;margin-bottom:12px">📚</div>
+      <div style="font-size:16px;font-weight:700">Cargando EPM...</div>
+    </div>
+  </div>
+</div>
+
+<script type="text/babel" data-presets="react">
+const { useState, useEffect, useCallback } = React;
+
+// ── NAVEGACIÓN ─────────────────────────────────────────────────────────────────
+const NAV = [
+  { id:'dashboard',       label:'Dashboard',        icon:'🏠', permiso:null },
+  { id:'estudiantes',     label:'Estudiantes',       icon:'👥', permiso:'ver_estudiantes' },
+  { id:'asistencia',      label:'Tomar asistencia',  icon:'📋', permiso:'cargar_asistencias' },
+  { id:'reportes',        label:'Reportes',          icon:'📊', permiso:'ver_reportes' },
+  { id:'planificaciones', label:'Planificaciones',   icon:'📝', permiso:'ver_planificaciones' },
+  { id:'cursos',          label:'Cursos',            icon:'🏫', permiso:'administrar_cursos' },
+  { id:'usuarios',        label:'Usuarios y roles',  icon:'👤', permiso:'administrar_usuarios_roles' },
+  { id:'backup',          label:'Backup',            icon:'💾', permiso:'acceder_backup' },
+];
+
+// ── UTILS ───────────────────────────────────────────────────────────────────────
+const getToken = () => localStorage.getItem('epm_token');
+const getUser  = () => { try { return JSON.parse(localStorage.getItem('epm_user')); } catch { return null; } };
+
+async function apiFetch(url, opts = {}) {
+  const token = getToken();
+  const res = await fetch(url, {
+    ...opts,
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization:`Bearer ${token}` } : {}),
+      ...(opts.headers || {}),
+    },
+    body: opts.body ? JSON.stringify(opts.body) : undefined,
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || `Error ${res.status}`);
+  return data;
+}
+
+// ── CSV IMPORT UTILITIES ────────────────────────────────────────────────────────
+const COLS_CSV = ['Nombre','Apellido','DNI','CUIT','Fecha de nacimiento','Dirección',
+                  'Tutor','DNI del tutor','Autorización de Imagen','Autorización General',
+                  'Autorización Boleto Estudiantil','Curso'];
+
+function descargarPlantilla() {
+  const ej1 = ['Juan','García','45123456','20-45123456-7','15/03/2015','Av. Siempreviva 742','María García','23456789','sí','sí','no','Mojarritas'];
+  const ej2 = ['Sofía','López','45678901','','22/07/2016','','','','no','no','sí','Delfines'];
+  const csv = [COLS_CSV,ej1,ej2].map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8;'}));
+  a.download = 'EPM_plantilla_importacion.csv';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+}
+
+function parseBool(v) {
+  return ['si','sí','x','1','true','yes','y'].includes(String(v||'').toLowerCase().trim());
+}
+function parseFecha(v) {
+  const s = String(v||'').trim();
+  if (!s) return '';
+  const m = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+  if (m) return `${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`;
+  return /^\d{4}-\d{2}-\d{2}$/.test(s) ? s : null;
+}
+function parseCsvLine(line) {
+  const res=[]; let cur='', inQ=false;
+  for (let i=0; i<line.length; i++) {
+    const c=line[i];
+    if (c==='"') { if (inQ&&line[i+1]==='"'){cur+='"';i++;} else inQ=!inQ; }
+    else if (c===','&&!inQ) { res.push(cur.trim().replace(/^"|"$/g,'')); cur=''; }
+    else cur+=c;
+  }
+  res.push(cur.trim().replace(/^"|"$/g,'')); return res;
+}
+function parseCsv(text) {
+  const lines = text.replace(/^﻿/,'').replace(/\r\n/g,'\n').replace(/\r/g,'\n').trim().split('\n').filter(l=>l.trim());
+  if (lines.length<2) return [];
+  const headers = parseCsvLine(lines[0]);
+  return lines.slice(1).map(l => {
+    const vals = parseCsvLine(l);
+    const row = {};
+    headers.forEach((h,i)=>{ row[h] = vals[i]||''; });
+    return row;
+  });
+}
+function validarFilaCSV(row, cursos, allDnis, idx) {
+  const errors=[];
+  const nombre   = row['Nombre']?.trim()||'';
+  const apellido = row['Apellido']?.trim()||'';
+  const dni      = row['DNI']?.trim()||'';
+  if (!nombre)   errors.push('Nombre requerido');
+  if (!apellido) errors.push('Apellido requerido');
+  if (!dni)      errors.push('DNI requerido');
+  if (dni && allDnis.filter(d=>d===dni).length>1) errors.push('DNI duplicado en el archivo');
+  let fecha_nacimiento='';
+  if (row['Fecha de nacimiento']?.trim()) {
+    const f=parseFecha(row['Fecha de nacimiento']);
+    if (f===null) errors.push('Fecha inválida (usar DD/MM/AAAA o AAAA-MM-DD)');
+    else fecha_nacimiento=f;
+  }
+  let curso_id=null;
+  const curso_nombre=row['Curso']?.trim()||'';
+  if (curso_nombre) {
+    const c=cursos.find(c=>c.nombre.toLowerCase().trim()===curso_nombre.toLowerCase());
+    if (!c) errors.push(`Curso "${curso_nombre}" no existe`);
+    else curso_id=c.id;
+  }
+  return {
+    idx:idx+1, ok:errors.length===0, errors,
+    nombre, apellido, dni,
+    cuit:         row['CUIT']?.trim()||'',
+    fecha_nacimiento,
+    direccion:    row['Dirección']?.trim()||'',
+    tutor_nombre: row['Tutor']?.trim()||'',
+    tutor_dni:    row['DNI del tutor']?.trim()||'',
+    auth_imagen:  parseBool(row['Autorización de Imagen']),
+    auth_general: parseBool(row['Autorización General']),
+    auth_boleto:  parseBool(row['Autorización Boleto Estudiantil']),
+    curso_id, curso_nombre,
+  };
+}
+
+async function apiFotoUpload(id, file) {
+  const fd = new FormData();
+  fd.append('foto', file);
+  const res = await fetch(`/api/estudiantes/${id}/foto`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${getToken()}` },
+    body: fd,
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || 'Error al subir foto');
+  return data;
+}
+
+// ── LOGIN ───────────────────────────────────────────────────────────────────────
+function LoginPage({ onLogin }) {
+  const [form,    setForm]    = useState({ email:'', password:'' });
+  const [error,   setError]   = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const submit = async (e) => {
+    e.preventDefault();
+    setError(''); setLoading(true);
+    try {
+      const data = await apiFetch('/api/auth/login', { method:'POST', body:form });
+      localStorage.setItem('epm_token', data.token);
+      localStorage.setItem('epm_user',  JSON.stringify(data.user));
+      onLogin(data.user);
+    } catch (err) { setError(err.message); }
+    finally { setLoading(false); }
+  };
+
+  return (
+    <div className="login-page">
+      <div className="login-card">
+        <div className="login-logo">
+          <h1>EPM</h1>
+          <p>Sistema de Gestión Escolar</p>
+        </div>
+        {error && <div className="login-error">{error}</div>}
+        <form onSubmit={submit}>
+          <div className="form-group">
+            <label className="form-label">Correo electrónico</label>
+            <input className="form-control" type="email" placeholder="usuario@epm.edu.ar"
+              value={form.email} onChange={e => setForm({...form, email:e.target.value})} required />
+          </div>
+          <div className="form-group">
+            <label className="form-label">Contraseña</label>
+            <input className="form-control" type="password" placeholder="••••••••"
+              value={form.password} onChange={e => setForm({...form, password:e.target.value})} required />
+          </div>
+          <button className="btn btn-primary" type="submit" disabled={loading}>
+            {loading ? 'Ingresando...' : 'Ingresar'}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// ── SIDEBAR ─────────────────────────────────────────────────────────────────────
+function Sidebar({ user, section, onSection, open, onClose }) {
+  const puede = (p) => !p || user.permisos?.includes(p);
+  const initials = user.nombre.split(' ').slice(0,2).map(w => w[0]).join('').toUpperCase();
+
+  const logout = () => {
+    localStorage.removeItem('epm_token');
+    localStorage.removeItem('epm_user');
+    window.location.reload();
+  };
+
+  return (
+    <>
+      <div className={`sidebar-overlay ${open?'open':''}`} onClick={onClose} />
+      <nav className={`sidebar ${open?'open':''}`}>
+        <div className="sidebar-logo">
+          <h1>EPM</h1>
+          <p>{user.institucion_nombre}</p>
+        </div>
+        <div className="sidebar-nav">
+          {NAV.map(item => puede(item.permiso) ? (
+            <div key={item.id}
+              className={`nav-item ${section===item.id?'active':''}`}
+              onClick={() => { onSection(item.id); onClose(); }}>
+              <span className="nav-icon">{item.icon}</span>
+              <span>{item.label}</span>
+            </div>
+          ) : null)}
+        </div>
+        <div className="sidebar-user">
+          <div className="user-avatar">{initials}</div>
+          <div className="user-info">
+            <div className="user-name">{user.nombre}</div>
+            <div className="user-role">{user.rol_nombre}</div>
+          </div>
+          <button className="btn-logout" onClick={logout} title="Cerrar sesión">⎋</button>
+        </div>
+      </nav>
+    </>
+  );
+}
+
+// ── DASHBOARD ───────────────────────────────────────────────────────────────────
+function Dashboard({ user, onSection }) {
+  const puede = (p) => user.permisos?.includes(p);
+  const items = NAV.filter(n => n.id !== 'dashboard' && (!n.permiso || puede(n.permiso)));
+
+  return (
+    <div>
+      <div className="dash-welcome">
+        <h2>Bienvenido/a, {user.nombre.split(' ')[0]} 👋</h2>
+        <p>{user.institucion_nombre} · {user.rol_nombre}</p>
+      </div>
+      <div className="card">
+        <div className="card-title">🗂 Módulos disponibles</div>
+        <div className="modules-grid">
+          {items.map(item => (
+            <div key={item.id} className="module-card" onClick={() => onSection(item.id)}>
+              <div className="module-icon">{item.icon}</div>
+              <div className="module-label">{item.label}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── PLACEHOLDER ─────────────────────────────────────────────────────────────────
+function Placeholder({ id }) {
+  const item = NAV.find(n => n.id === id) || {};
+  return (
+    <div className="placeholder">
+      <div className="placeholder-icon">{item.icon}</div>
+      <div className="placeholder-title">{item.label}</div>
+      <div className="placeholder-sub">
+        Este módulo está siendo desarrollado y pronto vas a poder usarlo desde acá.
+      </div>
+      <span className="badge-wip">🚧 En construcción</span>
+    </div>
+  );
+}
+
+// ── MODAL IMPORTAR CSV ───────────────────────────────────────────────────────────
+function ModalImport({ cursos, onImportado, onClose }) {
+  const [fase,        setFase]       = useState('upload'); // upload | preview | done
+  const [filas,       setFilas]      = useState([]);
+  const [validas,     setValidas]    = useState([]);
+  const [errores,     setErrores]    = useState([]);
+  const [saving,      setSaving]     = useState(false);
+  const [resultado,   setResultado]  = useState(null);
+  const [dragOver,    setDragOver]   = useState(false);
+  const [parseErr,    setParseErr]   = useState('');
+
+  const procesar = (file) => {
+    if (!file) return;
+    if (!file.name.match(/\.csv$/i)) { setParseErr('El archivo debe ser .csv'); return; }
+    setParseErr('');
+    const reader = new FileReader();
+    reader.onload = ev => {
+      try {
+        const rows = parseCsv(ev.target.result);
+        if (!rows.length) { setParseErr('El archivo no tiene filas de datos.'); return; }
+        const dnis = rows.map(r=>r['DNI']?.trim()).filter(Boolean);
+        const proc = rows.map((r,i) => validarFilaCSV(r, cursos, dnis, i));
+        setFilas(proc);
+        setValidas(proc.filter(f=>f.ok));
+        setErrores(proc.filter(f=>!f.ok));
+        setFase('preview');
+      } catch(e) { setParseErr('Error al leer el archivo: '+e.message); }
+    };
+    reader.readAsText(file, 'UTF-8');
+  };
+
+  const importar = async () => {
+    setSaving(true); setParseErr('');
+    try {
+      const r = await apiFetch('/api/estudiantes/importar', {
+        method:'POST',
+        body:{ estudiantes: validas.map(f=>({
+          nombre:f.nombre, apellido:f.apellido, dni:f.dni,
+          cuit:f.cuit||null, fecha_nacimiento:f.fecha_nacimiento||null,
+          direccion:f.direccion||null, tutor_nombre:f.tutor_nombre||null,
+          tutor_dni:f.tutor_dni||null,
+          auth_imagen:f.auth_imagen, auth_general:f.auth_general, auth_boleto:f.auth_boleto,
+          curso_id:f.curso_id||null,
+        })) }
+      });
+      setResultado(r); setFase('done'); onImportado();
+    } catch(e) { setParseErr(e.message); }
+    finally { setSaving(false); }
+  };
+
+  const resumenCursos = {};
+  validas.forEach(f => { const k=f.curso_nombre||'(sin curso)'; resumenCursos[k]=(resumenCursos[k]||0)+1; });
+
+  return (
+    <div className="modal-overlay" onClick={e=>e.target===e.currentTarget&&onClose()}>
+      <div className="modal" style={{maxWidth:600}}>
+        <div className="modal-header">
+          <span className="modal-title">📥 Importar estudiantes desde CSV</span>
+          <button className="modal-close" onClick={onClose}>✕</button>
+        </div>
+
+        {fase==='upload' && (
+          <>
+            <p style={{fontSize:13,color:'var(--text2)',marginBottom:14,lineHeight:1.6}}>
+              Subí un CSV con los datos del plantel. Las columnas deben estar en el orden de la plantilla.
+              Los nombres de curso deben coincidir exactamente con los existentes en el sistema.
+            </p>
+            <button className="btn btn-secondary btn-auto" style={{marginBottom:14}}
+              onClick={descargarPlantilla}>
+              📄 Descargar plantilla CSV con ejemplos
+            </button>
+            {parseErr && <div className="alert alert-error">{parseErr}</div>}
+            <label className={`import-drop ${dragOver?'over':''}`}
+              onDragOver={e=>{e.preventDefault();setDragOver(true)}}
+              onDragLeave={()=>setDragOver(false)}
+              onDrop={e=>{e.preventDefault();setDragOver(false);procesar(e.dataTransfer.files[0])}}>
+              <div style={{fontSize:36}}>📂</div>
+              <p><strong>Tocá para elegir un archivo CSV</strong></p>
+              <p>o arrastrá el archivo aquí (desktop)</p>
+              <input type="file" accept=".csv,text/csv" hidden
+                onChange={e=>procesar(e.target.files[0])} />
+            </label>
+          </>
+        )}
+
+        {fase==='preview' && (
+          <>
+            {validas.length>0 && (
+              <div className="alert alert-success" style={{marginBottom:8}}>
+                ✅ <strong>{validas.length} estudiante(s)</strong> listos para importar.
+                {Object.entries(resumenCursos).map(([k,v])=>(
+                  <span key={k}> · {k}: {v}</span>
+                ))}
+              </div>
+            )}
+            {errores.length>0 && (
+              <div className="alert alert-error" style={{marginBottom:8}}>
+                ❌ <strong>{errores.length} fila(s) con errores</strong> — no se importarán.
+              </div>
+            )}
+            {parseErr && <div className="alert alert-error">{parseErr}</div>}
+
+            <div className="preview-scroll">
+              <table className="preview-table">
+                <thead>
+                  <tr><th>#</th><th>Apellido, Nombre</th><th>DNI</th><th>Curso</th><th>Estado</th></tr>
+                </thead>
+                <tbody>
+                  {filas.map(f=>(
+                    <tr key={f.idx} className={f.ok?'pr-ok':'pr-err'}>
+                      <td>{f.idx}</td>
+                      <td>{f.apellido}, {f.nombre}</td>
+                      <td>{f.dni}</td>
+                      <td>{f.curso_nombre||'—'}</td>
+                      <td>{f.ok ? '✅' : <span className="pr-error-msg">{f.errors.join(' · ')}</span>}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="modal-footer">
+              <button className="btn btn-secondary btn-auto"
+                onClick={()=>{setFase('upload');setParseErr('');}}>← Volver</button>
+              <button className="btn btn-primary btn-auto"
+                disabled={validas.length===0||saving} onClick={importar}>
+                {saving ? 'Importando…' : `💾 Importar ${validas.length} estudiante(s)`}
+              </button>
+            </div>
+          </>
+        )}
+
+        {fase==='done' && resultado && (
+          <div style={{textAlign:'center',padding:'20px 0'}}>
+            <div style={{fontSize:56,marginBottom:8}}>✅</div>
+            <h3 style={{fontSize:20,fontWeight:800,marginBottom:8}}>¡Importación completada!</h3>
+            <p style={{color:'var(--text2)'}}>{resultado.importados} estudiante(s) importados exitosamente.</p>
+            {resultado.errores?.length>0 && (
+              <div className="alert alert-warning" style={{marginTop:12,textAlign:'left'}}>
+                {resultado.errores.length} fila(s) no se importaron (DNI ya existente u otro error).
+                <ul style={{marginTop:6,paddingLeft:16,fontSize:12}}>
+                  {resultado.errores.map((e,i)=><li key={i}>DNI {e.dni}: {e.error}</li>)}
+                </ul>
+              </div>
+            )}
+            <button className="btn btn-primary btn-auto" style={{marginTop:16}} onClick={onClose}>
+              Cerrar
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── CALENDARIO DE ASISTENCIA (componente reutilizable) ──────────────────────────
+const MESES_ES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+const DIAS_ES  = ['L','M','M','J','V','S','D'];
+
+function CalendarioAsistencia({ estudianteId }) {
+  const hoy = new Date();
+  const [anio,  setAnio]  = useState(hoy.getFullYear());
+  const [mes,   setMes]   = useState(hoy.getMonth());
+  const [asis,  setAsis]  = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [selDay, setSelDay] = useState(null);
+
+  useEffect(() => {
+    if (!estudianteId) return;
+    const inicio = `${anio}-${String(mes+1).padStart(2,'0')}-01`;
+    const ultimo = new Date(anio, mes+1, 0).getDate();
+    const fin    = `${anio}-${String(mes+1).padStart(2,'0')}-${String(ultimo).padStart(2,'0')}`;
+    setLoading(true); setSelDay(null);
+    apiFetch(`/api/asistencias/estudiante/${estudianteId}?fecha_inicio=${inicio}&fecha_fin=${fin}`)
+      .then(setAsis).catch(()=>setAsis([]))
+      .finally(()=>setLoading(false));
+  }, [estudianteId, anio, mes]);
+
+  const prevMes = () => { if (mes===0){setAnio(a=>a-1);setMes(11);}else setMes(m=>m-1); };
+  const nextMes = () => {
+    const esActual = anio===hoy.getFullYear()&&mes>=hoy.getMonth();
+    if (!esActual) { if(mes===11){setAnio(a=>a+1);setMes(0);}else setMes(m=>m+1); }
+  };
+  const esFuturo = anio===hoy.getFullYear()&&mes>=hoy.getMonth();
+
+  // Mapa fecha → asistencia
+  const asMap = {};
+  asis.forEach(a => { asMap[a.fecha] = a; });
+
+  // Construir grilla del mes (lunes primero)
+  const firstDow  = new Date(anio, mes, 1).getDay();
+  const startPad  = (firstDow===0) ? 6 : firstDow-1;
+  const lastDay   = new Date(anio, mes+1, 0).getDate();
+  const days = [];
+  for (let i=0; i<startPad; i++) days.push(null);
+  for (let d=1; d<=lastDay; d++) {
+    const dateStr = `${anio}-${String(mes+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const dow = new Date(anio,mes,d).getDay();
+    days.push({ d, dateStr, isWeekend:dow===0||dow===6, a:asMap[dateStr]||null });
+  }
+  while (days.length%7!==0) days.push(null);
+
+  const pres  = asis.filter(a=>a.estado==='presente').length;
+  const aus   = asis.filter(a=>a.estado==='ausente').length;
+  const tard  = asis.filter(a=>a.estado==='tarde').length;
+  const total = pres+aus+tard;
+  const pct   = total>0 ? Math.round(pres/total*100) : null;
+
+  return (
+    <div>
+      {/* Navegación mes */}
+      <div className="cal-nav">
+        <button className="cal-nav-btn" onClick={prevMes}>←</button>
+        <span className="cal-month-label">{MESES_ES[mes]} {anio}</span>
+        <button className="cal-nav-btn" onClick={nextMes} disabled={esFuturo}>→</button>
+      </div>
+
+      {/* Resumen */}
+      {total>0 && (
+        <div className="cal-summary">
+          <div className="cal-sum-item"><div className="cal-sum-dot" style={{background:'#22c55e'}}/>✅ {pres}{pct!==null&&` (${pct}%)`}</div>
+          <div className="cal-sum-item"><div className="cal-sum-dot" style={{background:'#ef4444'}}/>❌ {aus}</div>
+          <div className="cal-sum-item"><div className="cal-sum-dot" style={{background:'#f59e0b'}}/>⏰ {tard}</div>
+        </div>
+      )}
+
+      {loading ? <div className="spinner" style={{padding:16}}><div className="spin"/></div> : (
+        <>
+          {/* Encabezados días */}
+          <div className="cal-header">
+            {DIAS_ES.map((d,i)=><div key={i} className="cal-dow">{d}</div>)}
+          </div>
+
+          {/* Grilla */}
+          <div className="cal-grid">
+            {days.map((cell,i) => {
+              if (!cell) return <div key={i} className="cal-cell cal-empty"/>;
+              const { d, dateStr, isWeekend, a } = cell;
+              const isSel = selDay?.dateStr===dateStr;
+
+              // Clases CSS
+              let cls = 'cal-cell';
+              if (isWeekend) cls += ' cal-weekend';
+              else if (a)    cls += ` cal-${a.estado}`;
+              else           cls += ' cal-nodata';
+              if (isSel)     cls += ' cal-selected';
+
+              // Inline style como respaldo — garantiza el color sin importar la cascada
+              const inlineStyle = {};
+              if (!isWeekend && a) {
+                if (a.estado==='presente') Object.assign(inlineStyle,{background:'#22c55e',borderColor:'#16a34a'});
+                if (a.estado==='ausente')  Object.assign(inlineStyle,{background:'#ef4444',borderColor:'#dc2626'});
+                if (a.estado==='tarde')    Object.assign(inlineStyle,{background:'#f59e0b',borderColor:'#d97706'});
+              }
+
+              const SIMBOLO = { presente:'✓', ausente:'✗', tarde:'~' };
+
+              return (
+                <div key={i} className={cls} style={inlineStyle}
+                  onClick={()=>{ if(!isWeekend) setSelDay(isSel?null:{...cell}); }}>
+                  <span className="cal-day-num" style={!isWeekend&&a?{color:'#fff',fontWeight:800}:{}}>{d}</span>
+                  {!isWeekend && a && <span className="cal-status">{SIMBOLO[a.estado]||''}</span>}
+                  {a?.observacion && <span className="cal-obs-dot" style={{color:'rgba(255,255,255,.8)'}}>●</span>}
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Detalle día seleccionado */}
+          {selDay && (
+            <div className="cal-obs-card">
+              <div className="cal-obs-fecha">
+                {new Date(selDay.dateStr+'T12:00').toLocaleDateString('es-AR',{weekday:'long',day:'numeric',month:'long'})}
+              </div>
+              {selDay.a ? (
+                <>
+                  <div style={{marginBottom:selDay.a.observacion?4:0}}>
+                    {selDay.a.estado==='presente'&&'✅ Presente'}
+                    {selDay.a.estado==='ausente'&&'❌ Ausente'}
+                    {selDay.a.estado==='tarde'&&'⏰ Tarde'}
+                  </div>
+                  {selDay.a.observacion&&<div style={{fontSize:12,color:'var(--text2)'}}>💬 {selDay.a.observacion}</div>}
+                </>
+              ) : (
+                <div style={{color:'var(--text2)'}}>Sin registro de asistencia este día.</div>
+              )}
+            </div>
+          )}
+
+          {total===0 && (
+            <div style={{textAlign:'center',padding:'16px 0',color:'var(--text2)',fontSize:13}}>
+              Sin registros en {MESES_ES[mes]} {anio}.
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+// ── LISTA DE ESTUDIANTES ────────────────────────────────────────────────────────
+function ListaEstudiantes({ user, onNuevo, onEditar }) {
+  const [cursos,      setCursos]      = useState([]);
+  const [cursoId,     setCursoId]     = useState('');
+  const [buscar,      setBuscar]      = useState('');
+  const [estudiantes, setEstudiantes] = useState([]);
+  const [loading,     setLoading]     = useState(true);
+  const [delTarget,   setDelTarget]   = useState(null);
+  const [toast,       setToast]       = useState({ type:'', text:'' });
+  // ── Selección y bulk
+  const [sel,         setSel]         = useState(new Set());
+  const [modalBulk,   setModalBulk]   = useState(false);
+  const [confirmBulk, setConfirmBulk] = useState(false);
+  const [bulkAuths,   setBulkAuths]   = useState({ auth_imagen:false, auth_general:false, auth_boleto:false });
+  const [bulkSaving,  setBulkSaving]  = useState(false);
+  const [modalImport, setModalImport] = useState(false);
+
+  const puede = (p) => user.permisos?.includes(p);
+  const showToast = (type, text) => { setToast({ type, text }); setTimeout(() => setToast({type:'',text:''}), 4000); };
+
+  useEffect(() => { apiFetch('/api/cursos').then(setCursos).catch(() => {}); }, []);
+
+  const cargar = useCallback(async () => {
+    setLoading(true);
+    try {
+      const p = new URLSearchParams();
+      if (cursoId)       p.set('curso_id', cursoId);
+      if (buscar.trim()) p.set('buscar', buscar.trim());
+      setEstudiantes(await apiFetch(`/api/estudiantes?${p}`));
+      setSel(new Set());
+    } catch (e) { showToast('error', e.message); }
+    finally { setLoading(false); }
+  }, [cursoId, buscar]);
+
+  useEffect(() => { const t = setTimeout(cargar, buscar ? 300 : 0); return () => clearTimeout(t); }, [cargar]);
+
+  const confirmarBaja = async () => {
+    try {
+      await apiFetch(`/api/estudiantes/${delTarget.id}`, { method:'DELETE' });
+      showToast('success', `${delTarget.apellido}, ${delTarget.nombre} fue dado de baja.`);
+      setDelTarget(null); cargar();
+    } catch (e) { showToast('error', e.message); }
+  };
+
+  const toggleSel = (id) => setSel(prev => { const s = new Set(prev); s.has(id) ? s.delete(id) : s.add(id); return s; });
+  const toggleTodos = () => setSel(sel.size === estudiantes.length ? new Set() : new Set(estudiantes.map(e => e.id)));
+
+  const exportarCSV = () => {
+    const target = sel.size > 0 ? estudiantes.filter(e => sel.has(e.id)) : estudiantes;
+    const rows = target.map(e => [
+      e.nombre, e.apellido, e.dni, e.cuit||'',
+      e.fecha_nacimiento ? e.fecha_nacimiento.split('-').reverse().join('/') : '',
+      e.direccion||'', e.tutor_nombre||'', e.tutor_dni||'',
+      e.auth_imagen?'sí':'no', e.auth_general?'sí':'no', e.auth_boleto?'sí':'no',
+      e.curso_nombre||'',
+    ]);
+    const csv  = [COLS_CSV,...rows].map(r=>r.map(v=>`"${String(v||'').replace(/"/g,'""')}"`).join(',')).join('\n');
+    const blob = new Blob(['﻿'+csv], {type:'text/csv;charset=utf-8;'});
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href = url;
+    const curso = cursoId ? (cursos.find(c=>String(c.id)===cursoId)?.nombre||'plantel') : 'plantel';
+    a.download = `EPM_${curso}_${new Date().toISOString().slice(0,10)}.csv`;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const aplicarBulk = async () => {
+    if (!bulkAuths.auth_imagen && !bulkAuths.auth_general && !bulkAuths.auth_boleto) return;
+    setBulkSaving(true);
+    try {
+      const r = await apiFetch('/api/estudiantes/bulk-autorizar', { method:'PUT', body:{ ids: [...sel], ...bulkAuths } });
+      showToast('success', `${r.actualizados} estudiante(s) actualizados.`);
+      setModalBulk(false); setConfirmBulk(false);
+      setSel(new Set()); setBulkAuths({ auth_imagen:false, auth_general:false, auth_boleto:false });
+      cargar();
+    } catch (e) { showToast('error', e.message); }
+    finally { setBulkSaving(false); }
+  };
+
+  const ini = (e) => `${e.nombre?.[0]||''}${e.apellido?.[0]||''}`.toUpperCase();
+  const nombresAuths = { auth_imagen:'Imagen', auth_general:'General', auth_boleto:'Boleto' };
+  const authsSeleccionadas = Object.entries(bulkAuths).filter(([,v])=>v).map(([k])=>nombresAuths[k]).join(', ');
+
+  return (
+    <div>
+      {toast.text && (
+        <div className={`alert alert-${toast.type}`} style={{cursor:'pointer'}} onClick={() => setToast({type:'',text:''})}>
+          {toast.text}
+        </div>
+      )}
+      <div className="card">
+        <div className="section-header">
+          <span className="card-title" style={{marginBottom:0}}>👥 Estudiantes</span>
+          <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
+            <button className="btn btn-secondary btn-auto" onClick={exportarCSV}>📤 Exportar CSV</button>
+            {puede('crear_estudiantes') && (<>
+              <button className="btn btn-secondary btn-auto" onClick={() => setModalImport(true)}>📥 Importar</button>
+              <button className="btn btn-primary btn-auto" onClick={() => onNuevo(cursoId||null)}>＋ Nueva ficha</button>
+            </>)}
+          </div>
+        </div>
+
+        <div className="curso-tabs">
+          <div className={`curso-tab ${!cursoId?'active':''}`} onClick={() => setCursoId('')}>Todos</div>
+          {cursos.map(c => (
+            <div key={c.id} className={`curso-tab ${String(cursoId)===String(c.id)?'active':''}`}
+              onClick={() => setCursoId(String(c.id))}>{c.nombre}</div>
+          ))}
+        </div>
+
+        <div className="form-group">
+          <input className="form-control" placeholder="🔍 Buscar por nombre, apellido o DNI…"
+            value={buscar} onChange={e => setBuscar(e.target.value)} />
+        </div>
+
+        {/* Barra de selección / bulk */}
+        {puede('editar_estudiantes') && !loading && estudiantes.length > 0 && (
+          <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:8}}>
+            <div className={`est-check ${sel.size===estudiantes.length&&estudiantes.length>0?'on':''}`}
+              onClick={toggleTodos} title="Seleccionar todos">
+              {sel.size===estudiantes.length&&estudiantes.length>0?'✓':''}
+            </div>
+            <span style={{fontSize:12,color:'var(--text2)'}}>
+              {sel.size > 0 ? `${sel.size} seleccionado(s)` : 'Seleccionar todos'}
+            </span>
+            {sel.size > 0 && (
+              <button className="btn btn-secondary btn-auto" style={{marginLeft:'auto'}}
+                onClick={() => setModalBulk(true)}>
+                ✅ Marcar autorizaciones ({sel.size})
+              </button>
+            )}
+          </div>
+        )}
+
+        {loading ? (
+          <div className="spinner"><div className="spin" /></div>
+        ) : estudiantes.length === 0 ? (
+          <div className="empty-state">
+            <div className="empty-state-icon">👥</div>
+            <p>{buscar ? 'Sin resultados para esa búsqueda.' : 'No hay estudiantes aquí todavía.'}</p>
+          </div>
+        ) : estudiantes.map(e => (
+          <div key={e.id} className={`est-row ${sel.has(e.id)?'sel':''}`}>
+            {puede('editar_estudiantes') && (
+              <div className={`est-check ${sel.has(e.id)?'on':''}`} onClick={() => toggleSel(e.id)}>
+                {sel.has(e.id)?'✓':''}
+              </div>
+            )}
+            <div className="est-avatar" style={{cursor:'pointer'}} onClick={() => onEditar(e.id)}>
+              {e.foto_path
+                ? <img src={e.foto_path} style={{width:'100%',height:'100%',objectFit:'cover',borderRadius:'inherit'}} />
+                : ini(e)}
+            </div>
+            <div style={{flex:1,minWidth:0,cursor:'pointer'}} onClick={() => onEditar(e.id)}>
+              <div className="est-nombre">{e.apellido}, {e.nombre}</div>
+              <div className="est-sub">DNI {e.dni}{e.curso_nombre ? ` · ${e.curso_nombre}` : ''}</div>
+            </div>
+            {!cursoId && e.curso_nombre && <span className="est-tag">{e.curso_nombre}</span>}
+            <div className="row-actions">
+              <button className="btn-icon" onClick={() => onEditar(e.id)} title="Editar ficha">✏️</button>
+              {puede('editar_estudiantes') && (
+                <button className="btn-icon btn-icon-danger" onClick={() => setDelTarget(e)} title="Dar de baja">🗑️</button>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Modal bulk autorizar */}
+      {modalBulk && (
+        <div className="modal-overlay" onClick={e => e.target===e.currentTarget && setModalBulk(false)}>
+          <div className="modal">
+            <div className="modal-header">
+              <span className="modal-title">✅ Marcar autorizaciones</span>
+              <button className="modal-close" onClick={() => setModalBulk(false)}>✕</button>
+            </div>
+            <p style={{marginBottom:12,fontSize:13,color:'var(--text2)'}}>
+              Se aplicará a <strong>{sel.size} estudiante(s)</strong>. Solo marca; no desmarca autorizaciones ya otorgadas.
+            </p>
+            <div className="auth-list">
+              {Object.entries(nombresAuths).map(([campo, label]) => (
+                <div key={campo} className={`auth-row ${bulkAuths[campo]?'on':''}`}
+                  onClick={() => setBulkAuths(prev => ({...prev, [campo]:!prev[campo]}))}>
+                  <div className="auth-check">{bulkAuths[campo]?'✓':''}</div>
+                  <div className="auth-label">Autorización de {label}</div>
+                </div>
+              ))}
+            </div>
+            <div className="modal-footer">
+              <button className="btn btn-secondary btn-auto" onClick={() => setModalBulk(false)}>Cancelar</button>
+              <button className="btn btn-primary btn-auto"
+                disabled={!bulkAuths.auth_imagen && !bulkAuths.auth_general && !bulkAuths.auth_boleto}
+                onClick={() => setConfirmBulk(true)}>Continuar →</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Confirmación bulk */}
+      {confirmBulk && (
+        <div className="modal-overlay">
+          <div className="modal">
+            <div className="modal-header">
+              <span className="modal-title">⚠️ Confirmar cambio masivo</span>
+            </div>
+            <div className="alert alert-warning">
+              Esto va a generar el siguiente cambio: se va a marcar como <strong>SÍ</strong> la autorización de&nbsp;
+              <strong>{authsSeleccionadas}</strong> en <strong>{sel.size} estudiante(s)</strong>.
+              Esta acción no puede deshacerse desde la interfaz.
+            </div>
+            <div className="modal-footer">
+              <button className="btn btn-secondary btn-auto" onClick={() => setConfirmBulk(false)}>Volver</button>
+              <button className="btn btn-primary btn-auto" onClick={aplicarBulk} disabled={bulkSaving}>
+                {bulkSaving ? 'Aplicando…' : 'Confirmar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {modalImport && (
+        <ModalImport
+          cursos={cursos}
+          onImportado={() => { cargar(); setSel(new Set()); }}
+          onClose={() => setModalImport(false)}
+        />
+      )}
+
+      {/* Modal baja */}
+      {delTarget && (
+        <div className="modal-overlay" onClick={e => e.target===e.currentTarget && setDelTarget(null)}>
+          <div className="modal">
+            <div className="modal-header">
+              <span className="modal-title">⚠️ Dar de baja al estudiante</span>
+              <button className="modal-close" onClick={() => setDelTarget(null)}>✕</button>
+            </div>
+            <p style={{marginBottom:12}}>Estudiante: <strong>{delTarget.apellido}, {delTarget.nombre}</strong></p>
+            <div className="alert alert-warning">
+              Esto va a generar el siguiente cambio: el estudiante quedará <strong>inactivo</strong> y no
+              aparecerá en los listados. Todos sus registros se conservan intactos.
+            </div>
+            <div className="modal-footer">
+              <button className="btn btn-secondary btn-auto" onClick={() => setDelTarget(null)}>Cancelar</button>
+              <button className="btn btn-danger btn-auto" onClick={confirmarBaja}>Confirmar baja</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── FICHA DE ESTUDIANTE ──────────────────────────────────────────────────────────
+const FORM_VACIO = {
+  nombre:'', apellido:'', dni:'', cuit:'', fecha_nacimiento:'',
+  tutor_nombre:'', tutor_dni:'', direccion:'', curso_id:'',
+  auth_imagen:false, auth_general:false, auth_boleto:false,
+};
+
+const AUTORIZACIONES = [
+  { campo:'auth_imagen',  label:'Autorización de Imagen',          sub:'Permite usar la imagen del estudiante en comunicaciones institucionales.' },
+  { campo:'auth_general', label:'Autorización General',            sub:'Autorización general para actividades y salidas escolares.' },
+  { campo:'auth_boleto',  label:'Autorización Boleto Estudiantil', sub:'Solicitud del beneficio de boleto estudiantil de transporte.' },
+];
+
+function Ficha({ user, estudianteId, cursoDefault, onClose, onGuardarYCargarOtro }) {
+  const isNew = !estudianteId;
+  const inicial = { ...FORM_VACIO, curso_id: cursoDefault || '' };
+  const [form,         setForm]        = useState(inicial);
+  const [savedForm,    setSavedForm]   = useState(inicial);
+  const [cursos,       setCursos]      = useState([]);
+  const [loading,      setLoading]     = useState(!isNew);
+  const [saving,       setSaving]      = useState(false);
+  const [error,        setError]       = useState('');
+  // ── Foto
+  const [fotoActual,   setFotoActual]  = useState(null);
+  const [fotoPend,     setFotoPend]    = useState(null);   // File object pendiente
+  const [fotoPreview,  setFotoPreview] = useState(null);   // DataURL local
+  const [fotoQuitada,  setFotoQuitada] = useState(false);
+
+  const puede = (p) => user.permisos?.includes(p);
+  const set = (f, v) => setForm(prev => ({ ...prev, [f]: v }));
+  const isDirty = JSON.stringify(form) !== JSON.stringify(savedForm) || !!fotoPend || fotoQuitada;
+
+  useEffect(() => {
+    apiFetch('/api/cursos').then(setCursos).catch(() => {});
+    if (!isNew) {
+      apiFetch(`/api/estudiantes/${estudianteId}`)
+        .then(data => {
+          const f = {
+            nombre:           data.nombre || '',
+            apellido:         data.apellido || '',
+            dni:              data.dni || '',
+            cuit:             data.cuit || '',
+            fecha_nacimiento: data.fecha_nacimiento || '',
+            direccion:        data.direccion || '',
+            tutor_nombre:     data.tutor_nombre || '',
+            tutor_dni:        data.tutor_dni || '',
+            curso_id:         data.curso_id ? String(data.curso_id) : '',
+            auth_imagen:      !!data.auth_imagen,
+            auth_general:     !!data.auth_general,
+            auth_boleto:      !!data.auth_boleto,
+          };
+          setForm(f); setSavedForm(f);
+          setFotoActual(data.foto_path || null);
+        })
+        .catch(e => setError(e.message))
+        .finally(() => setLoading(false));
+    }
+  }, []);
+
+  const handleClose = () => {
+    if (isDirty && !window.confirm('Hay cambios sin guardar. ¿Salir de todas formas?')) return;
+    onClose();
+  };
+
+  const onFotoSel = (file) => {
+    setFotoPend(file); setFotoQuitada(false);
+    const r = new FileReader(); r.onload = e => setFotoPreview(e.target.result); r.readAsDataURL(file);
+  };
+
+  const quitarFoto = () => {
+    setFotoPend(null); setFotoPreview(null);
+    if (fotoActual) setFotoQuitada(true);
+    setFotoActual(null);
+  };
+
+  const guardar = async (modo) => {
+    if (!form.nombre.trim() || !form.apellido.trim() || !form.dni.trim()) {
+      setError('Nombre, apellido y DNI son obligatorios.'); return;
+    }
+    setSaving(true); setError('');
+    try {
+      const body = {
+        ...form,
+        curso_id:     form.curso_id ? Number(form.curso_id) : null,
+        auth_imagen:  form.auth_imagen  ? 1 : 0,
+        auth_general: form.auth_general ? 1 : 0,
+        auth_boleto:  form.auth_boleto  ? 1 : 0,
+      };
+      let estId = estudianteId;
+      if (isNew) { const r = await apiFetch('/api/estudiantes', { method:'POST', body }); estId = r.id; }
+      else { await apiFetch(`/api/estudiantes/${estudianteId}`, { method:'PUT', body }); }
+
+      if (fotoQuitada && estId) {
+        await fetch(`/api/estudiantes/${estId}/foto`, { method:'DELETE', headers:{ Authorization:`Bearer ${getToken()}` } });
+      }
+      if (fotoPend && estId) {
+        await apiFotoUpload(estId, fotoPend);
+      }
+      setSavedForm(form); setFotoPend(null); setFotoQuitada(false);
+      modo === 'otro' ? onGuardarYCargarOtro(form.curso_id || null) : onClose();
+    } catch (e) { setError(e.message); }
+    finally { setSaving(false); }
+  };
+
+  const initials = [form.nombre?.[0], form.apellido?.[0]].filter(Boolean).join('').toUpperCase() || '?';
+  const fotoSrc  = fotoPreview || fotoActual;
+  const titulo   = isNew ? 'Nueva ficha' : (form.apellido || form.nombre) ? `${form.apellido}, ${form.nombre}` : 'Editando estudiante';
+
+  if (loading) return <div className="spinner"><div className="spin" /></div>;
+
+  return (
+    <div className="ficha-wrap">
+      {/* ── Header con avatar-foto ── */}
+      <div className="ficha-header">
+        <button className="btn btn-secondary btn-auto" style={{flexShrink:0}} onClick={handleClose}>← Lista</button>
+        <label className="foto-avatar-wrap" title={fotoSrc ? 'Cambiar foto' : 'Agregar foto'}>
+          {fotoSrc ? <img src={fotoSrc} alt="foto" /> : initials}
+          <input type="file" accept="image/*" hidden onChange={e => e.target.files[0] && onFotoSel(e.target.files[0])} />
+        </label>
+        <div className="ficha-meta">
+          <h2>{titulo}</h2>
+          <p>{isNew ? 'Ficha nueva · sin guardar' : `ID ${estudianteId}`}</p>
+          {fotoSrc
+            ? <button onClick={quitarFoto} style={{background:'none',border:'none',color:'var(--danger)',fontSize:11,cursor:'pointer',padding:0,marginTop:2}}>✕ Quitar foto</button>
+            : <span className="foto-hint">📷 Tocá el círculo para agregar foto</span>}
+        </div>
+      </div>
+
+      {isDirty && <div className="dirty-bar"><span>●</span> Cambios sin guardar</div>}
+      {error   && <div className="alert alert-error">{error}</div>}
+
+      {/* ── Identidad ── */}
+      <div className="ficha-section">
+        <div className="ficha-section-title">🪪 Identidad</div>
+        <div className="form-grid">
+          <div className="form-group" style={{marginBottom:0}}>
+            <label className="form-label">Nombre *</label>
+            <input className="form-control" value={form.nombre}
+              onChange={e => set('nombre', e.target.value)} placeholder="Juan" />
+          </div>
+          <div className="form-group" style={{marginBottom:0}}>
+            <label className="form-label">Apellido *</label>
+            <input className="form-control" value={form.apellido}
+              onChange={e => set('apellido', e.target.value)} placeholder="García" />
+          </div>
+          <div className="form-group" style={{marginBottom:0}}>
+            <label className="form-label">DNI *</label>
+            <input className="form-control" value={form.dni} inputMode="numeric"
+              onChange={e => set('dni', e.target.value)} placeholder="12345678" />
+          </div>
+          <div className="form-group" style={{marginBottom:0}}>
+            <label className="form-label">CUIT</label>
+            <input className="form-control" value={form.cuit}
+              onChange={e => set('cuit', e.target.value)} placeholder="20-12345678-9" />
+          </div>
+          <div className="form-group" style={{marginBottom:0}}>
+            <label className="form-label">Fecha de nacimiento</label>
+            <input className="form-control" type="date" value={form.fecha_nacimiento}
+              onChange={e => set('fecha_nacimiento', e.target.value)} />
+          </div>
+          <div className="form-group" style={{marginBottom:0}}>
+            <label className="form-label">Dirección</label>
+            <input className="form-control" value={form.direccion}
+              onChange={e => set('direccion', e.target.value)} placeholder="Av. Ejemplo 1234, Ciudad" />
+          </div>
+        </div>
+      </div>
+
+      {/* ── Familia / Tutor ── */}
+      <div className="ficha-section">
+        <div className="ficha-section-title">👨‍👩‍👧 Familia / Tutor</div>
+        <div className="form-grid">
+          <div className="form-group" style={{marginBottom:0}}>
+            <label className="form-label">Nombre del tutor</label>
+            <input className="form-control" value={form.tutor_nombre}
+              onChange={e => set('tutor_nombre', e.target.value)} placeholder="María García" />
+          </div>
+          <div className="form-group" style={{marginBottom:0}}>
+            <label className="form-label">DNI del tutor</label>
+            <input className="form-control" value={form.tutor_dni} inputMode="numeric"
+              onChange={e => set('tutor_dni', e.target.value)} placeholder="23456789" />
+          </div>
+        </div>
+      </div>
+
+      {/* ── Curso ── */}
+      <div className="ficha-section">
+        <div className="ficha-section-title">🏫 Curso</div>
+        <div className="form-group" style={{marginBottom:0}}>
+          <label className="form-label">Asignar a un curso</label>
+          <select className="form-control" value={form.curso_id}
+            onChange={e => set('curso_id', e.target.value)}>
+            <option value="">Sin curso asignado</option>
+            {cursos.map(c => <option key={c.id} value={String(c.id)}>{c.nombre}</option>)}
+          </select>
+        </div>
+      </div>
+
+      {/* ── Autorizaciones ── */}
+      <div className="ficha-section ficha-autorizaciones">
+        <div className="ficha-section-title">📋 Autorizaciones</div>
+        <div className="auth-list">
+          {AUTORIZACIONES.map(({ campo, label, sub }) => (
+            <div key={campo} className={`auth-row ${form[campo] ? 'on' : ''}`}
+              onClick={() => set(campo, !form[campo])}>
+              <div className="auth-check">{form[campo] ? '✓' : ''}</div>
+              <div>
+                <div className="auth-label">{label}</div>
+                <div className="auth-sub">{sub}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* ── Historial de asistencia (solo al editar) ── */}
+      {!isNew && (
+        <div className="ficha-section">
+          <div className="ficha-section-title">📊 Historial de asistencia</div>
+          <CalendarioAsistencia estudianteId={estudianteId} />
+        </div>
+      )}
+
+      {/* ── Footer ── */}
+      <div className="ficha-footer">
+        <button className="btn btn-secondary btn-auto" onClick={handleClose}>Cancelar</button>
+        {(isNew ? puede('crear_estudiantes') : puede('editar_estudiantes')) && (<>
+          {isNew && (
+            <button className="btn btn-secondary btn-auto" onClick={() => guardar('otro')} disabled={saving}>
+              {saving ? 'Guardando…' : '💾 Guardar y cargar otro'}
+            </button>
+          )}
+          <button className="btn btn-primary btn-auto" onClick={() => guardar('cerrar')} disabled={saving}>
+            {saving ? 'Guardando…' : '💾 Guardar y cerrar'}
+          </button>
+        </>)}
+      </div>
+    </div>
+  );
+}
+
+// ── ESTUDIANTES (contenedor) ──────────────────────────────────────────────────────
+function Estudiantes({ user }) {
+  const [view,         setView]         = useState('list');
+  const [fichaId,      setFichaId]      = useState(null);
+  const [fichaKey,     setFichaKey]     = useState(0);
+  const [cursoDefault, setCursoDefault] = useState(null);
+
+  const abrirNuevo  = (curso = null) => {
+    setFichaId(null); setCursoDefault(curso);
+    setFichaKey(k => k + 1); setView('ficha');
+  };
+  const abrirEditar = (id) => {
+    setFichaId(id); setCursoDefault(null);
+    setFichaKey(k => k + 1); setView('ficha');
+  };
+  const cargarOtro  = (curso) => {
+    setFichaId(null); setCursoDefault(curso);
+    setFichaKey(k => k + 1);
+    // se mantiene en 'ficha'; el cambio de key fuerza remount con form vacío
+  };
+
+  if (view === 'ficha') {
+    return (
+      <Ficha key={fichaKey} user={user}
+        estudianteId={fichaId} cursoDefault={cursoDefault}
+        onClose={() => setView('list')}
+        onGuardarYCargarOtro={cargarOtro}
+      />
+    );
+  }
+  return <ListaEstudiantes user={user} onNuevo={abrirNuevo} onEditar={abrirEditar} />;
+}
+
+// ── HISTORIAL DE ASISTENCIA (sección de Asistencias) ───────────────────────────
+function HistorialAsistencia({ user }) {
+  const [cursos,      setCursos]      = useState([]);
+  const [cursoId,     setCursoId]     = useState('');
+  const [estudiantes, setEstudiantes] = useState([]);
+  const [estId,       setEstId]       = useState('');
+  const [loadingEst,  setLoadingEst]  = useState(false);
+
+  useEffect(() => {
+    apiFetch('/api/cursos/mis-cursos')
+      .then(cs => { setCursos(cs); if (cs.length===1) setCursoId(String(cs[0].id)); })
+      .catch(()=>{});
+  }, []);
+
+  useEffect(() => {
+    if (!cursoId) { setEstudiantes([]); setEstId(''); return; }
+    setLoadingEst(true);
+    apiFetch(`/api/estudiantes?curso_id=${cursoId}`)
+      .then(es => { setEstudiantes(es); setEstId(es.length>0?String(es[0].id):''); })
+      .catch(()=>{})
+      .finally(()=>setLoadingEst(false));
+  }, [cursoId]);
+
+  const estActual = estudiantes.find(e=>String(e.id)===estId);
+
+  return (
+    <div>
+      <div className="card" style={{marginBottom:14}}>
+        <div className="card-title" style={{marginBottom:12}}>📊 Historial de asistencia</div>
+        <div className="form-grid">
+          <div className="form-group" style={{marginBottom:0}}>
+            <label className="form-label">Curso</label>
+            <select className="form-control" value={cursoId} onChange={e=>{setCursoId(e.target.value);setEstId('');}}>
+              <option value="">-- Seleccionar --</option>
+              {cursos.map(c=><option key={c.id} value={String(c.id)}>{c.nombre}</option>)}
+            </select>
+          </div>
+          <div className="form-group" style={{marginBottom:0}}>
+            <label className="form-label">Estudiante</label>
+            <select className="form-control" value={estId} onChange={e=>setEstId(e.target.value)}
+              disabled={!cursoId||loadingEst}>
+              <option value="">-- Seleccionar --</option>
+              {estudiantes.map(e=><option key={e.id} value={String(e.id)}>{e.apellido}, {e.nombre}</option>)}
+            </select>
+          </div>
+        </div>
+      </div>
+
+      {estId ? (
+        <div className="card">
+          <div className="card-title" style={{marginBottom:12}}>
+            {estActual && `${estActual.apellido}, ${estActual.nombre}`}
+          </div>
+          <CalendarioAsistencia estudianteId={Number(estId)} />
+        </div>
+      ) : cursoId ? (
+        <div className="empty-state">
+          <div className="empty-state-icon">📊</div>
+          <p>Seleccioná un estudiante para ver su historial.</p>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+// ── VISTA ASISTENCIAS (contenedor con tabs) ──────────────────────────────────────
+function AsistenciasView({ user }) {
+  const [tab, setTab] = useState('tomar');
+  return (
+    <div>
+      <div className="curso-tabs" style={{marginBottom:16}}>
+        <div className={`curso-tab ${tab==='tomar'?'active':''}`} onClick={()=>setTab('tomar')}>📋 Tomar asistencia</div>
+        <div className={`curso-tab ${tab==='historial'?'active':''}`} onClick={()=>setTab('historial')}>📊 Historial</div>
+      </div>
+      {tab==='tomar' ? <TomarAsistencia user={user} /> : <HistorialAsistencia user={user} />}
+    </div>
+  );
+}
+
+// ── TOMAR ASISTENCIA ────────────────────────────────────────────────────────────
+function TomarAsistencia({ user }) {
+  const hoy = (() => {
+    const d = new Date();
+    return [d.getFullYear(), String(d.getMonth()+1).padStart(2,'0'), String(d.getDate()).padStart(2,'0')].join('-');
+  })();
+
+  const [cursos,      setCursos]      = useState([]);
+  const [cursoId,     setCursoId]     = useState('');
+  const [fecha,       setFecha]       = useState(hoy);
+  const [estudiantes, setEstudiantes] = useState([]);
+  const [asis,        setAsis]        = useState({});  // { id: { estado, observacion } }
+  const [existente,   setExistente]   = useState(false);
+  const [loading,     setLoading]     = useState(false);
+  const [saving,      setSaving]      = useState(false);
+  const [saved,       setSaved]       = useState(false);
+  const [error,       setError]       = useState('');
+
+  const puede = (p) => user.permisos?.includes(p);
+
+  useEffect(() => {
+    apiFetch('/api/cursos/mis-cursos')
+      .then(cs => {
+        setCursos(cs);
+        if (cs.length === 1) setCursoId(String(cs[0].id));
+      })
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    if (!cursoId || !fecha) return;
+    setSaved(false); setError('');
+    const load = async () => {
+      setLoading(true);
+      try {
+        const [ests, existentes] = await Promise.all([
+          apiFetch(`/api/estudiantes?curso_id=${cursoId}`),
+          apiFetch(`/api/asistencias?curso_id=${cursoId}&fecha=${fecha}`),
+        ]);
+        setEstudiantes(ests);
+        const map = {};
+        existentes.forEach(a => { map[a.estudiante_id] = { estado: a.estado, observacion: a.observacion || '' }; });
+        const init = {};
+        ests.forEach(e => { init[e.id] = map[e.id] || { estado: '', observacion: '' }; });
+        setAsis(init);
+        setExistente(existentes.length > 0);
+      } catch (e) { setError(e.message); }
+      finally { setLoading(false); }
+    };
+    load();
+  }, [cursoId, fecha]);
+
+  const setEst = (id, estado) => setAsis(prev => ({ ...prev, [id]: { ...prev[id], estado } }));
+  const setObs = (id, obs)    => setAsis(prev => ({ ...prev, [id]: { ...prev[id], observacion: obs } }));
+  const marcarTodos = (estado) => {
+    const next = {};
+    estudiantes.forEach(e => { next[e.id] = { ...asis[e.id], estado }; });
+    setAsis(next);
+  };
+
+  const guardar = async () => {
+    const items = estudiantes
+      .filter(e => asis[e.id]?.estado)
+      .map(e => ({ estudiante_id: e.id, estado: asis[e.id].estado, observacion: asis[e.id].observacion || '' }));
+
+    if (items.length === 0) { setError('Seleccioná el estado de al menos un estudiante.'); return; }
+
+    const sinMarcar = estudiantes.filter(e => !asis[e.id]?.estado).length;
+    if (sinMarcar > 0 && !window.confirm(`Quedan ${sinMarcar} estudiante(s) sin marcar. ¿Guardar igual?`)) return;
+
+    setSaving(true); setError('');
+    try {
+      await apiFetch('/api/asistencias/bulk', {
+        method: 'POST',
+        body: { curso_id: Number(cursoId), fecha, asistencias: items }
+      });
+      setSaved(true); setExistente(true);
+    } catch (e) { setError(e.message); }
+    finally { setSaving(false); }
+  };
+
+  const stats = { presente: 0, ausente: 0, tarde: 0, sin: 0 };
+  estudiantes.forEach(e => {
+    const est = asis[e.id]?.estado;
+    if      (est === 'presente') stats.presente++;
+    else if (est === 'ausente')  stats.ausente++;
+    else if (est === 'tarde')    stats.tarde++;
+    else                         stats.sin++;
+  });
+
+  const cursoNombre = cursos.find(c => String(c.id) === cursoId)?.nombre || '';
+  const fechaStr = fecha
+    ? new Date(fecha + 'T12:00').toLocaleDateString('es-AR', { weekday:'long', day:'numeric', month:'long' })
+    : '';
+
+  return (
+    <div>
+      {/* ── Selector de curso y fecha ── */}
+      <div className="card" style={{marginBottom:14}}>
+        <div className="card-title" style={{marginBottom:12}}>📋 Tomar Asistencia</div>
+        <div className="form-grid">
+          <div className="form-group" style={{marginBottom:0}}>
+            <label className="form-label">Curso</label>
+            <select className="form-control" value={cursoId} onChange={e => setCursoId(e.target.value)}>
+              <option value="">-- Seleccionar --</option>
+              {cursos.map(c => <option key={c.id} value={String(c.id)}>{c.nombre}</option>)}
+            </select>
+          </div>
+          <div className="form-group" style={{marginBottom:0}}>
+            <label className="form-label">Fecha</label>
+            <input className="form-control" type="date" value={fecha}
+              onChange={e => setFecha(e.target.value)} />
+          </div>
+        </div>
+        {cursoId && fecha && !loading && (
+          <p style={{fontSize:12, color:'var(--text2)', marginTop:8}}>
+            {cursoNombre} · {fechaStr}
+          </p>
+        )}
+        {!puede('cargar_asistencias') && cursos.length === 0 && (
+          <p style={{fontSize:13, color:'var(--text2)', marginTop:10}}>
+            No tenés cursos asignados. Pedile a un administrador que te asigne cursos.
+          </p>
+        )}
+      </div>
+
+      {error && <div className="alert alert-error" onClick={() => setError('')} style={{cursor:'pointer'}}>{error}</div>}
+
+      {!cursoId ? null : loading ? (
+        <div className="spinner"><div className="spin" /></div>
+      ) : saved ? (
+        <div className="asis-success">
+          <div style={{fontSize:56, marginBottom:8}}>✅</div>
+          <h3>¡Asistencia guardada!</h3>
+          <p style={{marginTop:6, opacity:.9}}>{cursoNombre} · {fechaStr}</p>
+          <p style={{marginTop:4, opacity:.85, fontSize:13}}>
+            {stats.presente} presentes · {stats.ausente} ausentes · {stats.tarde} tardes
+          </p>
+          <button className="btn btn-secondary btn-auto" style={{marginTop:20}}
+            onClick={() => setSaved(false)}>
+            ← Seguir editando
+          </button>
+        </div>
+      ) : (
+        <>
+          {existente && (
+            <div className="alert alert-warning">
+              ✏️ Ya existe asistencia para este día. Editándola.
+            </div>
+          )}
+
+          {estudiantes.length > 0 && (
+            <div className="asis-counter">
+              <span style={{color:'var(--success)'}}>✅ {stats.presente}</span>
+              <span style={{color:'var(--danger)'}}>❌ {stats.ausente}</span>
+              <span style={{color:'#3b82f6'}}>⏰ {stats.tarde}</span>
+              {stats.sin > 0 && <span style={{color:'var(--text2)'}}>○ {stats.sin} sin marcar</span>}
+              <button style={{marginLeft:'auto', background:'none', border:'none',
+                color:'var(--primary)', fontWeight:700, fontSize:12, cursor:'pointer', padding:0}}
+                onClick={() => marcarTodos('presente')}>
+                Todos presentes →
+              </button>
+            </div>
+          )}
+
+          {estudiantes.length === 0 ? (
+            <div className="empty-state">
+              <div className="empty-state-icon">👥</div>
+              <p>No hay estudiantes en este curso.</p>
+            </div>
+          ) : (
+            <>
+              {estudiantes.map(e => {
+                const a = asis[e.id] || { estado: '', observacion: '' };
+                return (
+                  <div key={e.id} className={`asis-row ${a.estado ? 'asis-row-'+a.estado : ''}`}>
+                    <div className="asis-nombre">{e.apellido}, {e.nombre}</div>
+                    <div className="asis-btns">
+                      <button className={`asis-btn asis-presente ${a.estado==='presente'?'sel':''}`}
+                        onClick={() => setEst(e.id, 'presente')}>✅ Presente</button>
+                      <button className={`asis-btn asis-ausente ${a.estado==='ausente'?'sel':''}`}
+                        onClick={() => setEst(e.id, 'ausente')}>❌ Ausente</button>
+                      <button className={`asis-btn asis-tarde ${a.estado==='tarde'?'sel':''}`}
+                        onClick={() => setEst(e.id, 'tarde')}>⏰ Tarde</button>
+                    </div>
+                    {(a.estado === 'ausente' || a.estado === 'tarde' || a.observacion) && (
+                      <input className="asis-obs" placeholder="Observación opcional…"
+                        value={a.observacion}
+                        onChange={ev => setObs(e.id, ev.target.value)} />
+                    )}
+                  </div>
+                );
+              })}
+
+              {puede('cargar_asistencias') && (
+                <button className="btn btn-primary" style={{marginTop:16, padding:'16px', fontSize:15}}
+                  onClick={guardar} disabled={saving}>
+                  {saving ? 'Guardando…' : `💾 Guardar asistencia · ${cursoNombre}`}
+                </button>
+              )}
+            </>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+// ── GRÁFICO DE TORTA (SVG nativo, sin dependencias externas) ────────────────────
+// Colores: verde=Presente, rojo=Ausente, amarillo=Tarde
+// FUTURO: cuando se implemente asistencia por materia (UNSAM), reutilizar este
+// componente pasando los totales por materia: <PieChart presencias={} ausencias={} tardes={} />
+function PieChart({ presencias, ausencias, tardes, size = 80 }) {
+  const data = [
+    { v: presencias, color: '#22c55e' },
+    { v: ausencias,  color: '#ef4444' },
+    { v: tardes,     color: '#f59e0b' },
+  ];
+  const total = data.reduce((s, d) => s + d.v, 0);
+  const cx = size / 2, cy = size / 2, r = size / 2 - 2;
+
+  if (total === 0) {
+    return (
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{display:'block',flexShrink:0}}>
+        <circle cx={cx} cy={cy} r={r} fill="var(--bg3)" stroke="var(--border)" strokeWidth={1.5} />
+        <text x={cx} y={cy} textAnchor="middle" dy="0.35em" fontSize={Math.round(size*0.2)} fill="var(--text2)">—</text>
+      </svg>
+    );
+  }
+
+  const activos = data.filter(d => d.v > 0);
+  // Caso especial: un solo segmento → círculo completo
+  if (activos.length === 1) {
+    return (
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{display:'block',flexShrink:0}}>
+        <circle cx={cx} cy={cy} r={r} fill={activos[0].color} />
+      </svg>
+    );
+  }
+
+  let angle = -Math.PI / 2;
+  const paths = activos.map(d => {
+    const sweep = (d.v / total) * 2 * Math.PI;
+    const ea = angle + sweep;
+    const x1 = cx + r * Math.cos(angle), y1 = cy + r * Math.sin(angle);
+    const x2 = cx + r * Math.cos(ea),    y2 = cy + r * Math.sin(ea);
+    const la = sweep > Math.PI ? 1 : 0;
+    const path = `M${cx},${cy}L${x1.toFixed(3)},${y1.toFixed(3)}A${r},${r},0,${la},1,${x2.toFixed(3)},${y2.toFixed(3)}Z`;
+    angle = ea;
+    return { path, color: d.color };
+  });
+
+  return (
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{display:'block',flexShrink:0}}>
+      {paths.map((p, i) => (
+        <path key={i} d={p.path} fill={p.color} stroke="#fff" strokeWidth={1.5} />
+      ))}
+    </svg>
+  );
+}
+
+// ── REPORTES DE ASISTENCIA ───────────────────────────────────────────────────────
+function Reportes({ user }) {
+  const [ciclos,     setCiclos]     = useState([]);
+  const [cursos,     setCursos]     = useState([]);
+  const [modo,       setModo]       = useState('semestre');
+  const [semActivo,  setSemActivo]  = useState(null);
+  const [fechaIni,   setFechaIni]   = useState('');
+  const [fechaFin,   setFechaFin]   = useState('');
+  const [cursoId,    setCursoId]    = useState('');
+  const [reporte,    setReporte]    = useState(null);
+  const [loading,    setLoading]    = useState(false);
+  const [sortCol,    setSortCol]    = useState('apellido');
+  const [sortDir,    setSortDir]    = useState('asc');
+  const [editSem,    setEditSem]    = useState(null);
+  const [editForm,   setEditForm]   = useState({ fecha_inicio:'', fecha_fin:'' });
+  const [editSaving, setEditSaving] = useState(false);
+  const [error,      setError]      = useState('');
+  const [toast,      setToast]      = useState({ type:'', text:'' });
+
+  const puede = (p) => user.permisos?.includes(p);
+  const showToast = (type, text) => { setToast({type,text}); setTimeout(()=>setToast({type:'',text:''}),4000); };
+
+  useEffect(() => {
+    Promise.all([apiFetch('/api/cursos'), apiFetch('/api/periodos/ciclos')])
+      .then(([cs, cl]) => {
+        setCursos(cs); setCiclos(cl);
+        const sem1 = cl[0]?.semestres?.find(s => s.numero === 1);
+        if (sem1) { setSemActivo(sem1); setFechaIni(sem1.fecha_inicio); setFechaFin(sem1.fecha_fin); }
+      }).catch(() => {});
+  }, []);
+
+  const selSemestre = (sem) => {
+    setSemActivo(sem); setFechaIni(sem.fecha_inicio); setFechaFin(sem.fecha_fin);
+    setModo('semestre'); setReporte(null);
+  };
+
+  const toggleSort = (col) => {
+    if (sortCol === col) setSortDir(d => d==='asc'?'desc':'asc');
+    else { setSortCol(col); setSortDir('asc'); }
+  };
+
+  const cargarReporte = async () => {
+    if (!fechaIni || !fechaFin) { setError('Seleccioná un semestre o ingresá un rango de fechas.'); return; }
+    setLoading(true); setError('');
+    try {
+      const p = new URLSearchParams({ fecha_inicio: fechaIni, fecha_fin: fechaFin });
+      if (cursoId) p.set('curso_id', cursoId);
+      setReporte(await apiFetch(`/api/reportes/asistencia?${p}`));
+    } catch(e) { setError(e.message); }
+    finally { setLoading(false); }
+  };
+
+  const guardarSemestre = async () => {
+    setEditSaving(true);
+    try {
+      await apiFetch(`/api/periodos/semestres/${editSem.id}`, { method:'PUT', body: editForm });
+      const cl = await apiFetch('/api/periodos/ciclos');
+      setCiclos(cl);
+      if (semActivo?.id === editSem.id) {
+        setFechaIni(editForm.fecha_inicio); setFechaFin(editForm.fecha_fin);
+        setSemActivo(s => ({...s, ...editForm}));
+      }
+      setEditSem(null); showToast('success', 'Fechas del semestre actualizadas.'); setReporte(null);
+    } catch(e) { showToast('error', e.message); }
+    finally { setEditSaving(false); }
+  };
+
+  const est = reporte?.estudiantes || [];
+  const sorted = [...est].sort((a, b) => {
+    let av = sortCol==='apellido' ? `${a.apellido} ${a.nombre}` : a[sortCol];
+    let bv = sortCol==='apellido' ? `${b.apellido} ${b.nombre}` : b[sortCol];
+    if (sortCol==='porcentaje') { av = av??-1; bv = bv??-1; }
+    if (typeof av==='string') return sortDir==='asc' ? av.localeCompare(bv,'es') : bv.localeCompare(av,'es');
+    return sortDir==='asc' ? (av??0)-(bv??0) : (bv??0)-(av??0);
+  });
+
+  const conDatos = est.filter(e=>e.total_registros>0);
+  const promedio = conDatos.length
+    ? Math.round(conDatos.reduce((s,e)=>s+(e.porcentaje??0),0)/conDatos.length)
+    : null;
+  const alerta3   = est.filter(e=>e.ausencias>=3).length;
+  const totalPres = est.reduce((s,e) => s+e.presencias, 0);
+  const totalAus  = est.reduce((s,e) => s+e.ausencias,  0);
+  const totalTard = est.reduce((s,e) => s+e.tardes,     0);
+  const totalReg  = totalPres + totalAus + totalTard;
+  const allSems   = ciclos.flatMap(c=>c.semestres||[]);
+
+  const periodoLabel = modo==='semestre'&&semActivo
+    ? `${ciclos.find(c=>c.semestres?.some(s=>s.id===semActivo.id))?.nombre||''} · ${semActivo.nombre}`
+    : (fechaIni&&fechaFin ? `${fechaIni} al ${fechaFin}` : '');
+  const cursoLabel = cursoId ? (cursos.find(c=>String(c.id)===cursoId)?.nombre||'') : 'Todos los cursos';
+
+  const exportarCSV = () => {
+    if (!sorted.length) return;
+    const heads = ['Apellido','Nombre','Curso','Presencias','Ausencias','Tardes','Días','% Asistencia'];
+    const rows  = sorted.map(e=>[
+      e.apellido, e.nombre, e.curso_nombre||'',
+      e.presencias, e.ausencias, e.tardes, e.total_registros,
+      e.porcentaje!==null ? e.porcentaje+'%' : 'Sin datos',
+    ]);
+    const csv  = [heads,...rows].map(r=>r.map(v=>`"${String(v||'').replace(/"/g,'""')}"`).join(',')).join('\n');
+    const blob = new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8;'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `EPM_asistencia_${fechaIni}_${fechaFin}.csv`;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  };
+
+  const SortTh = ({col, label}) => (
+    <th className="rpt-th" onClick={()=>toggleSort(col)}>
+      {label}{sortCol===col && <span style={{marginLeft:4,fontSize:10}}>{sortDir==='asc'?'▲':'▼'}</span>}
+    </th>
+  );
+  const PctBadge = ({pct}) => {
+    if (pct===null) return <span style={{color:'var(--text2)',fontSize:12}}>—</span>;
+    return <span className={`pct-badge ${pct>=90?'pct-alta':pct>=75?'pct-media':'pct-baja'}`}>{pct}%</span>;
+  };
+
+  return (
+    <div>
+      {toast.text && <div className={`alert alert-${toast.type} no-print`} style={{cursor:'pointer'}} onClick={()=>setToast({type:'',text:''})}>{toast.text}</div>}
+
+      {/* ── Panel de control ── */}
+      <div className="card no-print" style={{marginBottom:14}}>
+        <div className="card-title" style={{marginBottom:12}}>📊 Reporte de Asistencia</div>
+
+        <div style={{marginBottom:14}}>
+          <div className="form-label">Período</div>
+          <div style={{display:'flex',gap:6,flexWrap:'wrap',marginBottom:8}}>
+            {allSems.map(s => (
+              <button key={s.id}
+                className={`curso-tab ${semActivo?.id===s.id&&modo==='semestre'?'active':''}`}
+                style={{display:'flex',alignItems:'center',gap:6}}
+                onClick={() => selSemestre(s)}>
+                <span>{s.nombre}</span>
+                <span style={{fontSize:10,opacity:.65}}>{s.fecha_inicio} → {s.fecha_fin}</span>
+                {puede('editar_reportes') && (
+                  <span style={{fontSize:12}} title="Editar fechas"
+                    onClick={e=>{e.stopPropagation();setEditSem(s);setEditForm({fecha_inicio:s.fecha_inicio,fecha_fin:s.fecha_fin});}}>
+                    ✏️
+                  </span>
+                )}
+              </button>
+            ))}
+            <button className={`curso-tab ${modo==='rango'?'active':''}`}
+              onClick={()=>{setModo('rango');setSemActivo(null);setReporte(null);}}>
+              Rango personalizado
+            </button>
+          </div>
+          {modo==='rango' && (
+            <div className="form-grid">
+              <div className="form-group" style={{marginBottom:0}}>
+                <label className="form-label">Desde</label>
+                <input className="form-control" type="date" value={fechaIni}
+                  onChange={e=>{setFechaIni(e.target.value);setReporte(null);}} />
+              </div>
+              <div className="form-group" style={{marginBottom:0}}>
+                <label className="form-label">Hasta</label>
+                <input className="form-control" type="date" value={fechaFin}
+                  onChange={e=>{setFechaFin(e.target.value);setReporte(null);}} />
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="form-group" style={{marginBottom:12}}>
+          <label className="form-label">Curso</label>
+          <select className="form-control" value={cursoId}
+            onChange={e=>{setCursoId(e.target.value);setReporte(null);}}>
+            <option value="">Todos los cursos</option>
+            {cursos.map(c=><option key={c.id} value={String(c.id)}>{c.nombre}</option>)}
+          </select>
+        </div>
+
+        {error && <div className="alert alert-error">{error}</div>}
+        <button className="btn btn-primary" onClick={cargarReporte} disabled={loading}>
+          {loading ? 'Generando…' : '📊 Generar reporte'}
+        </button>
+      </div>
+
+      {loading && <div className="spinner"><div className="spin" /></div>}
+
+      {reporte && !loading && (
+        <>
+          {/* Header visible solo al imprimir */}
+          <div className="print-header">
+            <h2 style={{fontSize:18,fontWeight:800,marginBottom:4}}>EPM – Reporte de Asistencia</h2>
+            <p style={{fontSize:12,color:'#666'}}>{periodoLabel} · {cursoLabel} · {new Date().toLocaleDateString('es-AR')}</p>
+            {reporte.dias_registrados>0 && <p style={{fontSize:12,color:'#666'}}>Días de clase registrados: {reporte.dias_registrados}</p>}
+          </div>
+
+          {/* Stats */}
+          <div className="report-stats no-print">
+            <div className="rstat">
+              <div className="rstat-value">{est.length}</div>
+              <div className="rstat-label">Estudiantes</div>
+            </div>
+            <div className="rstat">
+              <div className="rstat-value">{reporte.dias_registrados}</div>
+              <div className="rstat-label">Días registrados</div>
+            </div>
+            <div className={`rstat ${promedio!==null&&promedio<75?'rstat-danger':promedio!==null&&promedio<90?'rstat-alert':''}`}>
+              <div className="rstat-value">{promedio!==null?promedio+'%':'—'}</div>
+              <div className="rstat-label">Promedio asistencia</div>
+            </div>
+            <div className={`rstat ${alerta3>0?'rstat-alert':''}`}>
+              <div className="rstat-value">{alerta3}</div>
+              <div className="rstat-label">Con 3+ ausencias ⚠️</div>
+            </div>
+          </div>
+
+          {/* Torta general del curso */}
+          {totalReg > 0 && (
+            <div className="card no-print pie-wrap" style={{marginBottom:14,padding:'16px 20px'}}>
+              <PieChart presencias={totalPres} ausencias={totalAus} tardes={totalTard} size={110} />
+              <div>
+                <div className="form-label" style={{marginBottom:10}}>
+                  Distribución total del período · {sorted.length} estudiantes
+                </div>
+                <div className="pie-legend">
+                  <span style={{color:'#22c55e',fontSize:18,lineHeight:1}}>●</span>
+                  Presencias: <strong>{totalPres}</strong>
+                  <span style={{color:'var(--text2)',fontSize:12}}>({Math.round(totalPres/totalReg*100)}%)</span>
+                </div>
+                <div className="pie-legend">
+                  <span style={{color:'#ef4444',fontSize:18,lineHeight:1}}>●</span>
+                  Ausencias: <strong>{totalAus}</strong>
+                  <span style={{color:'var(--text2)',fontSize:12}}>({Math.round(totalAus/totalReg*100)}%)</span>
+                </div>
+                <div className="pie-legend">
+                  <span style={{color:'#f59e0b',fontSize:18,lineHeight:1}}>●</span>
+                  Tardes: <strong>{totalTard}</strong>
+                  <span style={{color:'var(--text2)',fontSize:12}}>({Math.round(totalTard/totalReg*100)}%)</span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Acciones */}
+          <div className="no-print" style={{display:'flex',gap:8,marginBottom:14,flexWrap:'wrap',alignItems:'center'}}>
+            <button className="btn btn-secondary btn-auto" onClick={exportarCSV}>📤 Exportar CSV</button>
+            <button className="btn btn-secondary btn-auto" onClick={()=>window.print()}>🖨️ Imprimir</button>
+            <span style={{fontSize:12,color:'var(--text2)'}}>
+              {sorted.length} est. · {periodoLabel} · {cursoLabel}
+            </span>
+          </div>
+
+          {/* Tabla */}
+          {sorted.length===0 ? (
+            <div className="empty-state">
+              <div className="empty-state-icon">📊</div>
+              <p>No hay estudiantes para mostrar con esos filtros.</p>
+            </div>
+          ) : (
+            <div className="card" style={{padding:0,overflow:'hidden'}}>
+              <div style={{overflowX:'auto'}}>
+                <table className="rpt-table">
+                  <thead>
+                    <tr>
+                      <SortTh col="apellido"        label="Estudiante" />
+                      {!cursoId && <SortTh col="curso_nombre" label="Curso" />}
+                      <SortTh col="presencias"      label="✅ Pres." />
+                      <SortTh col="ausencias"       label="❌ Aus." />
+                      <SortTh col="tardes"          label="⏰ Tarde" />
+                      <SortTh col="total_registros" label="Días" />
+                      <SortTh col="porcentaje"      label="% Asist." />
+                      <th className="rpt-th" style={{textAlign:'center'}}>Dist.</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {sorted.map(e => (
+                      <tr key={e.id} className={e.ausencias>=3?'rpt-row-alerta':''}>
+                        <td className="rpt-nombre">
+                          {e.apellido}, {e.nombre}
+                          {e.total_registros===0 && <span className="rpt-sin-datos">sin datos</span>}
+                        </td>
+                        {!cursoId && <td className="rpt-td">{e.curso_nombre||'—'}</td>}
+                        <td className="rpt-td rpt-num">{e.presencias}</td>
+                        <td className={`rpt-td rpt-num ${e.ausencias>=3?'rpt-aus-alta':e.ausencias>0?'rpt-aus-media':''}`}>
+                          {e.ausencias}
+                        </td>
+                        <td className="rpt-td rpt-num">{e.tardes}</td>
+                        <td className="rpt-td rpt-num">{e.total_registros}</td>
+                        <td className="rpt-td"><PctBadge pct={e.porcentaje} /></td>
+                        <td className="rpt-td" style={{padding:'4px 8px',textAlign:'center'}}>
+                          <PieChart presencias={e.presencias} ausencias={e.ausencias} tardes={e.tardes} size={44} />
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </>
+      )}
+
+      {/* Modal editar semestre */}
+      {editSem && (
+        <div className="modal-overlay" onClick={e=>e.target===e.currentTarget&&setEditSem(null)}>
+          <div className="modal">
+            <div className="modal-header">
+              <span className="modal-title">✏️ Editar fechas: {editSem.nombre}</span>
+              <button className="modal-close" onClick={()=>setEditSem(null)}>✕</button>
+            </div>
+            <div className="form-grid">
+              <div className="form-group" style={{marginBottom:0}}>
+                <label className="form-label">Fecha de inicio</label>
+                <input className="form-control" type="date" value={editForm.fecha_inicio}
+                  onChange={e=>setEditForm(f=>({...f,fecha_inicio:e.target.value}))} />
+              </div>
+              <div className="form-group" style={{marginBottom:0}}>
+                <label className="form-label">Fecha de fin</label>
+                <input className="form-control" type="date" value={editForm.fecha_fin}
+                  onChange={e=>setEditForm(f=>({...f,fecha_fin:e.target.value}))} />
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button className="btn btn-secondary btn-auto" onClick={()=>setEditSem(null)}>Cancelar</button>
+              <button className="btn btn-primary btn-auto" onClick={guardarSemestre} disabled={editSaving}>
+                {editSaving?'Guardando…':'Guardar fechas'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── GESTIÓN DE USUARIOS ─────────────────────────────────────────────────────────
+function GestionUsuarios({ self }) {
+  const [usuarios,setUsuarios]= useState([]);
+  const [cursos,  setCursos]  = useState([]);
+  const [roles,   setRoles]   = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [modal,   setModal]   = useState(null); // null|'form'|'password'|'delete'
+  const [target,  setTarget]  = useState(null);
+  const [form,    setForm]    = useState({ nombre:'', email:'', password:'', rol_id:'', cursos:[] });
+  const [pwForm,  setPwForm]  = useState({ password:'', confirm:'' });
+  const [saving,  setSaving]  = useState(false);
+  const [formErr, setFormErr] = useState('');
+  const [toast,   setToast]   = useState({ type:'', text:'' });
+
+  const showToast = (t,m) => { setToast({type:t,text:m}); setTimeout(()=>setToast({type:'',text:''}),4000); };
+  const ini = n => n.split(' ').slice(0,2).map(w=>w[0]||'').join('').toUpperCase();
+  const isNew = !target;
+
+  const cargar = async () => {
+    setLoading(true);
+    try {
+      const [us,cs,rs] = await Promise.all([
+        apiFetch('/api/usuarios'), apiFetch('/api/cursos'), apiFetch('/api/roles')
+      ]);
+      setUsuarios(us); setCursos(cs); setRoles(rs);
+    } catch(e) { showToast('error', e.message); }
+    finally { setLoading(false); }
+  };
+  useEffect(() => { cargar(); }, []);
+
+  const abrirNuevo = () => {
+    setTarget(null);
+    setForm({ nombre:'', email:'', password:'', rol_id: String(roles[0]?.id||''), cursos:[] });
+    setFormErr(''); setModal('form');
+  };
+  const abrirEditar = u => {
+    setTarget(u);
+    setForm({ nombre:u.nombre, email:u.email, password:'', rol_id:String(u.rol_id), cursos:(u.cursos||[]).map(c=>c.id) });
+    setFormErr(''); setModal('form');
+  };
+  const abrirPassword = u => { setTarget(u); setPwForm({password:'',confirm:''}); setFormErr(''); setModal('password'); };
+  const abrirDelete   = u => { setTarget(u); setModal('delete'); };
+  const cerrar = () => setModal(null);
+
+  const toggleCurso = id => setForm(f => ({
+    ...f, cursos: f.cursos.includes(id) ? f.cursos.filter(c=>c!==id) : [...f.cursos, id]
+  }));
+
+  const guardarUsuario = async () => {
+    if (!form.nombre.trim()||!form.email.trim()||!form.rol_id) { setFormErr('Nombre, email y rol son requeridos.'); return; }
+    if (isNew && !form.password) { setFormErr('Contraseña requerida.'); return; }
+    if (isNew && form.password.length<6) { setFormErr('Contraseña: mínimo 6 caracteres.'); return; }
+    setSaving(true); setFormErr('');
+    try {
+      let uid;
+      if (isNew) {
+        const r = await apiFetch('/api/usuarios', { method:'POST', body:{ nombre:form.nombre, email:form.email, password:form.password, rol_id:Number(form.rol_id) } });
+        uid = r.id;
+      } else {
+        await apiFetch(`/api/usuarios/${target.id}`, { method:'PUT', body:{ nombre:form.nombre, email:form.email, rol_id:Number(form.rol_id) } });
+        uid = target.id;
+      }
+      await apiFetch(`/api/usuarios/${uid}/cursos`, { method:'PUT', body:{ cursos: form.cursos } });
+      showToast('success', isNew ? `Usuario "${form.nombre}" creado.` : `"${form.nombre}" actualizado.`);
+      cerrar(); cargar();
+    } catch(e) { setFormErr(e.message); }
+    finally { setSaving(false); }
+  };
+
+  const cambiarPassword = async () => {
+    if (!pwForm.password || pwForm.password.length<6) { setFormErr('Mínimo 6 caracteres.'); return; }
+    if (pwForm.password!==pwForm.confirm) { setFormErr('Las contraseñas no coinciden.'); return; }
+    setSaving(true); setFormErr('');
+    try {
+      await apiFetch(`/api/usuarios/${target.id}/password`, { method:'PUT', body:{ password:pwForm.password } });
+      showToast('success', 'Contraseña actualizada.'); cerrar();
+    } catch(e) { setFormErr(e.message); }
+    finally { setSaving(false); }
+  };
+
+  const eliminarUsuario = async () => {
+    setSaving(true);
+    try {
+      await apiFetch(`/api/usuarios/${target.id}`, { method:'DELETE' });
+      showToast('success', `"${target.nombre}" dado de baja.`); cerrar(); cargar();
+    } catch(e) { showToast('error', e.message); cerrar(); }
+    finally { setSaving(false); }
+  };
+
+  return (
+    <div>
+      {toast.text && <div className={`alert alert-${toast.type}`} style={{cursor:'pointer'}} onClick={()=>setToast({type:'',text:''})}>{toast.text}</div>}
+      <div className="card">
+        <div className="section-header">
+          <span className="card-title" style={{marginBottom:0}}>👤 Usuarios</span>
+          <button className="btn btn-primary btn-auto" onClick={abrirNuevo}>＋ Nuevo usuario</button>
+        </div>
+        {loading ? <div className="spinner"><div className="spin"/></div>
+        : usuarios.length===0 ? <div className="empty-state"><div className="empty-state-icon">👤</div><p>Sin usuarios.</p></div>
+        : usuarios.map(u => (
+          <div key={u.id} className="usr-row">
+            <div className="usr-avatar">{ini(u.nombre)}</div>
+            <div style={{flex:1,minWidth:0}}>
+              <div className="usr-nombre">
+                {u.nombre}{u.id===self.id && <span className="usr-self">yo</span>}
+              </div>
+              <div className="usr-meta">
+                {u.email} · <span className="rol-badge">{u.rol_nombre}</span>
+                {u.cursos?.length>0 && <span style={{marginLeft:4}}>{u.cursos.length} curso(s)</span>}
+              </div>
+            </div>
+            <div className="row-actions">
+              <button className="btn-icon" onClick={()=>abrirEditar(u)} title="Editar">✏️</button>
+              <button className="btn-icon" onClick={()=>abrirPassword(u)} title="Contraseña">🔑</button>
+              <button className="btn-icon btn-icon-danger" onClick={()=>abrirDelete(u)}
+                disabled={u.id===self.id} style={{opacity:u.id===self.id?.35:1}}
+                title={u.id===self.id?'No podés darte de baja a vos mismo':'Dar de baja'}>🗑️</button>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Modal form usuario */}
+      {modal==='form' && (
+        <div className="modal-overlay" onClick={e=>e.target===e.currentTarget&&cerrar()}>
+          <div className="modal" style={{maxWidth:520}}>
+            <div className="modal-header">
+              <span className="modal-title">{isNew?'Nuevo usuario':'Editar usuario'}</span>
+              <button className="modal-close" onClick={cerrar}>✕</button>
+            </div>
+            {formErr && <div className="alert alert-error">{formErr}</div>}
+            <div className="form-group">
+              <label className="form-label">Nombre *</label>
+              <input className="form-control" value={form.nombre} onChange={e=>setForm(f=>({...f,nombre:e.target.value}))} placeholder="Ana González" />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Email *</label>
+              <input className="form-control" type="email" value={form.email} onChange={e=>setForm(f=>({...f,email:e.target.value}))} placeholder="ana@epm.edu.ar" />
+            </div>
+            {isNew && (
+              <div className="form-group">
+                <label className="form-label">Contraseña * (mín. 6 caracteres)</label>
+                <input className="form-control" type="password" value={form.password} onChange={e=>setForm(f=>({...f,password:e.target.value}))} placeholder="••••••" />
+              </div>
+            )}
+            <div className="form-group">
+              <label className="form-label">Rol *</label>
+              <select className="form-control" value={form.rol_id} onChange={e=>setForm(f=>({...f,rol_id:e.target.value}))}>
+                <option value="">Seleccionar…</option>
+                {roles.map(r=><option key={r.id} value={String(r.id)}>{r.nombre}</option>)}
+              </select>
+            </div>
+            {cursos.length>0 && (
+              <div className="form-group" style={{marginBottom:0}}>
+                <label className="form-label">Cursos asignados (visibles en Tomar Asistencia)</label>
+                <div className="auth-list">
+                  {cursos.map(c => {
+                    const on = form.cursos.includes(c.id);
+                    return (
+                      <div key={c.id} className={`auth-row ${on?'on':''}`} onClick={()=>toggleCurso(c.id)} style={{padding:'10px 14px'}}>
+                        <div className={`auth-check ${on?'on':''}`}>{on?'✓':''}</div>
+                        <div className="auth-label" style={{fontSize:14}}>{c.nombre}</div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+            <div className="modal-footer">
+              <button className="btn btn-secondary btn-auto" onClick={cerrar}>Cancelar</button>
+              <button className="btn btn-primary btn-auto" onClick={guardarUsuario} disabled={saving}>
+                {saving?'Guardando…':isNew?'Crear usuario':'Guardar cambios'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal contraseña */}
+      {modal==='password' && target && (
+        <div className="modal-overlay" onClick={e=>e.target===e.currentTarget&&cerrar()}>
+          <div className="modal">
+            <div className="modal-header">
+              <span className="modal-title">🔑 Cambiar contraseña</span>
+              <button className="modal-close" onClick={cerrar}>✕</button>
+            </div>
+            <p style={{marginBottom:12,fontSize:13}}>Usuario: <strong>{target.nombre}</strong></p>
+            {formErr && <div className="alert alert-error">{formErr}</div>}
+            <div className="form-group">
+              <label className="form-label">Nueva contraseña (mín. 6 caracteres)</label>
+              <input className="form-control" type="password" value={pwForm.password} onChange={e=>setPwForm(f=>({...f,password:e.target.value}))} placeholder="••••••" />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Confirmar contraseña</label>
+              <input className="form-control" type="password" value={pwForm.confirm} onChange={e=>setPwForm(f=>({...f,confirm:e.target.value}))} placeholder="••••••" />
+            </div>
+            <div className="modal-footer">
+              <button className="btn btn-secondary btn-auto" onClick={cerrar}>Cancelar</button>
+              <button className="btn btn-primary btn-auto" onClick={cambiarPassword} disabled={saving}>
+                {saving?'Guardando…':'Cambiar contraseña'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal confirmar baja */}
+      {modal==='delete' && target && (
+        <div className="modal-overlay" onClick={e=>e.target===e.currentTarget&&cerrar()}>
+          <div className="modal">
+            <div className="modal-header">
+              <span className="modal-title">⚠️ Dar de baja al usuario</span>
+              <button className="modal-close" onClick={cerrar}>✕</button>
+            </div>
+            <p style={{marginBottom:12}}>Usuario: <strong>{target.nombre}</strong></p>
+            <div className="alert alert-warning">
+              Esto va a generar el siguiente cambio: <strong>{target.nombre}</strong> quedará inactivo y
+              no podrá acceder al sistema. Sus registros (asistencias cargadas, etc.) se conservan intactos.
+            </div>
+            <div className="modal-footer">
+              <button className="btn btn-secondary btn-auto" onClick={cerrar}>Cancelar</button>
+              <button className="btn btn-danger btn-auto" onClick={eliminarUsuario} disabled={saving}>
+                {saving?'Procesando…':'Confirmar baja'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── GESTIÓN DE ROLES Y PERMISOS ──────────────────────────────────────────────────
+const GRUPOS_PERM = [
+  { key:'estudiantes',    label:'👥 Estudiantes' },
+  { key:'asistencias',   label:'📋 Asistencias' },
+  { key:'reportes',      label:'📊 Reportes' },
+  { key:'planificaciones',label:'📝 Planificaciones' },
+  { key:'administracion',label:'⚙️ Administración' },
+];
+
+function GestionRoles() {
+  const [roles,    setRoles]    = useState([]);
+  const [permisos, setPermisos] = useState([]);
+  const [loading,  setLoading]  = useState(true);
+  const [expanded, setExpanded] = useState(null);
+  const [pending,  setPending]  = useState({});   // { rolId: Set<codigo> }
+  const [confirm,  setConfirm]  = useState(null); // { rol, codes }
+  const [saving,   setSaving]   = useState(false);
+  const [modalNuevo, setModalNuevo] = useState(false);
+  const [nuevoForm,  setNuevoForm]  = useState({ nombre:'', descripcion:'' });
+  const [delConfirm, setDelConfirm] = useState(null);
+  const [toast,    setToast]    = useState({ type:'', text:'' });
+
+  const showToast = (t,m) => { setToast({type:t,text:m}); setTimeout(()=>setToast({type:'',text:''}),4000); };
+
+  const cargar = async () => {
+    setLoading(true);
+    try {
+      const [rs,ps] = await Promise.all([apiFetch('/api/roles'), apiFetch('/api/roles/permisos')]);
+      setRoles(rs); setPermisos(ps);
+    } catch(e) { showToast('error', e.message); }
+    finally { setLoading(false); }
+  };
+  useEffect(() => { cargar(); }, []);
+
+  const toggleExpand = rolId => {
+    setExpanded(e => e===rolId ? null : rolId);
+    if (!pending[rolId]) {
+      const rol = roles.find(r=>r.id===rolId);
+      if (rol) setPending(p => ({...p, [rolId]: new Set(rol.permisos)}));
+    }
+  };
+
+  const togglePerm = (rolId, codigo) => {
+    setPending(p => {
+      const s = new Set(p[rolId]||[]);
+      s.has(codigo) ? s.delete(codigo) : s.add(codigo);
+      return {...p, [rolId]: s};
+    });
+  };
+
+  const hayCambios = rolId => {
+    const rol = roles.find(r=>r.id===rolId);
+    if (!rol || !pending[rolId]) return false;
+    const saved = new Set(rol.permisos), curr = pending[rolId];
+    if (saved.size!==curr.size) return true;
+    for (const c of saved) if (!curr.has(c)) return true;
+    return false;
+  };
+
+  const guardarPermisos = async () => {
+    setSaving(true);
+    try {
+      await apiFetch(`/api/roles/${confirm.rol.id}/permisos`, { method:'PUT', body:{ permisos: confirm.codes } });
+      showToast('success', `Permisos de "${confirm.rol.nombre}" actualizados.`);
+      setConfirm(null); await cargar();
+    } catch(e) { showToast('error', e.message); setConfirm(null); }
+    finally { setSaving(false); }
+  };
+
+  const crearRol = async () => {
+    if (!nuevoForm.nombre.trim()) return;
+    setSaving(true);
+    try {
+      await apiFetch('/api/roles', { method:'POST', body: nuevoForm });
+      showToast('success', `Rol "${nuevoForm.nombre}" creado.`);
+      setModalNuevo(false); setNuevoForm({nombre:'',descripcion:''}); await cargar();
+    } catch(e) { showToast('error', e.message); }
+    finally { setSaving(false); }
+  };
+
+  const eliminarRol = async () => {
+    setSaving(true);
+    try {
+      await apiFetch(`/api/roles/${delConfirm.id}`, { method:'DELETE' });
+      showToast('success', `Rol "${delConfirm.nombre}" eliminado.`);
+      setDelConfirm(null); await cargar();
+    } catch(e) { showToast('error', e.message); setDelConfirm(null); }
+    finally { setSaving(false); }
+  };
+
+  if (loading) return <div className="spinner"><div className="spin"/></div>;
+
+  return (
+    <div>
+      {toast.text && <div className={`alert alert-${toast.type}`} style={{cursor:'pointer'}} onClick={()=>setToast({type:'',text:''})}>{toast.text}</div>}
+
+      <div className="section-header" style={{marginBottom:12}}>
+        <span style={{fontWeight:700,fontSize:15}}>🔑 Roles y Permisos</span>
+        <button className="btn btn-primary btn-auto" onClick={()=>setModalNuevo(true)}>＋ Nuevo rol</button>
+      </div>
+
+      {roles.map(rol => {
+        const isOpen  = expanded===rol.id;
+        const pend    = pending[rol.id] || new Set(rol.permisos);
+        const cambios = hayCambios(rol.id);
+
+        return (
+          <div key={rol.id}>
+            <div className={`role-header ${isOpen?'open':''}`} onClick={()=>toggleExpand(rol.id)}>
+              <span style={{flex:1,fontWeight:700,fontSize:15}}>{rol.nombre}</span>
+              {rol.es_sistema===1 && <span className="role-sistema">sistema</span>}
+              <span style={{fontSize:12,color:'var(--text2)',flexShrink:0}}>{rol.usuarios_count} usuario(s)</span>
+              {!rol.es_sistema && (
+                <button className="btn-icon btn-icon-danger" style={{padding:'3px 8px',fontSize:13}}
+                  onClick={e=>{e.stopPropagation();setDelConfirm(rol);}}>🗑️</button>
+              )}
+              <span style={{fontSize:11,color:'var(--text2)'}}>{isOpen?'▲':'▼'}</span>
+            </div>
+
+            {isOpen && (
+              <div className="role-body">
+                {GRUPOS_PERM.map(g => {
+                  const gPerms = permisos.filter(p=>p.grupo===g.key);
+                  return (
+                    <div key={g.key} className="perm-group">
+                      <div className="perm-group-title">{g.label}</div>
+                      <div className="perm-grid">
+                        {gPerms.map(p => {
+                          const on = pend.has(p.codigo);
+                          return (
+                            <div key={p.codigo} className={`perm-item ${on?'on':''}`}
+                              onClick={()=>togglePerm(rol.id, p.codigo)}>
+                              <div className={`perm-chk ${on?'on':''}`}>{on?'✓':''}</div>
+                              <span className="perm-desc">{p.descripcion}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+
+                {cambios ? (
+                  <button className="btn btn-primary" style={{marginTop:4}} onClick={()=>setConfirm({rol, codes:[...pend]})}>
+                    Guardar permisos de "{rol.nombre}"
+                  </button>
+                ) : (
+                  <p style={{fontSize:12,color:'var(--text2)',marginTop:4}}>Sin cambios pendientes.</p>
+                )}
+              </div>
+            )}
+          </div>
+        );
+      })}
+
+      {/* Confirmar permisos */}
+      {confirm && (
+        <div className="modal-overlay" onClick={e=>e.target===e.currentTarget&&setConfirm(null)}>
+          <div className="modal">
+            <div className="modal-header">
+              <span className="modal-title">⚠️ Confirmar cambio de permisos</span>
+              <button className="modal-close" onClick={()=>setConfirm(null)}>✕</button>
+            </div>
+            <div className="alert alert-warning" style={{lineHeight:1.6}}>
+              Esto va a generar el siguiente cambio: el rol <strong>"{confirm.rol.nombre}"</strong> tendrá
+              <strong> {confirm.codes.length}</strong> permiso(s) habilitado(s).
+              Afecta a <strong>{confirm.rol.usuarios_count}</strong> usuario(s) con este rol
+              (deben volver a iniciar sesión para que el cambio surta efecto).
+            </div>
+            <div className="modal-footer">
+              <button className="btn btn-secondary btn-auto" onClick={()=>setConfirm(null)}>Cancelar</button>
+              <button className="btn btn-primary btn-auto" onClick={guardarPermisos} disabled={saving}>
+                {saving?'Guardando…':'Confirmar cambio'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Eliminar rol */}
+      {delConfirm && (
+        <div className="modal-overlay" onClick={e=>e.target===e.currentTarget&&setDelConfirm(null)}>
+          <div className="modal">
+            <div className="modal-header">
+              <span className="modal-title">⚠️ Eliminar rol</span>
+              <button className="modal-close" onClick={()=>setDelConfirm(null)}>✕</button>
+            </div>
+            <p style={{marginBottom:12}}>Rol: <strong>{delConfirm.nombre}</strong></p>
+            <div className="alert alert-warning">
+              Esto va a generar el siguiente cambio: el rol "{delConfirm.nombre}" será
+              eliminado permanentemente. Solo se puede eliminar si no tiene usuarios asignados.
+            </div>
+            <div className="modal-footer">
+              <button className="btn btn-secondary btn-auto" onClick={()=>setDelConfirm(null)}>Cancelar</button>
+              <button className="btn btn-danger btn-auto" onClick={eliminarRol} disabled={saving}>
+                {saving?'Eliminando…':'Eliminar rol'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Nuevo rol */}
+      {modalNuevo && (
+        <div className="modal-overlay" onClick={e=>e.target===e.currentTarget&&setModalNuevo(false)}>
+          <div className="modal">
+            <div className="modal-header">
+              <span className="modal-title">Nuevo rol</span>
+              <button className="modal-close" onClick={()=>setModalNuevo(false)}>✕</button>
+            </div>
+            <div className="form-group">
+              <label className="form-label">Nombre del rol *</label>
+              <input className="form-control" value={nuevoForm.nombre} autoFocus
+                onChange={e=>setNuevoForm(f=>({...f,nombre:e.target.value}))} placeholder="Ej: Preceptor" />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Descripción</label>
+              <input className="form-control" value={nuevoForm.descripcion}
+                onChange={e=>setNuevoForm(f=>({...f,descripcion:e.target.value}))} placeholder="Opcional" />
+            </div>
+            <div className="modal-footer">
+              <button className="btn btn-secondary btn-auto" onClick={()=>setModalNuevo(false)}>Cancelar</button>
+              <button className="btn btn-primary btn-auto" onClick={crearRol} disabled={saving||!nuevoForm.nombre.trim()}>
+                {saving?'Creando…':'Crear rol'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── USUARIOS Y ROLES (contenedor con tabs) ───────────────────────────────────────
+function UsuariosYRoles({ user }) {
+  const [tab, setTab] = useState('usuarios');
+  return (
+    <div>
+      <div className="curso-tabs" style={{marginBottom:16}}>
+        <div className={`curso-tab ${tab==='usuarios'?'active':''}`} onClick={()=>setTab('usuarios')}>👤 Usuarios</div>
+        <div className={`curso-tab ${tab==='roles'?'active':''}`}   onClick={()=>setTab('roles')}>🔑 Roles y Permisos</div>
+      </div>
+      {tab==='usuarios'
+        ? <GestionUsuarios self={user} />
+        : <GestionRoles />}
+    </div>
+  );
+}
+
+// ── GESTIÓN PERÍODOS DE PLANIFICACIÓN ───────────────────────────────────────────
+function GestionPeriodosPlani() {
+  const [periodos,setPeriodos]= useState([]);
+  const [loading, setLoading] = useState(true);
+  const [modal,   setModal]   = useState(null);
+  const [target,  setTarget]  = useState(null);
+  const [form,    setForm]    = useState({ nombre:'', fecha_inicio:'', fecha_fin:'' });
+  const [saving,  setSaving]  = useState(false);
+  const [formErr, setFormErr] = useState('');
+  const [toast,   setToast]   = useState({ type:'', text:'' });
+
+  const showToast=(t,m)=>{ setToast({type:t,text:m}); setTimeout(()=>setToast({type:'',text:''}),4000); };
+  const cargar = async () => {
+    setLoading(true);
+    try { setPeriodos(await apiFetch('/api/periodos/planificacion')); }
+    catch(e) { showToast('error', e.message); }
+    finally { setLoading(false); }
+  };
+  useEffect(() => { cargar(); }, []);
+
+  const abrirNuevo  = ()  => { setTarget(null); setForm({nombre:'',fecha_inicio:'',fecha_fin:''}); setFormErr(''); setModal('form'); };
+  const abrirEditar = p   => { setTarget(p); setForm({nombre:p.nombre,fecha_inicio:p.fecha_inicio,fecha_fin:p.fecha_fin}); setFormErr(''); setModal('form'); };
+  const cerrar = () => setModal(null);
+
+  const guardar = async () => {
+    if (!form.nombre.trim()||!form.fecha_inicio||!form.fecha_fin) { setFormErr('Todos los campos son requeridos.'); return; }
+    if (form.fecha_inicio>=form.fecha_fin) { setFormErr('La fecha de inicio debe ser anterior al fin.'); return; }
+    setSaving(true); setFormErr('');
+    try {
+      if (!target) {
+        await apiFetch('/api/periodos/planificacion', { method:'POST', body:form });
+        showToast('success', `Período "${form.nombre}" creado.`);
+      } else {
+        await apiFetch(`/api/periodos/planificacion/${target.id}`, { method:'PUT', body:form });
+        showToast('success', `Período "${form.nombre}" actualizado.`);
+      }
+      cerrar(); cargar();
+    } catch(e) { setFormErr(e.message); }
+    finally { setSaving(false); }
+  };
+
+  const eliminar = async () => {
+    setSaving(true);
+    try {
+      await apiFetch(`/api/periodos/planificacion/${target.id}`, { method:'DELETE' });
+      showToast('success', 'Período eliminado.'); cerrar(); cargar();
+    } catch(e) { showToast('error', e.message); cerrar(); }
+    finally { setSaving(false); }
+  };
+
+  return (
+    <div>
+      {toast.text && <div className={`alert alert-${toast.type}`} style={{cursor:'pointer'}} onClick={()=>setToast({type:'',text:''})}>{toast.text}</div>}
+      <div className="card">
+        <div className="section-header">
+          <span className="card-title" style={{marginBottom:0}}>📅 Períodos de Planificación</span>
+          <button className="btn btn-primary btn-auto" onClick={abrirNuevo}>＋ Nuevo período</button>
+        </div>
+        {loading ? <div className="spinner"><div className="spin"/></div>
+        : periodos.length===0 ? <div className="empty-state"><div className="empty-state-icon">📅</div><p>No hay períodos todavía. Creá uno para empezar.</p></div>
+        : periodos.map(p => (
+          <div key={p.id} className="list-row">
+            <div style={{flex:1}}>
+              <div className="list-row-label">{p.nombre}</div>
+              <div style={{fontSize:11,color:'var(--text2)',marginTop:2}}>{p.fecha_inicio} → {p.fecha_fin}</div>
+            </div>
+            <div className="row-actions">
+              <button className="btn-icon" onClick={()=>abrirEditar(p)}>✏️</button>
+              <button className="btn-icon btn-icon-danger" onClick={()=>{setTarget(p);setModal('delete');}}>🗑️</button>
+            </div>
+          </div>
+        ))}
+      </div>
+      {modal==='form' && (
+        <div className="modal-overlay" onClick={e=>e.target===e.currentTarget&&cerrar()}>
+          <div className="modal">
+            <div className="modal-header">
+              <span className="modal-title">{!target?'Nuevo período':'Editar período'}</span>
+              <button className="modal-close" onClick={cerrar}>✕</button>
+            </div>
+            {formErr && <div className="alert alert-error">{formErr}</div>}
+            <div className="form-group">
+              <label className="form-label">Nombre *</label>
+              <input className="form-control" value={form.nombre} autoFocus onChange={e=>setForm(f=>({...f,nombre:e.target.value}))} placeholder="Ej: 1er Cuatrimestre" />
+            </div>
+            <div className="form-grid">
+              <div className="form-group" style={{marginBottom:0}}>
+                <label className="form-label">Fecha de inicio *</label>
+                <input className="form-control" type="date" value={form.fecha_inicio} onChange={e=>setForm(f=>({...f,fecha_inicio:e.target.value}))} />
+              </div>
+              <div className="form-group" style={{marginBottom:0}}>
+                <label className="form-label">Fecha de fin *</label>
+                <input className="form-control" type="date" value={form.fecha_fin} onChange={e=>setForm(f=>({...f,fecha_fin:e.target.value}))} />
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button className="btn btn-secondary btn-auto" onClick={cerrar}>Cancelar</button>
+              <button className="btn btn-primary btn-auto" onClick={guardar} disabled={saving}>
+                {saving?'Guardando…':!target?'Crear período':'Guardar cambios'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {modal==='delete' && target && (
+        <div className="modal-overlay" onClick={e=>e.target===e.currentTarget&&cerrar()}>
+          <div className="modal">
+            <div className="modal-header">
+              <span className="modal-title">⚠️ Eliminar período</span>
+              <button className="modal-close" onClick={cerrar}>✕</button>
+            </div>
+            <p style={{marginBottom:12}}>Período: <strong>{target.nombre}</strong></p>
+            <div className="alert alert-warning">Solo se puede eliminar si no tiene planificaciones asociadas.</div>
+            <div className="modal-footer">
+              <button className="btn btn-secondary btn-auto" onClick={cerrar}>Cancelar</button>
+              <button className="btn btn-danger btn-auto" onClick={eliminar} disabled={saving}>{saving?'Eliminando…':'Eliminar'}</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── LISTA DE PLANIFICACIONES ─────────────────────────────────────────────────────
+function ListaPlanifs({ user, onSelect }) {
+  const [periodos,  setPeriodos]  = useState([]);
+  const [cursos,    setCursos]    = useState([]);
+  const [planifs,   setPlanifs]   = useState([]);
+  const [periodoId, setPeriodoId] = useState('');
+  const [cursoId,   setCursoId]   = useState('');
+  const [loading,   setLoading]   = useState(false);
+  const [modalNueva,setModalNueva]= useState(false);
+  const [nuevaForm, setNuevaForm] = useState({ curso_id:'', periodo_id:'', titulo:'' });
+  const [saving,    setSaving]    = useState(false);
+  const [delPlan,   setDelPlan]   = useState(null);
+  const [toast,     setToast]     = useState({ type:'', text:'' });
+
+  const puede = p => user.permisos?.includes(p);
+  const showToast=(t,m)=>{ setToast({type:t,text:m}); setTimeout(()=>setToast({type:'',text:''}),4000); };
+
+  useEffect(() => {
+    Promise.all([apiFetch('/api/periodos/planificacion'), apiFetch('/api/cursos/mis-cursos')])
+      .then(([ps,cs]) => {
+        setPeriodos(ps); setCursos(cs);
+        if (ps.length>0) setPeriodoId(String(ps[0].id));
+      }).catch(() => {});
+  }, []);
+
+  const cargar = async () => {
+    setLoading(true);
+    try {
+      const p = new URLSearchParams();
+      if (periodoId) p.set('periodo_id', periodoId);
+      if (cursoId)   p.set('curso_id', cursoId);
+      setPlanifs(await apiFetch(`/api/planificaciones?${p}`));
+    } catch(e) { showToast('error', e.message); }
+    finally { setLoading(false); }
+  };
+  useEffect(() => { cargar(); }, [periodoId, cursoId]);
+
+  const crearPlan = async () => {
+    if (!nuevaForm.curso_id) return;
+    setSaving(true);
+    try {
+      const r = await apiFetch('/api/planificaciones', { method:'POST', body:{ ...nuevaForm, periodo_id: nuevaForm.periodo_id||null } });
+      showToast('success', 'Planificación creada.');
+      setModalNueva(false); setNuevaForm({curso_id:'',periodo_id:'',titulo:''});
+      onSelect(r.id);
+    } catch(e) { showToast('error', e.message); }
+    finally { setSaving(false); }
+  };
+
+  const eliminarPlan = async () => {
+    setSaving(true);
+    try {
+      await apiFetch(`/api/planificaciones/${delPlan.id}`, { method:'DELETE' });
+      showToast('success', 'Planificación eliminada.'); setDelPlan(null); cargar();
+    } catch(e) { showToast('error', e.message); setDelPlan(null); }
+    finally { setSaving(false); }
+  };
+
+  return (
+    <div>
+      {toast.text && <div className={`alert alert-${toast.type}`} style={{cursor:'pointer'}} onClick={()=>setToast({type:'',text:''})}>{toast.text}</div>}
+      <div className="card" style={{marginBottom:14}}>
+        <div className="section-header" style={{marginBottom:12}}>
+          <span className="card-title" style={{marginBottom:0}}>📝 Planificaciones</span>
+          {puede('editar_planificaciones') && (
+            <button className="btn btn-primary btn-auto" onClick={()=>setModalNueva(true)}>＋ Nueva</button>
+          )}
+        </div>
+        <div className="form-grid">
+          <div className="form-group" style={{marginBottom:0}}>
+            <label className="form-label">Período</label>
+            <select className="form-control" value={periodoId} onChange={e=>setPeriodoId(e.target.value)}>
+              <option value="">Todos</option>
+              {periodos.map(p=><option key={p.id} value={String(p.id)}>{p.nombre}</option>)}
+            </select>
+          </div>
+          <div className="form-group" style={{marginBottom:0}}>
+            <label className="form-label">Curso</label>
+            <select className="form-control" value={cursoId} onChange={e=>setCursoId(e.target.value)}>
+              <option value="">Todos</option>
+              {cursos.map(c=><option key={c.id} value={String(c.id)}>{c.nombre}</option>)}
+            </select>
+          </div>
+        </div>
+        {periodos.length===0 && (
+          <p style={{fontSize:13,color:'var(--text2)',marginTop:10}}>
+            No hay períodos. {puede('editar_planificaciones')&&'Creá uno en la pestaña "Períodos".'}
+          </p>
+        )}
+      </div>
+
+      {loading ? <div className="spinner"><div className="spin"/></div>
+      : planifs.length===0 ? (
+        <div className="empty-state">
+          <div className="empty-state-icon">📝</div>
+          <p>{periodos.length===0 ? 'Primero creá un período de planificación.' : 'No hay planificaciones para estos filtros.'}</p>
+        </div>
+      ) : planifs.map(p => (
+        <div key={p.id} className="plan-item" onClick={()=>onSelect(p.id)}>
+          <div className="plan-item-hd">
+            <div style={{flex:1,minWidth:0}}>
+              <div className="plan-titulo">{p.titulo||'Planificación sin título'}</div>
+              <div className="plan-meta">
+                📚 {p.curso_nombre} · 👤 {p.docente_nombre}
+                {p.periodo_nombre&&<> · <span className="periodo-tag">{p.periodo_nombre}</span></>}
+                · {p.n_contenidos} contenido(s)
+              </div>
+            </div>
+            {puede('editar_planificaciones') && (
+              <button className="btn-icon btn-icon-danger" style={{flexShrink:0}}
+                onClick={e=>{e.stopPropagation();setDelPlan(p);}}>🗑️</button>
+            )}
+          </div>
+        </div>
+      ))}
+
+      {modalNueva && (
+        <div className="modal-overlay" onClick={e=>e.target===e.currentTarget&&setModalNueva(false)}>
+          <div className="modal">
+            <div className="modal-header">
+              <span className="modal-title">Nueva planificación</span>
+              <button className="modal-close" onClick={()=>setModalNueva(false)}>✕</button>
+            </div>
+            <div className="form-group">
+              <label className="form-label">Curso *</label>
+              <select className="form-control" value={nuevaForm.curso_id} onChange={e=>setNuevaForm(f=>({...f,curso_id:e.target.value}))}>
+                <option value="">Seleccionar…</option>
+                {cursos.map(c=><option key={c.id} value={String(c.id)}>{c.nombre}</option>)}
+              </select>
+            </div>
+            <div className="form-group">
+              <label className="form-label">Período</label>
+              <select className="form-control" value={nuevaForm.periodo_id} onChange={e=>setNuevaForm(f=>({...f,periodo_id:e.target.value}))}>
+                <option value="">Sin período</option>
+                {periodos.map(p=><option key={p.id} value={String(p.id)}>{p.nombre}</option>)}
+              </select>
+            </div>
+            <div className="form-group">
+              <label className="form-label">Título (opcional)</label>
+              <input className="form-control" value={nuevaForm.titulo} onChange={e=>setNuevaForm(f=>({...f,titulo:e.target.value}))} placeholder="Ej: Planificación anual" />
+            </div>
+            <p style={{fontSize:11,color:'var(--text2)',marginBottom:4}}>
+              ℹ️ UNSAM futuro: se podrá asociar a una materia.
+            </p>
+            <div className="modal-footer">
+              <button className="btn btn-secondary btn-auto" onClick={()=>setModalNueva(false)}>Cancelar</button>
+              <button className="btn btn-primary btn-auto" onClick={crearPlan} disabled={saving||!nuevaForm.curso_id}>
+                {saving?'Creando…':'Crear planificación'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {delPlan && (
+        <div className="modal-overlay" onClick={e=>e.target===e.currentTarget&&setDelPlan(null)}>
+          <div className="modal">
+            <div className="modal-header">
+              <span className="modal-title">⚠️ Eliminar planificación</span>
+              <button className="modal-close" onClick={()=>setDelPlan(null)}>✕</button>
+            </div>
+            <p style={{marginBottom:12}}>{delPlan.titulo||'Planificación'} — {delPlan.curso_nombre}</p>
+            <div className="alert alert-warning">Se eliminarán la planificación y sus {delPlan.n_contenidos} contenido(s) permanentemente.</div>
+            <div className="modal-footer">
+              <button className="btn btn-secondary btn-auto" onClick={()=>setDelPlan(null)}>Cancelar</button>
+              <button className="btn btn-danger btn-auto" onClick={eliminarPlan} disabled={saving}>{saving?'Eliminando…':'Eliminar'}</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── FICHA DE PLANIFICACIÓN (con contenidos) ──────────────────────────────────────
+function FichaPlanif({ user, planId, onBack }) {
+  const [plan,       setPlan]      = useState(null);
+  const [loading,    setLoading]   = useState(true);
+  const [editingCid, setEditingCid]= useState(null);
+  const [editForm,   setEditForm]  = useState({ titulo:'', descripcion:'' });
+  const [showAdd,    setShowAdd]   = useState(false);
+  const [addForm,    setAddForm]   = useState({ titulo:'', descripcion:'' });
+  const [saving,     setSaving]    = useState(false);
+  const [delCid,     setDelCid]    = useState(null);
+  const [toast,      setToast]     = useState({ type:'', text:'' });
+
+  const puede = p => user.permisos?.includes(p);
+  const showToast=(t,m)=>{ setToast({type:t,text:m}); setTimeout(()=>setToast({type:'',text:''}),4000); };
+
+  const cargar = async () => {
+    setLoading(true);
+    try { setPlan(await apiFetch(`/api/planificaciones/${planId}`)); }
+    catch(e) { showToast('error', e.message); }
+    finally { setLoading(false); }
+  };
+  useEffect(() => { cargar(); }, [planId]);
+
+  const puedeEditar = puede('editar_planificaciones') &&
+    plan && (plan.docente_id === user.id || user.permisos?.includes('administrar_cursos'));
+
+  // Reordenar ↑/↓
+  const mover = async (idx, dir) => {
+    const cont = [...plan.contenidos];
+    const other = idx + dir;
+    if (other < 0 || other >= cont.length) return;
+    [cont[idx], cont[other]] = [cont[other], cont[idx]];
+    setPlan(p => ({ ...p, contenidos: cont }));
+    try {
+      await apiFetch(`/api/planificaciones/${planId}/contenidos/orden`, {
+        method: 'PUT', body: { items: cont.map((c, i) => ({ id: c.id, orden: i })) }
+      });
+    } catch(e) { showToast('error', e.message); cargar(); }
+  };
+
+  // Editar contenido
+  const abrirEdit = c => { setEditingCid(c.id); setEditForm({ titulo:c.titulo, descripcion:c.descripcion||'' }); };
+  const guardarEdit = async cid => {
+    if (!editForm.titulo.trim()) return;
+    setSaving(true);
+    try {
+      await apiFetch(`/api/planificaciones/${planId}/contenidos/${cid}`, { method:'PUT', body:editForm });
+      setPlan(p => ({ ...p, contenidos: p.contenidos.map(c => c.id===cid ? {...c,...editForm} : c) }));
+      setEditingCid(null);
+    } catch(e) { showToast('error', e.message); }
+    finally { setSaving(false); }
+  };
+
+  // Agregar contenido
+  const agregar = async () => {
+    if (!addForm.titulo.trim()) return;
+    setSaving(true);
+    try {
+      const nuevo = await apiFetch(`/api/planificaciones/${planId}/contenidos`, { method:'POST', body:addForm });
+      setPlan(p => ({ ...p, contenidos: [...p.contenidos, nuevo] }));
+      setAddForm({ titulo:'', descripcion:'' }); setShowAdd(false);
+    } catch(e) { showToast('error', e.message); }
+    finally { setSaving(false); }
+  };
+
+  // Eliminar contenido
+  const eliminarCont = async cid => {
+    setSaving(true);
+    try {
+      await apiFetch(`/api/planificaciones/${planId}/contenidos/${cid}`, { method:'DELETE' });
+      setPlan(p => ({ ...p, contenidos: p.contenidos.filter(c => c.id!==cid) }));
+      setDelCid(null);
+    } catch(e) { showToast('error', e.message); }
+    finally { setSaving(false); }
+  };
+
+  if (loading) return <div className="spinner"><div className="spin"/></div>;
+  if (!plan)   return <div className="empty-state"><div className="empty-state-icon">📝</div><p>Planificación no encontrada.</p></div>;
+
+  return (
+    <div>
+      {toast.text && <div className={`alert alert-${toast.type}`} style={{cursor:'pointer'}} onClick={()=>setToast({type:'',text:''})}>{toast.text}</div>}
+
+      {/* Header */}
+      <div className="plan-detail-hd">
+        <button className="btn btn-secondary btn-auto" style={{flexShrink:0}} onClick={onBack}>← Volver</button>
+        <div style={{flex:1,minWidth:0}}>
+          <div className="plan-detail-title">{plan.titulo||`Planificación — ${plan.curso_nombre}`}</div>
+          <div className="plan-detail-meta">
+            📚 {plan.curso_nombre} · 👤 {plan.docente_nombre}
+            {plan.periodo_nombre && <> · <span className="periodo-tag">{plan.periodo_nombre}</span></>}
+          </div>
+        </div>
+      </div>
+
+      {/* Descripción */}
+      {plan.descripcion && (
+        <div style={{fontSize:14,color:'var(--text2)',lineHeight:1.6,marginBottom:16}}>{plan.descripcion}</div>
+      )}
+
+      {/* Contenidos */}
+      <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:12}}>
+        <span style={{fontWeight:700,fontSize:14}}>Contenidos</span>
+        <span style={{fontSize:12,color:'var(--text2)'}}>{plan.contenidos.length} ítem(s)</span>
+      </div>
+
+      {plan.contenidos.length===0 && !showAdd && (
+        <div className="empty-state" style={{padding:'20px 0'}}>
+          <div className="empty-state-icon" style={{fontSize:32}}>📄</div>
+          <p>Sin contenidos. {puedeEditar&&'¡Agregá el primero!'}</p>
+        </div>
+      )}
+
+      {plan.contenidos.map((c, idx) => (
+        <div key={c.id} className="contenido-row">
+          <div className="contenido-num">{idx+1}</div>
+
+          {editingCid===c.id ? (
+            <div style={{flex:1}}>
+              <div className="form-group" style={{marginBottom:8}}>
+                <input className="form-control" value={editForm.titulo} autoFocus
+                  onChange={e=>setEditForm(f=>({...f,titulo:e.target.value}))} placeholder="Título *" />
+              </div>
+              <div className="form-group" style={{marginBottom:8}}>
+                <textarea className="form-control" value={editForm.descripcion} rows={3} style={{resize:'vertical'}}
+                  onChange={e=>setEditForm(f=>({...f,descripcion:e.target.value}))} placeholder="Descripción (opcional)" />
+              </div>
+              <div style={{display:'flex',gap:6}}>
+                <button className="btn btn-secondary btn-auto" onClick={()=>setEditingCid(null)}>Cancelar</button>
+                <button className="btn btn-primary btn-auto" onClick={()=>guardarEdit(c.id)} disabled={saving||!editForm.titulo.trim()}>
+                  {saving?'Guardando…':'Guardar'}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="contenido-body">
+              <div className="contenido-titulo">{c.titulo}</div>
+              {c.descripcion && <div className="contenido-desc">{c.descripcion}</div>}
+            </div>
+          )}
+
+          {puedeEditar && editingCid!==c.id && (<>
+            <div className="contenido-orden">
+              <button className="btn-ord" onClick={()=>mover(idx,-1)} disabled={idx===0} title="Mover arriba">↑</button>
+              <button className="btn-ord" onClick={()=>mover(idx,1)} disabled={idx===plan.contenidos.length-1} title="Mover abajo">↓</button>
+            </div>
+            <div className="row-actions">
+              <button className="btn-icon" onClick={()=>abrirEdit(c)}>✏️</button>
+              <button className="btn-icon btn-icon-danger" onClick={()=>setDelCid(c)}>🗑️</button>
+            </div>
+          </>)}
+        </div>
+      ))}
+
+      {/* Agregar contenido */}
+      {puedeEditar && (showAdd ? (
+        <div className="plan-add-form">
+          <div style={{fontWeight:700,fontSize:14,marginBottom:10}}>Nuevo contenido</div>
+          <div className="form-group">
+            <label className="form-label">Título *</label>
+            <input className="form-control" value={addForm.titulo} autoFocus
+              onChange={e=>setAddForm(f=>({...f,titulo:e.target.value}))}
+              onKeyDown={e=>e.key==='Enter'&&!e.shiftKey&&agregar()}
+              placeholder="Título del tema o contenido" />
+          </div>
+          <div className="form-group" style={{marginBottom:10}}>
+            <label className="form-label">Descripción (opcional)</label>
+            <textarea className="form-control" value={addForm.descripcion} rows={3} style={{resize:'vertical'}}
+              onChange={e=>setAddForm(f=>({...f,descripcion:e.target.value}))}
+              placeholder="Objetivos, actividades, materiales…" />
+          </div>
+          <div style={{display:'flex',gap:6}}>
+            <button className="btn btn-secondary btn-auto" onClick={()=>{setShowAdd(false);setAddForm({titulo:'',descripcion:''});}}>Cancelar</button>
+            <button className="btn btn-primary btn-auto" onClick={agregar} disabled={saving||!addForm.titulo.trim()}>
+              {saving?'Agregando…':'＋ Agregar'}
+            </button>
+          </div>
+        </div>
+      ) : (
+        <button className="btn btn-secondary" style={{marginTop:10}} onClick={()=>setShowAdd(true)}>
+          ＋ Agregar contenido
+        </button>
+      ))}
+
+      {/* Confirmar eliminar contenido */}
+      {delCid && (
+        <div className="modal-overlay" onClick={e=>e.target===e.currentTarget&&setDelCid(null)}>
+          <div className="modal">
+            <div className="modal-header">
+              <span className="modal-title">⚠️ Eliminar contenido</span>
+              <button className="modal-close" onClick={()=>setDelCid(null)}>✕</button>
+            </div>
+            <p style={{marginBottom:12}}>"{delCid.titulo}"</p>
+            <div className="alert alert-warning">Este contenido se eliminará permanentemente.</div>
+            <div className="modal-footer">
+              <button className="btn btn-secondary btn-auto" onClick={()=>setDelCid(null)}>Cancelar</button>
+              <button className="btn btn-danger btn-auto" onClick={()=>eliminarCont(delCid.id)} disabled={saving}>
+                {saving?'Eliminando…':'Eliminar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── PLANIFICACIONES (contenedor con tabs) ────────────────────────────────────────
+function Planificaciones({ user }) {
+  const [view,   setView]   = useState('lista');
+  const [planId, setPlanId] = useState(null);
+  const puede = p => user.permisos?.includes(p);
+
+  return (
+    <div>
+      {view !== 'ficha' && (
+        <div className="curso-tabs" style={{marginBottom:16}}>
+          <div className={`curso-tab ${view==='lista'?'active':''}`} onClick={()=>setView('lista')}>📝 Planificaciones</div>
+          {puede('editar_planificaciones') && (
+            <div className={`curso-tab ${view==='periodos'?'active':''}`} onClick={()=>setView('periodos')}>📅 Períodos</div>
+          )}
+        </div>
+      )}
+      {view==='lista'    && <ListaPlanifs   user={user} onSelect={id=>{setPlanId(id);setView('ficha');}} />}
+      {view==='periodos' && <GestionPeriodosPlani />}
+      {view==='ficha'    && <FichaPlanif    user={user} planId={planId} onBack={()=>{setPlanId(null);setView('lista');}} />}
+    </div>
+  );
+}
+
+// ── BACKUP ──────────────────────────────────────────────────────────────────────
+function Backup() {
+  const [backups,    setBackups]    = useState([]);
+  const [loading,    setLoading]    = useState(true);
+  const [creating,   setCreating]   = useState(false);
+  const [descargando,setDescargando]= useState(null);
+  const [restoring,  setRestoring]  = useState(null); // backup elegido para restaurar
+  const [restSaving, setRestSaving] = useState(false);
+  const [restDone,   setRestDone]   = useState(false);
+  const [toast,      setToast]      = useState({ type:'', text:'' });
+
+  const showToast = (t,m) => { setToast({type:t,text:m}); setTimeout(()=>setToast({type:'',text:''}),6000); };
+
+  const formatSize = bytes => {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024*1024) return Math.round(bytes/1024) + ' KB';
+    return (bytes/1024/1024).toFixed(1) + ' MB';
+  };
+
+  const formatFecha = s => {
+    try {
+      return new Date(s + 'T12:00').toLocaleDateString('es-AR', { weekday:'short', day:'numeric', month:'long', year:'numeric' });
+    } catch { return s; }
+  };
+
+  const cargar = async () => {
+    setLoading(true);
+    try { setBackups(await apiFetch('/api/backup/lista')); }
+    catch(e) { showToast('error', e.message); }
+    finally { setLoading(false); }
+  };
+  useEffect(() => { cargar(); }, []);
+
+  const hacerBackup = async () => {
+    setCreating(true);
+    try {
+      const r = await apiFetch('/api/backup/crear', { method:'POST' });
+      showToast('success', `✅ Backup creado: ${r.filename} (${formatSize(r.size)})`);
+      cargar();
+    } catch(e) { showToast('error', e.message); }
+    finally { setCreating(false); }
+  };
+
+  const descargar = async (filename) => {
+    setDescargando(filename);
+    try {
+      const res = await fetch(`/api/backup/descargar/${filename}`, {
+        headers: { Authorization: `Bearer ${getToken()}` }
+      });
+      if (!res.ok) throw new Error('Error al descargar');
+      const blob = await res.blob();
+      const url  = URL.createObjectURL(blob);
+      const a    = document.createElement('a');
+      a.href = url; a.download = filename;
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch(e) { showToast('error', e.message); }
+    finally { setDescargando(null); }
+  };
+
+  const restaurar = async () => {
+    setRestSaving(true);
+    try {
+      const r = await apiFetch(`/api/backup/restaurar/${restoring.filename}`, { method:'POST' });
+      setRestoring(null);
+      setRestDone(true);
+      showToast('success', r.message);
+    } catch(e) { showToast('error', e.message); }
+    finally { setRestSaving(false); }
+  };
+
+  if (restDone) return (
+    <div style={{textAlign:'center',padding:'40px 20px'}}>
+      <div style={{fontSize:64,marginBottom:16}}>🔄</div>
+      <h2 style={{fontSize:22,fontWeight:800,marginBottom:12}}>Servidor cerrado</h2>
+      <p style={{fontSize:15,color:'var(--text2)',lineHeight:1.7}}>
+        La restauración fue preparada exitosamente.<br/>
+        <strong>Reiniciá el servidor</strong> con <code style={{background:'var(--bg3)',padding:'2px 6px',borderRadius:4}}>npm start</code> y volvé a iniciar sesión.
+      </p>
+    </div>
+  );
+
+  return (
+    <div>
+      {toast.text && <div className={`alert alert-${toast.type}`} style={{cursor:'pointer'}} onClick={()=>setToast({type:'',text:''})}>{toast.text}</div>}
+
+      {/* Header */}
+      <div className="card" style={{marginBottom:14}}>
+        <div className="section-header" style={{marginBottom:0}}>
+          <div>
+            <div className="card-title" style={{marginBottom:4}}>💾 Backup del sistema</div>
+            <p style={{fontSize:12,color:'var(--text2)'}}>Backup automático semanal · Base de datos: epm.db</p>
+          </div>
+          <button className="btn btn-primary btn-auto" onClick={hacerBackup} disabled={creating}>
+            {creating ? 'Creando…' : '💾 Hacer backup ahora'}
+          </button>
+        </div>
+      </div>
+
+      {/* Lista de backups */}
+      <div className="card">
+        <div className="card-title" style={{marginBottom:12}}>📋 Backups disponibles</div>
+        {loading ? <div className="spinner"><div className="spin"/></div>
+        : backups.length===0 ? (
+          <div className="empty-state">
+            <div className="empty-state-icon">💾</div>
+            <p>No hay backups todavía. Creá uno con el botón de arriba.</p>
+          </div>
+        ) : backups.map(b => (
+          <div key={b.filename} className="backup-item">
+            <div style={{fontSize:28,flexShrink:0}}>🗄️</div>
+            <div className="backup-fecha">
+              <div className="backup-nombre">{formatFecha(b.fecha)}</div>
+              <div className="backup-meta">{b.hora} · {formatSize(b.size)}</div>
+            </div>
+            <div style={{display:'flex',gap:6,flexShrink:0,flexWrap:'wrap'}}>
+              <button className="btn btn-secondary btn-auto"
+                onClick={()=>descargar(b.filename)} disabled={descargando===b.filename}>
+                {descargando===b.filename ? '⏳' : '⬇️ Descargar'}
+              </button>
+              <button className="btn btn-auto"
+                style={{background:'#fee2e2',color:'var(--danger)',border:'1.5px solid #fca5a5'}}
+                onClick={()=>setRestoring(b)}>
+                🔄 Restaurar
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Modal confirmación restaurar */}
+      {restoring && (
+        <div className="modal-overlay">
+          <div className="modal" style={{maxWidth:520}}>
+            <div className="modal-header">
+              <span className="modal-title" style={{color:'var(--danger)'}}>⚠️ Restaurar backup</span>
+              <button className="modal-close" onClick={()=>setRestoring(null)}>✕</button>
+            </div>
+
+            <div className="restore-warning">
+              <div style={{fontSize:20,marginBottom:10,fontWeight:800}}>⚠️ ADVERTENCIA — LEER ANTES DE CONFIRMAR</div>
+              <p style={{marginBottom:10,lineHeight:1.6}}>
+                Esto va a <strong>reemplazar TODOS los datos actuales</strong> (estudiantes, asistencias,
+                planificaciones, usuarios) con los del backup del <strong>{formatFecha(restoring.fecha)}</strong>.
+              </p>
+              <p style={{marginBottom:10,lineHeight:1.6}}>
+                ✅ Antes de restaurar, se creará un <strong>backup automático del estado actual</strong> por seguridad.
+              </p>
+              <p style={{lineHeight:1.6}}>
+                🔄 Después de restaurar, el <strong>servidor se cerrará</strong> y deberás iniciarlo manualmente
+                con <code style={{background:'rgba(0,0,0,.1)',padding:'1px 5px',borderRadius:3}}>npm start</code>.
+              </p>
+            </div>
+
+            <p style={{fontSize:13,color:'var(--text2)',marginBottom:16}}>
+              Backup a restaurar: <strong>{restoring.filename}</strong> ({formatSize(restoring.size)})
+            </p>
+
+            <div className="modal-footer">
+              <button className="btn btn-secondary btn-auto" onClick={()=>setRestoring(null)}>Cancelar</button>
+              <button className="btn btn-auto" disabled={restSaving}
+                style={{background:'var(--danger)',color:'#fff',border:'none'}}
+                onClick={restaurar}>
+                {restSaving ? 'Restaurando…' : '⚠️ Sí, restaurar este backup'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── CURSOS ──────────────────────────────────────────────────────────────────────
+function Cursos({ user }) {
+  const [cursos,  setCursos]  = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [saving,  setSaving]  = useState(false);
+  const [modal,   setModal]   = useState(null);
+  const [editing, setEditing] = useState(null);
+  const [nombre,  setNombre]  = useState('');
+  const [delTarget, setDelTarget] = useState(null);
+  const [toast,   setToast]   = useState({ type:'', text:'' });
+  const [formErr, setFormErr] = useState('');
+
+  const puede = (p) => user.permisos?.includes(p);
+
+  const showToast = (type, text) => {
+    setToast({ type, text });
+    setTimeout(() => setToast({ type:'', text:'' }), 4000);
+  };
+
+  const cargar = async () => {
+    setLoading(true);
+    try { setCursos(await apiFetch('/api/cursos')); }
+    catch (e) { showToast('error', e.message); }
+    finally { setLoading(false); }
+  };
+
+  useEffect(() => { cargar(); }, []);
+
+  const abrirNuevo   = () => { setEditing(null); setNombre(''); setFormErr(''); setModal('form'); };
+  const abrirEditar  = (c) => { setEditing(c); setNombre(c.nombre); setFormErr(''); setModal('form'); };
+  const cerrarModal  = ()  => setModal(null);
+
+  const abrirBorrar = async (c) => {
+    try {
+      const info = await apiFetch(`/api/cursos/${c.id}/info`);
+      setDelTarget({ curso: c, estudiantes: info.estudiantes });
+      setModal('delete');
+    } catch (e) { showToast('error', e.message); }
+  };
+
+  const guardar = async () => {
+    const n = nombre.trim();
+    if (!n) { setFormErr('El nombre no puede estar vacío.'); return; }
+    setSaving(true); setFormErr('');
+    try {
+      if (editing) {
+        await apiFetch(`/api/cursos/${editing.id}`, { method:'PUT', body:{ nombre:n } });
+        showToast('success', `"${n}" actualizado.`);
+      } else {
+        await apiFetch('/api/cursos', { method:'POST', body:{ nombre:n } });
+        showToast('success', `Curso "${n}" creado.`);
+      }
+      cerrarModal(); cargar();
+    } catch (e) { setFormErr(e.message); }
+    finally { setSaving(false); }
+  };
+
+  const confirmarBorrar = async () => {
+    setSaving(true);
+    try {
+      const r = await apiFetch(`/api/cursos/${delTarget.curso.id}`, { method:'DELETE' });
+      const txt = r.accion === 'desactivado'
+        ? `Curso desactivado. Los ${r.estudiantes} estudiantes conservan todos sus datos.`
+        : 'Curso eliminado permanentemente.';
+      showToast('success', txt); cerrarModal(); cargar();
+    } catch (e) { showToast('error', e.message); }
+    finally { setSaving(false); }
+  };
+
+  return (
+    <div>
+      {toast.text && (
+        <div className={`alert alert-${toast.type}`} style={{cursor:'pointer'}}
+          onClick={() => setToast({ type:'', text:'' })}>
+          {toast.text}
+        </div>
+      )}
+
+      <div className="card">
+        <div className="section-header">
+          <span className="card-title" style={{marginBottom:0}}>🏫 Cursos</span>
+          {puede('administrar_cursos') && (
+            <button className="btn btn-primary btn-auto" onClick={abrirNuevo}>＋ Nuevo curso</button>
+          )}
+        </div>
+
+        {loading ? (
+          <div className="spinner"><div className="spin" /></div>
+        ) : cursos.length === 0 ? (
+          <div className="empty-state">
+            <div className="empty-state-icon">🏫</div>
+            <p>No hay cursos cargados todavía.</p>
+          </div>
+        ) : cursos.map(c => (
+          <div key={c.id} className="list-row">
+            <span className="list-row-label">{c.nombre}</span>
+            <span className="badge-count">{c.estudiantes} est.</span>
+            {puede('administrar_cursos') && (
+              <div className="row-actions">
+                <button className="btn-icon" onClick={() => abrirEditar(c)} title="Renombrar">✏️</button>
+                <button className="btn-icon btn-icon-danger" onClick={() => abrirBorrar(c)} title="Eliminar">🗑️</button>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {modal === 'form' && (
+        <div className="modal-overlay" onClick={e => e.target === e.currentTarget && cerrarModal()}>
+          <div className="modal">
+            <div className="modal-header">
+              <span className="modal-title">{editing ? 'Renombrar curso' : 'Nuevo curso'}</span>
+              <button className="modal-close" onClick={cerrarModal}>✕</button>
+            </div>
+            {formErr && <div className="alert alert-error">{formErr}</div>}
+            <div className="form-group">
+              <label className="form-label">Nombre del curso</label>
+              <input className="form-control" value={nombre}
+                onChange={e => setNombre(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && guardar()}
+                placeholder="Ej: Mojarritas" autoFocus />
+            </div>
+            <div className="modal-footer">
+              <button className="btn btn-secondary btn-auto" onClick={cerrarModal}>Cancelar</button>
+              <button className="btn btn-primary btn-auto" onClick={guardar} disabled={saving}>
+                {saving ? 'Guardando…' : editing ? 'Guardar cambios' : 'Crear curso'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {modal === 'delete' && delTarget && (
+        <div className="modal-overlay" onClick={e => e.target === e.currentTarget && cerrarModal()}>
+          <div className="modal">
+            <div className="modal-header">
+              <span className="modal-title">
+                ⚠️ {delTarget.estudiantes > 0 ? 'Desactivar' : 'Eliminar'} curso
+              </span>
+              <button className="modal-close" onClick={cerrarModal}>✕</button>
+            </div>
+            <p style={{marginBottom:12}}>Curso: <strong>{delTarget.curso.nombre}</strong></p>
+            {delTarget.estudiantes > 0 ? (
+              <div className="alert alert-warning">
+                <strong>Este curso tiene {delTarget.estudiantes} estudiante(s).</strong><br />
+                El curso quedará <strong>desactivado</strong> y no aparecerá en los listados.
+                Los estudiantes y todos sus registros (asistencias, etc.) se conservan intactos;
+                quedan sin curso asignado hasta que los reasignes desde su ficha.
+              </div>
+            ) : (
+              <div className="alert alert-warning">
+                Este curso no tiene estudiantes y se <strong>eliminará permanentemente</strong>.
+              </div>
+            )}
+            <div className="modal-footer">
+              <button className="btn btn-secondary btn-auto" onClick={cerrarModal}>Cancelar</button>
+              <button className="btn btn-danger btn-auto" onClick={confirmarBorrar} disabled={saving}>
+                {saving ? 'Procesando…' : delTarget.estudiantes > 0 ? 'Desactivar curso' : 'Eliminar curso'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── LAYOUT ──────────────────────────────────────────────────────────────────────
+function Layout({ user }) {
+  const [section, setSection] = useState('dashboard');
+  const [menuOpen, setMenuOpen] = useState(false);
+  const title = NAV.find(n => n.id === section)?.label || 'Dashboard';
+
+  return (
+    <div className="layout">
+      <Sidebar
+        user={user} section={section}
+        onSection={setSection}
+        open={menuOpen} onClose={() => setMenuOpen(false)}
+      />
+      <div className="main">
+        <div className="topbar">
+          <button className="topbar-menu" onClick={() => setMenuOpen(o => !o)}>☰</button>
+          <span className="topbar-title">{title}</span>
+        </div>
+        <div className="page">
+          {section === 'dashboard'
+            ? <Dashboard user={user} onSection={setSection} />
+            : section === 'estudiantes'
+            ? <Estudiantes user={user} />
+            : section === 'asistencia'
+            ? <AsistenciasView user={user} />
+            : section === 'reportes'
+            ? <Reportes user={user} />
+            : section === 'usuarios'
+            ? <UsuariosYRoles user={user} />
+            : section === 'planificaciones'
+            ? <Planificaciones user={user} />
+            : section === 'backup'
+            ? <Backup />
+            : section === 'cursos'
+            ? <Cursos user={user} />
+            : <Placeholder id={section} />}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── APP ─────────────────────────────────────────────────────────────────────────
+function App() {
+  const [user,    setUser]    = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!getUser()) { setLoading(false); return; }
+    apiFetch('/api/auth/me')
+      .then(d => {
+        // Reemplaza token y usuario con datos frescos de la DB.
+        // Resuelve tokens viejos que no tengan todos los campos (ej: institucion_id, permisos).
+        if (d.token) localStorage.setItem('epm_token', d.token);
+        localStorage.setItem('epm_user', JSON.stringify(d.user));
+        setUser(d.user);
+      })
+      .catch(() => {
+        localStorage.removeItem('epm_token');
+        localStorage.removeItem('epm_user');
+      })
+      .finally(() => setLoading(false));
+  }, []);
+
+  if (loading) return (
+    <div style={{minHeight:'100vh',display:'flex',alignItems:'center',justifyContent:'center',
+                 background:'linear-gradient(135deg,#1e1b4b,#312e81)'}}>
+      <div className="spinner">
+        <div className="spin" style={{borderColor:'rgba(255,255,255,.3)',borderTopColor:'#a5b4fc'}} />
+      </div>
+    </div>
+  );
+
+  return user ? <Layout user={user} /> : <LoginPage onLogin={setUser} />;
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>
