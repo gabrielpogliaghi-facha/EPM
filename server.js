@@ -54,7 +54,13 @@ app.use('/api/backup',          require('./routes/backup'));
 
 // ── SPA FALLBACK ───────────────────────────────────────────────────────────────
 app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+  const indexPath = path.join(__dirname, 'public', 'index.html');
+  res.sendFile(indexPath, err => {
+    if (err) {
+      console.error('sendFile error:', err.message, '| path:', indexPath);
+      res.status(500).send('Error al servir la aplicación');
+    }
+  });
 });
 
 app.listen(PORT, () => {
