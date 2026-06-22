@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
   <title>EPM – Sistema de Gestión Escolar</title>
+  <link rel="icon" type="image/jpeg" href="/logo-epm.jpg" />
   <script src="https://cdn.jsdelivr.net/npm/react@18.3.1/umd/react.production.min.js" crossorigin="anonymous"></script>
   <script src="https://cdn.jsdelivr.net/npm/react-dom@18.3.1/umd/react-dom.production.min.js" crossorigin="anonymous"></script>
   <script src="https://cdn.jsdelivr.net/npm/@babel/standalone@7.24.7/babel.min.js"></script>
@@ -59,9 +60,11 @@
       display:flex; flex-direction:column; position:fixed; height:100vh;
       z-index:200; transition:transform .3s;
     }
-    .sidebar-logo   { padding:20px; border-bottom:1px solid rgba(255,255,255,.1); }
-    .sidebar-logo h1{ font-size:19px; font-weight:800; color:var(--primary-l); }
-    .sidebar-logo p { font-size:11px; color:rgba(255,255,255,.45); margin-top:2px; }
+    .sidebar-logo        { padding:16px 20px; border-bottom:1px solid rgba(255,255,255,.1); display:flex; align-items:center; gap:12px; }
+    .sidebar-logo-img    { background:#fff; border-radius:8px; padding:4px; flex-shrink:0; }
+    .sidebar-logo-img img{ width:40px; height:40px; object-fit:contain; display:block; }
+    .sidebar-logo h1     { font-size:19px; font-weight:800; color:var(--primary-l); }
+    .sidebar-logo p      { font-size:11px; color:rgba(255,255,255,.45); margin-top:2px; }
     .sidebar-nav    { flex:1; padding:12px 0; overflow-y:auto; }
 
     .nav-item {
@@ -154,11 +157,12 @@
       background:var(--card); border-radius:20px; padding:40px;
       width:100%; max-width:400px; box-shadow:0 20px 60px rgba(0,0,0,.3);
     }
-    .login-logo    { text-align:center; margin-bottom:32px; }
-    .login-logo h1 { font-size:30px; font-weight:900;
-                     background:linear-gradient(135deg,var(--primary),var(--accent));
-                     -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
-    .login-logo p  { font-size:13px; color:var(--text2); margin-top:4px; }
+    .login-logo        { text-align:center; margin-bottom:32px; }
+    .login-logo img    { width:130px; height:auto; margin-bottom:12px; display:block; margin-left:auto; margin-right:auto; }
+    .login-logo h1     { font-size:30px; font-weight:900;
+                         background:linear-gradient(135deg,var(--primary),var(--accent));
+                         -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
+    .login-logo p      { font-size:13px; color:var(--text2); margin-top:4px; }
     .login-error   { background:#fee2e2; color:var(--danger); padding:10px 14px;
                      border-radius:8px; font-size:13px; margin-bottom:14px; }
 
@@ -743,6 +747,7 @@ function LoginPage({ onLogin }) {
     <div className="login-page">
       <div className="login-card">
         <div className="login-logo">
+          <img src="/logo-epm.jpg" alt="Logo EPM" />
           <h1>EPM</h1>
           <p>Sistema de Gestión Escolar</p>
         </div>
@@ -783,8 +788,13 @@ function Sidebar({ user, section, onSection, open, onClose }) {
       <div className={`sidebar-overlay ${open?'open':''}`} onClick={onClose} />
       <nav className={`sidebar ${open?'open':''}`}>
         <div className="sidebar-logo">
-          <h1>EPM</h1>
-          <p>{user.institucion_nombre}</p>
+          <div className="sidebar-logo-img">
+            <img src="/logo-epm.jpg" alt="Logo EPM" />
+          </div>
+          <div>
+            <h1>EPM</h1>
+            <p>{user.institucion_nombre}</p>
+          </div>
         </div>
         <div className="sidebar-nav">
           {NAV.map(item => puede(item.permiso) ? (
