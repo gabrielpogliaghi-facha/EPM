@@ -104,10 +104,10 @@ router.post('/importar', verifyToken, requirePermiso('crear_estudiantes'), async
   const errores = [];
   for (const e of rows) {
     try {
-      await db.execute({
+      const r = await db.execute({
         sql,
         args: [
-          req.user.institucion_id, e.curso_id || null,
+          req.user.institucion_id, null,
           e.nombre.trim(), e.apellido.trim(), e.dni.trim(),
           e.cuit?.trim() || null, e.fecha_nacimiento || null,
           e.tutor_nombre?.trim() || null, e.tutor_dni?.trim() || null,
@@ -115,6 +115,16 @@ router.post('/importar', verifyToken, requirePermiso('crear_estudiantes'), async
           e.auth_imagen ? 1 : 0, e.auth_general ? 1 : 0, e.auth_boleto ? 1 : 0,
         ],
       });
+      const estId = Number(r.lastInsertRowid);
+      // Crear inscripciones si las hay
+      for (const ins of (e.inscripciones || [])) {
+        try {
+          await db.execute({
+            sql: 'INSERT INTO inscripciones (estudiante_id, curso_id, instrumento_id) VALUES (?,?,?)',
+            args: [estId, Number(ins.curso_id), Number(ins.instrumento_id)],
+          });
+        } catch (_) {} // ignora duplicados silenciosamente
+      }
       importados++;
     } catch (err) {
       errores.push({ dni: e.dni, error: err.message?.includes('UNIQUE') ? 'DNI ya existe en el sistema' : err.message });

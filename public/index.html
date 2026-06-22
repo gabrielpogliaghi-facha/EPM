@@ -633,11 +633,12 @@ async function apiFetch(url, opts = {}) {
 // ── CSV IMPORT UTILITIES ────────────────────────────────────────────────────────
 const COLS_CSV = ['Nombre','Apellido','DNI','CUIT','Fecha de nacimiento','Dirección',
                   'Tutor','DNI del tutor','Autorización de Imagen','Autorización General',
-                  'Autorización Boleto Estudiantil','Curso'];
+                  'Autorización Boleto Estudiantil','Curso','Instrumento'];
 
 function descargarPlantilla() {
-  const ej1 = ['Juan','García','45123456','20-45123456-7','15/03/2015','Av. Siempreviva 742','María García','23456789','sí','sí','no','Mojarritas'];
-  const ej2 = ['Sofía','López','45678901','','22/07/2016','','','','no','no','sí','Delfines'];
+  // Curso e Instrumento soportan múltiples valores separados por | (uno por inscripción)
+  const ej1 = ['Juan','García','45123456','20-45123456-7','15/03/2015','Av. Siempreviva 742','María García','23456789','sí','sí','no','Delfines|Mojarritas','Guitarra|Canto'];
+  const ej2 = ['Sofía','López','45678901','','22/07/2016','','','','no','no','sí','Tiburones','Batería'];
   const csv = [COLS_CSV,ej1,ej2].map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
   const a = document.createElement('a');
   a.href = URL.createObjectURL(new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8;'}));
@@ -676,7 +677,7 @@ function parseCsv(text) {
     return row;
   });
 }
-function validarFilaCSV(row, cursos, allDnis, idx) {
+function validarFilaCSV(row, cursos, instrumentos, allDnis, idx) {
   const errors=[];
   const nombre   = row['Nombre']?.trim()||'';
   const apellido = row['Apellido']?.trim()||'';
@@ -691,13 +692,34 @@ function validarFilaCSV(row, cursos, allDnis, idx) {
     if (f===null) errors.push('Fecha inválida (usar DD/MM/AAAA o AAAA-MM-DD)');
     else fecha_nacimiento=f;
   }
-  let curso_id=null;
-  const curso_nombre=row['Curso']?.trim()||'';
-  if (curso_nombre) {
-    const c=cursos.find(c=>c.nombre.toLowerCase().trim()===curso_nombre.toLowerCase());
-    if (!c) errors.push(`Curso "${curso_nombre}" no existe`);
-    else curso_id=c.id;
+
+  // Parsear inscripciones: columna Instrumento (opcional) emparejada con Curso
+  const instrStr = row['Instrumento']?.trim()||'';
+  const cursoStr = row['Curso']?.trim()||'';
+  const inscripciones = [];
+  let inscripcionesLabel = '';
+
+  if (instrStr) {
+    const instrNombres = instrStr.split('|').map(s=>s.trim()).filter(Boolean);
+    const cursoNombres = cursoStr.split('|').map(s=>s.trim()).filter(Boolean);
+    instrNombres.forEach((instrNombre, i) => {
+      const cursoNombre = cursoNombres[i] || '';
+      const instr = (instrumentos||[]).find(x=>x.nombre.toLowerCase()===instrNombre.toLowerCase());
+      const curso = cursos.find(c=>c.nombre.toLowerCase()===cursoNombre.toLowerCase());
+      if (!instr) {
+        errors.push(`Instrumento "${instrNombre}" no encontrado en el sistema`);
+      } else if (!cursoNombre) {
+        errors.push(`Falta el nivel para instrumento "${instrNombre}"`);
+      } else if (!curso) {
+        errors.push(`Nivel "${cursoNombre}" no existe`);
+      } else {
+        inscripciones.push({ curso_id: Number(curso.id), instrumento_id: Number(instr.id),
+                             curso_nombre: curso.nombre, instrumento_nombre: instr.nombre });
+      }
+    });
+    inscripcionesLabel = inscripciones.map(i=>`${i.instrumento_nombre}→${i.curso_nombre}`).join(' | ');
   }
+
   return {
     idx:idx+1, ok:errors.length===0, errors,
     nombre, apellido, dni,
@@ -709,7 +731,7 @@ function validarFilaCSV(row, cursos, allDnis, idx) {
     auth_imagen:  parseBool(row['Autorización de Imagen']),
     auth_general: parseBool(row['Autorización General']),
     auth_boleto:  parseBool(row['Autorización Boleto Estudiantil']),
-    curso_id, curso_nombre,
+    inscripciones, inscripcionesLabel,
   };
 }
 
@@ -862,7 +884,7 @@ function Placeholder({ id }) {
 }
 
 // ── MODAL IMPORTAR CSV ───────────────────────────────────────────────────────────
-function ModalImport({ cursos, onImportado, onClose }) {
+function ModalImport({ cursos, instrumentos, onImportado, onClose }) {
   const [fase,        setFase]       = useState('upload'); // upload | preview | done
   const [filas,       setFilas]      = useState([]);
   const [validas,     setValidas]    = useState([]);
@@ -882,7 +904,7 @@ function ModalImport({ cursos, onImportado, onClose }) {
         const rows = parseCsv(ev.target.result);
         if (!rows.length) { setParseErr('El archivo no tiene filas de datos.'); return; }
         const dnis = rows.map(r=>r['DNI']?.trim()).filter(Boolean);
-        const proc = rows.map((r,i) => validarFilaCSV(r, cursos, dnis, i));
+        const proc = rows.map((r,i) => validarFilaCSV(r, cursos, instrumentos, dnis, i));
         setFilas(proc);
         setValidas(proc.filter(f=>f.ok));
         setErrores(proc.filter(f=>!f.ok));
@@ -903,7 +925,7 @@ function ModalImport({ cursos, onImportado, onClose }) {
           direccion:f.direccion||null, tutor_nombre:f.tutor_nombre||null,
           tutor_dni:f.tutor_dni||null,
           auth_imagen:f.auth_imagen, auth_general:f.auth_general, auth_boleto:f.auth_boleto,
-          curso_id:f.curso_id||null,
+          inscripciones: f.inscripciones||[],
         })) }
       });
       setResultado(r); setFase('done'); onImportado();
@@ -911,8 +933,7 @@ function ModalImport({ cursos, onImportado, onClose }) {
     finally { setSaving(false); }
   };
 
-  const resumenCursos = {};
-  validas.forEach(f => { const k=f.curso_nombre||'(sin curso)'; resumenCursos[k]=(resumenCursos[k]||0)+1; });
+  const conInscripciones = validas.filter(f=>(f.inscripciones||[]).length>0).length;
 
   return (
     <div className="modal-overlay" onClick={e=>e.target===e.currentTarget&&onClose()}>
@@ -951,9 +972,8 @@ function ModalImport({ cursos, onImportado, onClose }) {
             {validas.length>0 && (
               <div className="alert alert-success" style={{marginBottom:8}}>
                 ✅ <strong>{validas.length} estudiante(s)</strong> listos para importar.
-                {Object.entries(resumenCursos).map(([k,v])=>(
-                  <span key={k}> · {k}: {v}</span>
-                ))}
+                {conInscripciones>0 && <span> · {conInscripciones} con inscripciones</span>}
+                {validas.length-conInscripciones>0 && <span> · {validas.length-conInscripciones} sin instrumento</span>}
               </div>
             )}
             {errores.length>0 && (
@@ -966,7 +986,7 @@ function ModalImport({ cursos, onImportado, onClose }) {
             <div className="preview-scroll">
               <table className="preview-table">
                 <thead>
-                  <tr><th>#</th><th>Apellido, Nombre</th><th>DNI</th><th>Curso</th><th>Estado</th></tr>
+                  <tr><th>#</th><th>Apellido, Nombre</th><th>DNI</th><th>Inscripciones</th><th>Estado</th></tr>
                 </thead>
                 <tbody>
                   {filas.map(f=>(
@@ -974,7 +994,7 @@ function ModalImport({ cursos, onImportado, onClose }) {
                       <td>{f.idx}</td>
                       <td>{f.apellido}, {f.nombre}</td>
                       <td>{f.dni}</td>
-                      <td>{f.curso_nombre||'—'}</td>
+                      <td>{f.inscripcionesLabel||'—'}</td>
                       <td>{f.ok ? '✅' : <span className="pr-error-msg">{f.errors.join(' · ')}</span>}</td>
                     </tr>
                   ))}
@@ -1221,7 +1241,8 @@ function ListaEstudiantes({ user, onNuevo, onEditar }) {
       e.fecha_nacimiento ? e.fecha_nacimiento.split('-').reverse().join('/') : '',
       e.direccion||'', e.tutor_nombre||'', e.tutor_dni||'',
       e.auth_imagen?'sí':'no', e.auth_general?'sí':'no', e.auth_boleto?'sí':'no',
-      (e.inscripciones||[]).map(i=>`${i.instrumento_nombre}:${i.curso_nombre}`).join(' | '),
+      (e.inscripciones||[]).map(i=>i.curso_nombre).join('|'),
+      (e.inscripciones||[]).map(i=>i.instrumento_nombre).join('|'),
     ]);
     const csv  = [COLS_CSV,...rows].map(r=>r.map(v=>`"${String(v||'').replace(/"/g,'""')}"`).join(',')).join('\n');
     const blob = new Blob(['﻿'+csv], {type:'text/csv;charset=utf-8;'});
@@ -1410,6 +1431,7 @@ function ListaEstudiantes({ user, onNuevo, onEditar }) {
       {modalImport && (
         <ModalImport
           cursos={cursos}
+          instrumentos={instrumentos}
           onImportado={() => { cargar(); setSel(new Set()); }}
           onClose={() => setModalImport(false)}
         />
