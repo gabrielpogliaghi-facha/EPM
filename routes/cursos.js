@@ -10,17 +10,14 @@ router.get('/mis-cursos', verifyToken, async (req, res) => {
     const tieneAdmin = req.user.permisos?.includes('administrar_cursos');
     const sql = tieneAdmin
       ? `SELECT c.id, c.nombre, c.color,
-                COUNT(CASE WHEN e.activo=1 THEN 1 END) AS estudiantes
-         FROM cursos c LEFT JOIN estudiantes e ON e.curso_id=c.id
-         WHERE c.institucion_id=? AND c.activo=1
-         GROUP BY c.id ORDER BY c.nombre`
+                (SELECT COUNT(*) FROM inscripciones ins JOIN estudiantes e ON ins.estudiante_id=e.id
+                 WHERE ins.curso_id=c.id AND ins.activo=1 AND e.activo=1) AS estudiantes
+         FROM cursos c WHERE c.institucion_id=? AND c.activo=1 ORDER BY c.nombre`
       : `SELECT c.id, c.nombre, c.color,
-                COUNT(CASE WHEN e.activo=1 THEN 1 END) AS estudiantes
-         FROM usuarios_cursos uc
-         JOIN cursos c ON uc.curso_id=c.id
-         LEFT JOIN estudiantes e ON e.curso_id=c.id AND e.activo=1
-         WHERE uc.usuario_id=? AND c.activo=1
-         GROUP BY c.id ORDER BY c.nombre`;
+                (SELECT COUNT(*) FROM inscripciones ins JOIN estudiantes e ON ins.estudiante_id=e.id
+                 WHERE ins.curso_id=c.id AND ins.activo=1 AND e.activo=1) AS estudiantes
+         FROM usuarios_cursos uc JOIN cursos c ON uc.curso_id=c.id
+         WHERE uc.usuario_id=? AND c.activo=1 ORDER BY c.nombre`;
     const arg = tieneAdmin ? req.user.institucion_id : req.user.id;
     const { rows } = await db.execute({ sql, args: [arg] });
     res.json(rows);
@@ -34,10 +31,9 @@ router.get('/', verifyToken, async (req, res) => {
   try {
     const { rows } = await db.execute({
       sql: `SELECT c.id, c.nombre, c.color,
-                   COUNT(CASE WHEN e.activo = 1 THEN 1 END) AS estudiantes
-            FROM   cursos c LEFT JOIN estudiantes e ON e.curso_id = c.id
-            WHERE  c.institucion_id = ? AND c.activo = 1
-            GROUP  BY c.id ORDER BY c.nombre`,
+                   (SELECT COUNT(*) FROM inscripciones ins JOIN estudiantes e ON ins.estudiante_id=e.id
+                    WHERE ins.curso_id=c.id AND ins.activo=1 AND e.activo=1) AS estudiantes
+            FROM   cursos c WHERE c.institucion_id = ? AND c.activo = 1 ORDER BY c.nombre`,
       args: [req.user.institucion_id],
     });
     res.json(rows);
@@ -56,7 +52,9 @@ router.get('/:id/info', verifyToken, requirePermiso('administrar_cursos'), async
     if (!cRows[0]) return res.status(404).json({ error: 'Curso no encontrado' });
 
     const { rows: eRows } = await db.execute({
-      sql: 'SELECT COUNT(*) AS estudiantes FROM estudiantes WHERE curso_id = ? AND activo = 1',
+      sql: `SELECT COUNT(*) AS estudiantes FROM inscripciones ins
+            JOIN estudiantes e ON ins.estudiante_id=e.id
+            WHERE ins.curso_id=? AND ins.activo=1 AND e.activo=1`,
       args: [req.params.id],
     });
     res.json({ curso: cRows[0], estudiantes: Number(eRows[0].estudiantes) });
@@ -110,7 +108,9 @@ router.delete('/:id', verifyToken, requirePermiso('administrar_cursos'), async (
     if (!cRows[0]) return res.status(404).json({ error: 'Curso no encontrado' });
 
     const { rows: eRows } = await db.execute({
-      sql: 'SELECT COUNT(*) AS estudiantes FROM estudiantes WHERE curso_id = ? AND activo = 1',
+      sql: `SELECT COUNT(*) AS estudiantes FROM inscripciones ins
+            JOIN estudiantes e ON ins.estudiante_id=e.id
+            WHERE ins.curso_id=? AND ins.activo=1 AND e.activo=1`,
       args: [req.params.id],
     });
     const estudiantes = Number(eRows[0].estudiantes);

@@ -604,7 +604,8 @@ const NAV = [
   { id:'asistencia',      label:'Tomar asistencia',  icon:'📋', permiso:'cargar_asistencias' },
   { id:'reportes',        label:'Reportes',          icon:'📊', permiso:'ver_reportes' },
   { id:'planificaciones', label:'Planificaciones',   icon:'📝', permiso:'ver_planificaciones' },
-  { id:'cursos',          label:'Cursos',            icon:'🏫', permiso:'administrar_cursos' },
+  { id:'cursos',          label:'Cursos (Niveles)',   icon:'🏫', permiso:'administrar_cursos' },
+  { id:'instrumentos',    label:'Instrumentos',       icon:'🎸', permiso:'administrar_cursos' },
   { id:'usuarios',        label:'Usuarios y roles',  icon:'👤', permiso:'administrar_usuarios_roles' },
   { id:'backup',          label:'Backup',            icon:'💾', permiso:'acceder_backup' },
 ];
@@ -1162,9 +1163,11 @@ function CalendarioAsistencia({ estudianteId }) {
 
 // ── LISTA DE ESTUDIANTES ────────────────────────────────────────────────────────
 function ListaEstudiantes({ user, onNuevo, onEditar }) {
-  const [cursos,      setCursos]      = useState([]);
-  const [cursoId,     setCursoId]     = useState('');
-  const [buscar,      setBuscar]      = useState('');
+  const [cursos,        setCursos]        = useState([]);
+  const [instrumentos,  setInstrumentos]  = useState([]);
+  const [cursoId,       setCursoId]       = useState('');
+  const [instrumentoId, setInstrumentoId] = useState('');
+  const [buscar,        setBuscar]        = useState('');
   const [estudiantes, setEstudiantes] = useState([]);
   const [loading,     setLoading]     = useState(true);
   const [delTarget,   setDelTarget]   = useState(null);
@@ -1180,19 +1183,23 @@ function ListaEstudiantes({ user, onNuevo, onEditar }) {
   const puede = (p) => user.permisos?.includes(p);
   const showToast = (type, text) => { setToast({ type, text }); setTimeout(() => setToast({type:'',text:''}), 4000); };
 
-  useEffect(() => { apiFetch('/api/cursos').then(setCursos).catch(() => {}); }, []);
+  useEffect(() => {
+    apiFetch('/api/cursos').then(setCursos).catch(()=>{});
+    apiFetch('/api/instrumentos').then(setInstrumentos).catch(()=>{});
+  }, []);
 
   const cargar = useCallback(async () => {
     setLoading(true);
     try {
       const p = new URLSearchParams();
-      if (cursoId)       p.set('curso_id', cursoId);
-      if (buscar.trim()) p.set('buscar', buscar.trim());
+      if (cursoId)        p.set('curso_id',       cursoId);
+      if (instrumentoId)  p.set('instrumento_id', instrumentoId);
+      if (buscar.trim())  p.set('buscar',          buscar.trim());
       setEstudiantes(await apiFetch(`/api/estudiantes?${p}`));
       setSel(new Set());
     } catch (e) { showToast('error', e.message); }
     finally { setLoading(false); }
-  }, [cursoId, buscar]);
+  }, [cursoId, instrumentoId, buscar]);
 
   useEffect(() => { const t = setTimeout(cargar, buscar ? 300 : 0); return () => clearTimeout(t); }, [cargar]);
 
@@ -1214,7 +1221,7 @@ function ListaEstudiantes({ user, onNuevo, onEditar }) {
       e.fecha_nacimiento ? e.fecha_nacimiento.split('-').reverse().join('/') : '',
       e.direccion||'', e.tutor_nombre||'', e.tutor_dni||'',
       e.auth_imagen?'sí':'no', e.auth_general?'sí':'no', e.auth_boleto?'sí':'no',
-      e.curso_nombre||'',
+      (e.inscripciones||[]).map(i=>`${i.instrumento_nombre}:${i.curso_nombre}`).join(' | '),
     ]);
     const csv  = [COLS_CSV,...rows].map(r=>r.map(v=>`"${String(v||'').replace(/"/g,'""')}"`).join(',')).join('\n');
     const blob = new Blob(['﻿'+csv], {type:'text/csv;charset=utf-8;'});
@@ -1258,18 +1265,30 @@ function ListaEstudiantes({ user, onNuevo, onEditar }) {
             <button className="btn btn-secondary btn-auto" onClick={exportarCSV}>📤 Exportar CSV</button>
             {puede('crear_estudiantes') && (<>
               <button className="btn btn-secondary btn-auto" onClick={() => setModalImport(true)}>📥 Importar</button>
-              <button className="btn btn-primary btn-auto" onClick={() => onNuevo(cursoId||null)}>＋ Nueva ficha</button>
+              <button className="btn btn-primary btn-auto" onClick={onNuevo}>＋ Nueva ficha</button>
             </>)}
           </div>
         </div>
 
+        {/* Filtro por nivel */}
         <div className="curso-tabs">
-          <div className={`curso-tab ${!cursoId?'active':''}`} onClick={() => setCursoId('')}>Todos</div>
+          <div className={`curso-tab ${!cursoId?'active':''}`} onClick={() => setCursoId('')}>Todos los niveles</div>
           {cursos.map(c => (
             <div key={c.id} className={`curso-tab ${String(cursoId)===String(c.id)?'active':''}`}
               onClick={() => setCursoId(String(c.id))}>{c.nombre}</div>
           ))}
         </div>
+
+        {/* Filtro por instrumento */}
+        {instrumentos.length > 0 && (
+          <div style={{marginBottom:8}}>
+            <select className="form-control" value={instrumentoId} onChange={e=>setInstrumentoId(e.target.value)}
+              style={{fontSize:13}}>
+              <option value="">🎸 Todos los instrumentos</option>
+              {instrumentos.map(i=><option key={i.id} value={String(i.id)}>{i.nombre}</option>)}
+            </select>
+          </div>
+        )}
 
         <div className="form-group">
           <input className="form-control" placeholder="🔍 Buscar por nombre, apellido o DNI…"
@@ -1316,9 +1335,16 @@ function ListaEstudiantes({ user, onNuevo, onEditar }) {
             </div>
             <div style={{flex:1,minWidth:0,cursor:'pointer'}} onClick={() => onEditar(e.id)}>
               <div className="est-nombre">{e.apellido}, {e.nombre}</div>
-              <div className="est-sub">DNI {e.dni}{e.curso_nombre ? ` · ${e.curso_nombre}` : ''}</div>
+              <div className="est-sub">
+                DNI {e.dni}
+                {(e.inscripciones||[]).length > 0 && (
+                  <span> · {(e.inscripciones||[]).map(i=>`${i.instrumento_nombre} (${i.curso_nombre})`).join(' · ')}</span>
+                )}
+              </div>
             </div>
-            {!cursoId && e.curso_nombre && <span className="est-tag">{e.curso_nombre}</span>}
+            {(e.inscripciones||[]).map(i=>(
+              <span key={i.id} className="est-tag" style={{fontSize:11}}>{i.instrumento_nombre}</span>
+            ))}
             <div className="row-actions">
               <button className="btn-icon" onClick={() => onEditar(e.id)} title="Editar ficha">✏️</button>
               {puede('editar_estudiantes') && (
@@ -1413,10 +1439,153 @@ function ListaEstudiantes({ user, onNuevo, onEditar }) {
   );
 }
 
+// ── PANEL DE INSCRIPCIONES (dentro de la Ficha) ──────────────────────────────────
+function InscripcionesPanel({ estudianteId, user }) {
+  const [inscripciones, setInscripciones] = useState([]);
+  const [cursos,        setCursos]        = useState([]);
+  const [instrumentos,  setInstrumentos]  = useState([]);
+  const [loading,       setLoading]       = useState(true);
+  const [modal,         setModal]         = useState(false);
+  const [editando,      setEditando]      = useState(null); // { id, instrumento_id, instrumento_nombre, curso_id }
+  const [form,          setForm]          = useState({ curso_id:'', instrumento_id:'' });
+  const [saving,        setSaving]        = useState(false);
+  const [error,         setError]         = useState('');
+  const puede = (p) => user.permisos?.includes(p);
+
+  const cargar = async () => {
+    setLoading(true);
+    try {
+      const [ins, cs, instr] = await Promise.all([
+        apiFetch(`/api/estudiantes/${estudianteId}/inscripciones`),
+        apiFetch('/api/cursos'),
+        apiFetch('/api/instrumentos'),
+      ]);
+      setInscripciones(ins); setCursos(cs); setInstrumentos(instr);
+    } catch(e) {} finally { setLoading(false); }
+  };
+
+  useEffect(() => { cargar(); }, [estudianteId]);
+
+  const abrirAgregar = () => {
+    setEditando(null); setForm({ curso_id:'', instrumento_id:'' }); setError(''); setModal(true);
+  };
+  const abrirEditar  = (ins) => {
+    setEditando(ins); setForm({ curso_id: String(ins.curso_id), instrumento_id: String(ins.instrumento_id) });
+    setError(''); setModal(true);
+  };
+  const cerrar = () => setModal(false);
+
+  const guardar = async () => {
+    if (!form.curso_id) { setError('Seleccioná un nivel'); return; }
+    if (!editando && !form.instrumento_id) { setError('Seleccioná un instrumento'); return; }
+    setSaving(true); setError('');
+    try {
+      if (editando) {
+        await apiFetch(`/api/estudiantes/${estudianteId}/inscripciones/${editando.id}`, {
+          method:'PUT', body:{ curso_id: Number(form.curso_id) }
+        });
+      } else {
+        await apiFetch(`/api/estudiantes/${estudianteId}/inscripciones`, {
+          method:'POST', body:{ curso_id: Number(form.curso_id), instrumento_id: Number(form.instrumento_id) }
+        });
+      }
+      cerrar(); cargar();
+    } catch(e) { setError(e.message); }
+    finally { setSaving(false); }
+  };
+
+  const quitar = async (ins) => {
+    if (!window.confirm(`¿Quitar la inscripción de ${ins.instrumento_nombre}?`)) return;
+    try {
+      await apiFetch(`/api/estudiantes/${estudianteId}/inscripciones/${ins.id}`, { method:'DELETE' });
+      cargar();
+    } catch(e) {}
+  };
+
+  // Instrumentos ya inscriptos (para ocultar al agregar)
+  const instrIdUsados = inscripciones.map(i => Number(i.instrumento_id));
+  const instrDisponibles = instrumentos.filter(i => !instrIdUsados.includes(Number(i.id)));
+
+  const NIVEL_ORDER = { Mojarritas:1, Delfines:2, Tiburones:3, Pulpos:4 };
+  const nivelBadge  = (nombre) => {
+    const emoji = { Mojarritas:'🐟', Delfines:'🐬', Tiburones:'🦈', Pulpos:'🐙' }[nombre] || '📚';
+    return `${emoji} ${nombre}`;
+  };
+
+  if (loading) return <div className="spinner" style={{padding:12}}><div className="spin"/></div>;
+
+  return (
+    <div>
+      {inscripciones.length === 0
+        ? <p style={{color:'var(--text2)',fontSize:13,marginBottom:8}}>Sin inscripciones activas.</p>
+        : inscripciones.map(ins => (
+          <div key={ins.id} style={{display:'flex',alignItems:'center',gap:8,marginBottom:6,padding:'8px 10px',
+                                    background:'var(--bg3)',borderRadius:8}}>
+            <span style={{flex:1,fontSize:14}}>
+              <strong>{ins.instrumento_nombre}</strong>
+              <span style={{color:'var(--text2)',marginLeft:6}}>→</span>
+              <span style={{marginLeft:6}}>{nivelBadge(ins.curso_nombre)}</span>
+            </span>
+            {puede('editar_estudiantes') && (<>
+              <button className="btn-icon" onClick={() => abrirEditar(ins)} title="Cambiar nivel">✏️</button>
+              <button className="btn-icon btn-icon-danger" onClick={() => quitar(ins)} title="Quitar">🗑️</button>
+            </>)}
+          </div>
+        ))
+      }
+      {puede('editar_estudiantes') && instrDisponibles.length > 0 && (
+        <button className="btn btn-secondary btn-auto" style={{marginTop:4}} onClick={abrirAgregar}>
+          ＋ Agregar instrumento
+        </button>
+      )}
+
+      {modal && (
+        <div className="modal-overlay" onClick={e=>e.target===e.currentTarget&&cerrar()}>
+          <div className="modal">
+            <div className="modal-header">
+              <span className="modal-title">{editando ? `Cambiar nivel · ${editando.instrumento_nombre}` : 'Agregar inscripción'}</span>
+              <button className="modal-close" onClick={cerrar}>✕</button>
+            </div>
+            {error && <div className="alert alert-error">{error}</div>}
+
+            {!editando && (
+              <div className="form-group">
+                <label className="form-label">Instrumento</label>
+                <select className="form-control" value={form.instrumento_id}
+                  onChange={e=>setForm(p=>({...p,instrumento_id:e.target.value}))}>
+                  <option value="">-- Seleccionar --</option>
+                  {instrDisponibles.map(i=><option key={i.id} value={String(i.id)}>{i.nombre}</option>)}
+                </select>
+              </div>
+            )}
+
+            <div className="form-group">
+              <label className="form-label">Nivel</label>
+              <select className="form-control" value={form.curso_id}
+                onChange={e=>setForm(p=>({...p,curso_id:e.target.value}))}>
+                <option value="">-- Seleccionar --</option>
+                {[...cursos].sort((a,b)=>(NIVEL_ORDER[a.nombre]||99)-(NIVEL_ORDER[b.nombre]||99))
+                  .map(c=><option key={c.id} value={String(c.id)}>{nivelBadge(c.nombre)}</option>)}
+              </select>
+            </div>
+
+            <div className="modal-footer">
+              <button className="btn btn-secondary btn-auto" onClick={cerrar}>Cancelar</button>
+              <button className="btn btn-primary btn-auto" onClick={guardar} disabled={saving}>
+                {saving ? 'Guardando…' : editando ? 'Cambiar nivel' : 'Agregar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── FICHA DE ESTUDIANTE ──────────────────────────────────────────────────────────
 const FORM_VACIO = {
   nombre:'', apellido:'', dni:'', cuit:'', fecha_nacimiento:'',
-  tutor_nombre:'', tutor_dni:'', direccion:'', curso_id:'',
+  tutor_nombre:'', tutor_dni:'', direccion:'',
   auth_imagen:false, auth_general:false, auth_boleto:false,
 };
 
@@ -1426,12 +1595,10 @@ const AUTORIZACIONES = [
   { campo:'auth_boleto',  label:'Autorización Boleto Estudiantil', sub:'Solicitud del beneficio de boleto estudiantil de transporte.' },
 ];
 
-function Ficha({ user, estudianteId, cursoDefault, onClose, onGuardarYCargarOtro }) {
+function Ficha({ user, estudianteId, onClose, onGuardarYCargarOtro, onCreado }) {
   const isNew = !estudianteId;
-  const inicial = { ...FORM_VACIO, curso_id: cursoDefault || '' };
-  const [form,         setForm]        = useState(inicial);
-  const [savedForm,    setSavedForm]   = useState(inicial);
-  const [cursos,       setCursos]      = useState([]);
+  const [form,         setForm]        = useState(FORM_VACIO);
+  const [savedForm,    setSavedForm]   = useState(FORM_VACIO);
   const [loading,      setLoading]     = useState(!isNew);
   const [saving,       setSaving]      = useState(false);
   const [error,        setError]       = useState('');
@@ -1446,7 +1613,6 @@ function Ficha({ user, estudianteId, cursoDefault, onClose, onGuardarYCargarOtro
   const isDirty = JSON.stringify(form) !== JSON.stringify(savedForm) || !!fotoPend || fotoQuitada;
 
   useEffect(() => {
-    apiFetch('/api/cursos').then(setCursos).catch(() => {});
     if (!isNew) {
       apiFetch(`/api/estudiantes/${estudianteId}`)
         .then(data => {
@@ -1459,7 +1625,6 @@ function Ficha({ user, estudianteId, cursoDefault, onClose, onGuardarYCargarOtro
             direccion:        data.direccion || '',
             tutor_nombre:     data.tutor_nombre || '',
             tutor_dni:        data.tutor_dni || '',
-            curso_id:         data.curso_id ? String(data.curso_id) : '',
             auth_imagen:      !!data.auth_imagen,
             auth_general:     !!data.auth_general,
             auth_boleto:      !!data.auth_boleto,
@@ -1496,7 +1661,6 @@ function Ficha({ user, estudianteId, cursoDefault, onClose, onGuardarYCargarOtro
     try {
       const body = {
         ...form,
-        curso_id:     form.curso_id ? Number(form.curso_id) : null,
         auth_imagen:  form.auth_imagen  ? 1 : 0,
         auth_general: form.auth_general ? 1 : 0,
         auth_boleto:  form.auth_boleto  ? 1 : 0,
@@ -1512,7 +1676,9 @@ function Ficha({ user, estudianteId, cursoDefault, onClose, onGuardarYCargarOtro
         await apiFotoUpload(estId, fotoPend);
       }
       setSavedForm(form); setFotoPend(null); setFotoQuitada(false);
-      modo === 'otro' ? onGuardarYCargarOtro(form.curso_id || null) : onClose();
+      if (modo === 'otro') { onGuardarYCargarOtro(); }
+      else if (isNew && onCreado) { onCreado(estId); }
+      else { onClose(); }
     } catch (e) { setError(e.message); }
     finally { setSaving(false); }
   };
@@ -1598,17 +1764,13 @@ function Ficha({ user, estudianteId, cursoDefault, onClose, onGuardarYCargarOtro
         </div>
       </div>
 
-      {/* ── Curso ── */}
+      {/* ── Inscripciones ── */}
       <div className="ficha-section">
-        <div className="ficha-section-title">🏫 Curso</div>
-        <div className="form-group" style={{marginBottom:0}}>
-          <label className="form-label">Asignar a un curso</label>
-          <select className="form-control" value={form.curso_id}
-            onChange={e => set('curso_id', e.target.value)}>
-            <option value="">Sin curso asignado</option>
-            {cursos.map(c => <option key={c.id} value={String(c.id)}>{c.nombre}</option>)}
-          </select>
-        </div>
+        <div className="ficha-section-title">🎵 Inscripciones (instrumento → nivel)</div>
+        {isNew
+          ? <p style={{color:'var(--text2)',fontSize:13,margin:0}}>Guardá la ficha primero para agregar inscripciones.</p>
+          : <InscripcionesPanel estudianteId={estudianteId} user={user} />
+        }
       </div>
 
       {/* ── Autorizaciones ── */}
@@ -1645,6 +1807,11 @@ function Ficha({ user, estudianteId, cursoDefault, onClose, onGuardarYCargarOtro
               {saving ? 'Guardando…' : '💾 Guardar y cargar otro'}
             </button>
           )}
+          {isNew && onCreado && (
+            <button className="btn btn-secondary btn-auto" onClick={() => guardar('editar')} disabled={saving}>
+              {saving ? 'Guardando…' : '💾 Guardar y agregar inscripciones'}
+            </button>
+          )}
           <button className="btn btn-primary btn-auto" onClick={() => guardar('cerrar')} disabled={saving}>
             {saving ? 'Guardando…' : '💾 Guardar y cerrar'}
           </button>
@@ -1656,31 +1823,22 @@ function Ficha({ user, estudianteId, cursoDefault, onClose, onGuardarYCargarOtro
 
 // ── ESTUDIANTES (contenedor) ──────────────────────────────────────────────────────
 function Estudiantes({ user }) {
-  const [view,         setView]         = useState('list');
-  const [fichaId,      setFichaId]      = useState(null);
-  const [fichaKey,     setFichaKey]     = useState(0);
-  const [cursoDefault, setCursoDefault] = useState(null);
+  const [view,     setView]     = useState('list');
+  const [fichaId,  setFichaId]  = useState(null);
+  const [fichaKey, setFichaKey] = useState(0);
 
-  const abrirNuevo  = (curso = null) => {
-    setFichaId(null); setCursoDefault(curso);
-    setFichaKey(k => k + 1); setView('ficha');
-  };
-  const abrirEditar = (id) => {
-    setFichaId(id); setCursoDefault(null);
-    setFichaKey(k => k + 1); setView('ficha');
-  };
-  const cargarOtro  = (curso) => {
-    setFichaId(null); setCursoDefault(curso);
-    setFichaKey(k => k + 1);
-    // se mantiene en 'ficha'; el cambio de key fuerza remount con form vacío
-  };
+  const abrirNuevo  = () => { setFichaId(null); setFichaKey(k=>k+1); setView('ficha'); };
+  const abrirEditar = (id) => { setFichaId(id); setFichaKey(k=>k+1); setView('ficha'); };
+  const cargarOtro  = () => { setFichaId(null); setFichaKey(k=>k+1); };
+  const onCreado    = (id) => { setFichaId(id); setFichaKey(k=>k+1); }; // queda en edit mode
 
   if (view === 'ficha') {
     return (
       <Ficha key={fichaKey} user={user}
-        estudianteId={fichaId} cursoDefault={cursoDefault}
+        estudianteId={fichaId}
         onClose={() => setView('list')}
         onGuardarYCargarOtro={cargarOtro}
+        onCreado={onCreado}
       />
     );
   }
@@ -1940,9 +2098,14 @@ function TomarAsistencia({ user }) {
             <>
               {estudiantes.map(e => {
                 const a = asis[e.id] || { estado: '', observacion: '' };
+                const instrLabel = (e.inscripciones||[])
+                  .map(i=>i.instrumento_nombre).join(' / ');
                 return (
                   <div key={e.id} className={`asis-row ${a.estado ? 'asis-row-'+a.estado : ''}`}>
-                    <div className="asis-nombre">{e.apellido}, {e.nombre}</div>
+                    <div className="asis-nombre">
+                      {e.apellido}, {e.nombre}
+                      {instrLabel && <span style={{fontSize:11,color:'var(--text2)',marginLeft:6}}>· {instrLabel}</span>}
+                    </div>
                     <div className="asis-btns">
                       <button className={`asis-btn asis-presente ${a.estado==='presente'?'sel':''}`}
                         onClick={() => setEst(e.id, 'presente')}>✅ Presente</button>
@@ -3706,6 +3869,141 @@ function Cursos({ user }) {
   );
 }
 
+// ── INSTRUMENTOS ────────────────────────────────────────────────────────────────
+function Instrumentos({ user }) {
+  const [instrumentos, setInstrumentos] = useState([]);
+  const [loading,  setLoading]  = useState(true);
+  const [saving,   setSaving]   = useState(false);
+  const [modal,    setModal]    = useState(null);
+  const [editing,  setEditing]  = useState(null);
+  const [nombre,   setNombre]   = useState('');
+  const [delTarget,setDelTarget]= useState(null);
+  const [toast,    setToast]    = useState({ type:'', text:'' });
+  const [formErr,  setFormErr]  = useState('');
+  const puede = (p) => user.permisos?.includes(p);
+
+  const showToast = (type, text) => { setToast({type,text}); setTimeout(()=>setToast({type:'',text:''}),4000); };
+  const cargar = async () => {
+    setLoading(true);
+    try { setInstrumentos(await apiFetch('/api/instrumentos')); }
+    catch(e) { showToast('error', e.message); }
+    finally { setLoading(false); }
+  };
+  useEffect(() => { cargar(); }, []);
+
+  const abrirNuevo  = () => { setEditing(null); setNombre(''); setFormErr(''); setModal('form'); };
+  const abrirEditar = (i) => { setEditing(i); setNombre(i.nombre); setFormErr(''); setModal('form'); };
+  const cerrar      = () => setModal(null);
+
+  const guardar = async () => {
+    const n = nombre.trim();
+    if (!n) { setFormErr('El nombre no puede estar vacío.'); return; }
+    setSaving(true); setFormErr('');
+    try {
+      if (editing) {
+        await apiFetch(`/api/instrumentos/${editing.id}`, { method:'PUT', body:{nombre:n} });
+        showToast('success', `"${n}" actualizado.`);
+      } else {
+        await apiFetch('/api/instrumentos', { method:'POST', body:{nombre:n} });
+        showToast('success', `Instrumento "${n}" creado.`);
+      }
+      cerrar(); cargar();
+    } catch(e) { setFormErr(e.message); }
+    finally { setSaving(false); }
+  };
+
+  const confirmarBorrar = async () => {
+    setSaving(true);
+    try {
+      await apiFetch(`/api/instrumentos/${delTarget.id}`, { method:'DELETE' });
+      showToast('success', 'Instrumento eliminado.'); cerrar(); cargar();
+    } catch(e) { showToast('error', e.message); }
+    finally { setSaving(false); setDelTarget(null); }
+  };
+
+  return (
+    <div>
+      {toast.text && <div className={`alert alert-${toast.type}`} style={{cursor:'pointer'}} onClick={()=>setToast({type:'',text:''})}>{toast.text}</div>}
+      <div className="card">
+        <div className="section-header">
+          <span className="card-title" style={{marginBottom:0}}>🎸 Instrumentos</span>
+          {puede('administrar_cursos') && (
+            <button className="btn btn-primary btn-auto" onClick={abrirNuevo}>＋ Nuevo</button>
+          )}
+        </div>
+        <p style={{fontSize:12,color:'var(--text2)',marginBottom:12}}>
+          Los instrumentos se combinan con los niveles (Mojarritas → Pulpos) para formar las inscripciones de cada estudiante.
+        </p>
+        {loading ? <div className="spinner"><div className="spin"/></div>
+        : instrumentos.length === 0
+          ? <div className="empty-state"><div className="empty-state-icon">🎸</div><p>No hay instrumentos cargados.</p></div>
+          : instrumentos.map(i => (
+          <div key={i.id} className="list-row">
+            <span className="list-row-label">{i.nombre}</span>
+            <span className="badge-count">{Number(i.inscripciones)} insc.</span>
+            {puede('administrar_cursos') && (
+              <div className="row-actions">
+                <button className="btn-icon" onClick={()=>abrirEditar(i)} title="Renombrar">✏️</button>
+                <button className="btn-icon btn-icon-danger"
+                  onClick={()=>{ setDelTarget(i); setModal('delete'); }} title="Eliminar">🗑️</button>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {modal === 'form' && (
+        <div className="modal-overlay" onClick={e=>e.target===e.currentTarget&&cerrar()}>
+          <div className="modal">
+            <div className="modal-header">
+              <span className="modal-title">{editing ? 'Renombrar instrumento' : 'Nuevo instrumento'}</span>
+              <button className="modal-close" onClick={cerrar}>✕</button>
+            </div>
+            {formErr && <div className="alert alert-error">{formErr}</div>}
+            <div className="form-group">
+              <label className="form-label">Nombre del instrumento</label>
+              <input className="form-control" value={nombre}
+                onChange={e=>setNombre(e.target.value)}
+                onKeyDown={e=>e.key==='Enter'&&guardar()}
+                placeholder="Ej: Guitarra, Canto, Batería…" autoFocus />
+            </div>
+            <div className="modal-footer">
+              <button className="btn btn-secondary btn-auto" onClick={cerrar}>Cancelar</button>
+              <button className="btn btn-primary btn-auto" onClick={guardar} disabled={saving}>
+                {saving ? 'Guardando…' : editing ? 'Guardar cambios' : 'Crear instrumento'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {modal === 'delete' && delTarget && (
+        <div className="modal-overlay" onClick={e=>e.target===e.currentTarget&&cerrar()}>
+          <div className="modal">
+            <div className="modal-header">
+              <span className="modal-title">⚠️ Eliminar instrumento</span>
+              <button className="modal-close" onClick={cerrar}>✕</button>
+            </div>
+            <p style={{marginBottom:12}}>Instrumento: <strong>{delTarget.nombre}</strong></p>
+            {Number(delTarget.inscripciones) > 0
+              ? <div className="alert alert-error">Tiene {Number(delTarget.inscripciones)} inscripción(es) activa(s). Quitálas desde las fichas de los estudiantes antes de eliminar el instrumento.</div>
+              : <div className="alert alert-warning">Esta acción no puede deshacerse.</div>
+            }
+            <div className="modal-footer">
+              <button className="btn btn-secondary btn-auto" onClick={cerrar}>Cancelar</button>
+              {Number(delTarget.inscripciones) === 0 && (
+                <button className="btn btn-danger btn-auto" onClick={confirmarBorrar} disabled={saving}>
+                  {saving ? 'Eliminando…' : 'Eliminar'}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── LAYOUT ──────────────────────────────────────────────────────────────────────
 function Layout({ user }) {
   const [section, setSection] = useState('dashboard');
@@ -3741,6 +4039,8 @@ function Layout({ user }) {
             ? <Backup />
             : section === 'cursos'
             ? <Cursos user={user} />
+            : section === 'instrumentos'
+            ? <Instrumentos user={user} />
             : <Placeholder id={section} />}
         </div>
       </div>

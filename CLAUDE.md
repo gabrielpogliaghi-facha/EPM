@@ -13,7 +13,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Contexto del proyecto
 
-- Sistema de gestión escolar para la **EPM**. Los cursos actuales son: **Mojarritas, Delfines, Tiburones, Pulpos**.
+- Sistema de gestión escolar para la **EPM**. Los cursos (**Mojarritas, Delfines, Tiburones, Pulpos**) son **niveles de experiencia por instrumento**.
 - Está pensado para escalar al secundario de la **Escuela Técnica UNSAM**, con acceso de padres, materias y asistencia por materia.
 - Diseñar siempre pensando en **multi-institución** y en migrar a un servidor online más adelante.
 - El uso principal es desde **celulares**: todo mobile-first.
@@ -37,14 +37,18 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 | 7  | **Backup** | 2026-06-20 | Backup automático inicial + semanal, backup manual, lista, descarga, restauración con reinicio |
 | +  | **Historial de asistencia** (calendario visual) | 2026-06-20 | Grilla mensual color-coded en Ficha de estudiante y en sección Asistencias |
 
+| 8  | **Instrumentos + Inscripciones** | 2026-06-22 | Nuevo modelo: estudiante puede tener múltiples cursos por instrumento. CRUD de instrumentos, panel de inscripciones en Ficha, filtros en lista, instrumento visible en asistencia. Historial de progresión preparado en DB sin UI aún. |
+| inf| **Migración a Turso (libSQL)** | 2026-06-22 | Reemplaza node:sqlite por @libsql/client. Dev usa file:./epm.db; prod usa TURSO_URL + TURSO_AUTH_TOKEN. |
+
 ### Estado general
 
-**TODOS los módulos implementados + historial visual de asistencia.** Pendiente: repaso final (CLAUDE prompt CIERRE).
+**Todos los módulos + modelo de inscripciones por instrumento + Turso en producción.**
 
 ### Decisiones tomadas
 
 - **Eliminación de curso con estudiantes**: se *desactiva* (`activo=0`), nunca se borran datos. Sin estudiantes: se elimina físicamente. El pop-up explica la diferencia antes de confirmar.
-- **Conteo de estudiantes en `GET /api/cursos`**: incluido en la misma query (LEFT JOIN) para no hacer N+1 llamadas desde el frontend.
+- **Modelo inscripciones**: `inscripciones(estudiante_id, curso_id, instrumento_id)` con UNIQUE(estudiante_id, instrumento_id). Un estudiante puede estar en N cursos simultáneos pero solo uno por instrumento. `estudiantes.curso_id` quedó deprecated (nullable, ignorado en UI).
+- **Conteo de estudiantes en `GET /api/cursos`**: via subquery sobre `inscripciones` + `estudiantes` activos. No usa `estudiantes.curso_id`.
 - **Roles globales vs. por institución**: los tres roles base (`Gestión`, `Operador`, `Docente`) tienen `institucion_id = NULL` (globales). Los roles personalizados que Gestión cree tendrán `institucion_id` de la institución.
 - **Permisos en JWT**: los 13 permisos van en el payload del token para evitar una query extra por request. Si se cambian permisos de un rol, el usuario tiene que volver a loguearse para que se reflejen.
 - **DB**: `epm.db` (nueva). La DB anterior está en `escuela_v1.db` como backup.

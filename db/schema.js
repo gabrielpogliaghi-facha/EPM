@@ -212,6 +212,47 @@ async function runSchema(db) {
     CREATE UNIQUE INDEX IF NOT EXISTS idx_asis_materia
       ON asistencias(estudiante_id, fecha, materia_id) WHERE tipo_asistencia = 'materia'
   `);
+
+  // ── INSTRUMENTOS ───────────────────────────────────────────────────────────
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS instrumentos (
+      id             INTEGER PRIMARY KEY AUTOINCREMENT,
+      institucion_id INTEGER NOT NULL REFERENCES instituciones(id),
+      nombre         TEXT NOT NULL,
+      activo         INTEGER DEFAULT 1,
+      created_at     TEXT DEFAULT (datetime('now')),
+      UNIQUE(institucion_id, nombre)
+    )
+  `);
+
+  // ── INSCRIPCIONES (estudiante ↔ curso ↔ instrumento) ─────────────────────
+  // Un estudiante puede estar en varios cursos pero solo uno por instrumento.
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS inscripciones (
+      id             INTEGER PRIMARY KEY AUTOINCREMENT,
+      estudiante_id  INTEGER NOT NULL REFERENCES estudiantes(id) ON DELETE CASCADE,
+      curso_id       INTEGER NOT NULL REFERENCES cursos(id),
+      instrumento_id INTEGER NOT NULL REFERENCES instrumentos(id),
+      activo         INTEGER DEFAULT 1,
+      created_at     TEXT DEFAULT (datetime('now')),
+      updated_at     TEXT DEFAULT (datetime('now')),
+      UNIQUE(estudiante_id, instrumento_id)
+    )
+  `);
+
+  // ── HISTORIAL DE PROGRESIÓN (preparado para futuro, sin UI aún) ──────────
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS historial_inscripciones (
+      id             INTEGER PRIMARY KEY AUTOINCREMENT,
+      estudiante_id  INTEGER NOT NULL REFERENCES estudiantes(id),
+      instrumento_id INTEGER NOT NULL REFERENCES instrumentos(id),
+      curso_id_prev  INTEGER REFERENCES cursos(id),
+      curso_id_nuevo INTEGER NOT NULL REFERENCES cursos(id),
+      fecha_cambio   TEXT DEFAULT (datetime('now')),
+      registrado_por INTEGER REFERENCES usuarios(id),
+      notas          TEXT
+    )
+  `);
 }
 
 module.exports = { runSchema };

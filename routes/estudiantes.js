@@ -123,27 +123,57 @@ router.post('/importar', verifyToken, requirePermiso('crear_estudiantes'), async
   res.json({ importados, errores });
 });
 
-// GET /api/estudiantes
+// GET /api/estudiantes?curso_id=&instrumento_id=&buscar=
 router.get('/', verifyToken, requirePermiso('ver_estudiantes'), async (req, res) => {
   try {
-    const { curso_id, buscar } = req.query;
-    let sql = `
-      SELECT e.id, e.nombre, e.apellido, e.dni, e.cuit, e.fecha_nacimiento,
-             e.tutor_nombre, e.tutor_dni, e.direccion, e.foto_path, e.curso_id,
-             e.auth_imagen, e.auth_general, e.auth_boleto, e.created_at,
-             c.nombre AS curso_nombre
-      FROM   estudiantes e LEFT JOIN cursos c ON e.curso_id = c.id
-      WHERE  e.institucion_id = ? AND e.activo = 1
-    `;
-    const args = [req.user.institucion_id];
-    if (curso_id) { sql += ' AND e.curso_id = ?'; args.push(Number(curso_id)); }
+    const { curso_id, instrumento_id, buscar } = req.query;
+
+    let sql = `SELECT DISTINCT e.id, e.nombre, e.apellido, e.dni, e.cuit, e.fecha_nacimiento,
+               e.tutor_nombre, e.tutor_dni, e.direccion, e.foto_path,
+               e.auth_imagen, e.auth_general, e.auth_boleto, e.created_at
+               FROM estudiantes e`;
+    const args = [];
+
+    if (curso_id || instrumento_id) {
+      sql += ' JOIN inscripciones ins ON ins.estudiante_id = e.id AND ins.activo = 1';
+    }
+    sql += ' WHERE e.institucion_id = ? AND e.activo = 1';
+    args.push(req.user.institucion_id);
+
+    if (curso_id)       { sql += ' AND ins.curso_id = ?';       args.push(Number(curso_id)); }
+    if (instrumento_id) { sql += ' AND ins.instrumento_id = ?'; args.push(Number(instrumento_id)); }
     if (buscar) {
       sql += ' AND (e.nombre LIKE ? OR e.apellido LIKE ? OR e.dni LIKE ?)';
       const t = `%${buscar}%`; args.push(t, t, t);
     }
     sql += ' ORDER BY e.apellido, e.nombre';
-    const { rows } = await db.execute({ sql, args });
-    res.json(rows);
+
+    const { rows: estudiantes } = await db.execute({ sql, args });
+
+    // Carga todas las inscripciones de los estudiantes obtenidos en una sola query (evita N+1)
+    if (estudiantes.length === 0) return res.json([]);
+
+    const estIds  = estudiantes.map(e => Number(e.id));
+    const ph      = estIds.map(() => '?').join(',');
+    const { rows: inscs } = await db.execute({
+      sql: `SELECT ins.id, ins.estudiante_id, ins.curso_id, ins.instrumento_id,
+                   c.nombre AS curso_nombre, i.nombre AS instrumento_nombre
+            FROM inscripciones ins
+            JOIN cursos      c ON ins.curso_id       = c.id
+            JOIN instrumentos i ON ins.instrumento_id = i.id
+            WHERE ins.estudiante_id IN (${ph}) AND ins.activo = 1
+            ORDER BY i.nombre`,
+      args: estIds,
+    });
+
+    const inscMap = {};
+    inscs.forEach(ins => {
+      const eid = Number(ins.estudiante_id);
+      if (!inscMap[eid]) inscMap[eid] = [];
+      inscMap[eid].push(ins);
+    });
+
+    res.json(estudiantes.map(e => ({ ...e, inscripciones: inscMap[Number(e.id)] || [] })));
   } catch (e) {
     res.status(500).json({ error: 'Error al obtener estudiantes' });
   }
@@ -153,11 +183,22 @@ router.get('/', verifyToken, requirePermiso('ver_estudiantes'), async (req, res)
 router.get('/:id', verifyToken, requirePermiso('ver_estudiantes'), async (req, res) => {
   try {
     const { rows } = await db.execute({
-      sql: `SELECT e.*, c.nombre AS curso_nombre FROM estudiantes e LEFT JOIN cursos c ON e.curso_id = c.id WHERE e.id = ? AND e.institucion_id = ? AND e.activo = 1`,
+      sql: `SELECT e.* FROM estudiantes e WHERE e.id = ? AND e.institucion_id = ? AND e.activo = 1`,
       args: [Number(req.params.id), req.user.institucion_id],
     });
     if (!rows[0]) return res.status(404).json({ error: 'Estudiante no encontrado' });
-    res.json(rows[0]);
+
+    const { rows: inscs } = await db.execute({
+      sql: `SELECT ins.id, ins.curso_id, ins.instrumento_id,
+                   c.nombre AS curso_nombre, i.nombre AS instrumento_nombre
+            FROM inscripciones ins
+            JOIN cursos      c ON ins.curso_id       = c.id
+            JOIN instrumentos i ON ins.instrumento_id = i.id
+            WHERE ins.estudiante_id = ? AND ins.activo = 1
+            ORDER BY i.nombre`,
+      args: [Number(req.params.id)],
+    });
+    res.json({ ...rows[0], inscripciones: inscs });
   } catch (e) {
     res.status(500).json({ error: 'Error al obtener estudiante' });
   }
@@ -226,6 +267,104 @@ router.put('/:id', verifyToken, requirePermiso('editar_estudiantes'), async (req
   } catch (e) {
     if (e.message?.includes('UNIQUE')) return res.status(409).json({ error: 'Ya existe un estudiante con ese DNI' });
     res.status(500).json({ error: 'Error al actualizar estudiante' });
+  }
+});
+
+// ── INSCRIPCIONES ─────────────────────────────────────────────────────────────
+
+// GET /api/estudiantes/:id/inscripciones
+router.get('/:id/inscripciones', verifyToken, requirePermiso('ver_estudiantes'), async (req, res) => {
+  try {
+    const { rows } = await db.execute({
+      sql: `SELECT ins.id, ins.curso_id, ins.instrumento_id,
+                   c.nombre AS curso_nombre, i.nombre AS instrumento_nombre
+            FROM inscripciones ins
+            JOIN cursos      c ON ins.curso_id       = c.id
+            JOIN instrumentos i ON ins.instrumento_id = i.id
+            WHERE ins.estudiante_id = ? AND ins.activo = 1
+            ORDER BY i.nombre`,
+      args: [Number(req.params.id)],
+    });
+    res.json(rows);
+  } catch (e) {
+    res.status(500).json({ error: 'Error al obtener inscripciones' });
+  }
+});
+
+// POST /api/estudiantes/:id/inscripciones — agregar inscripción {curso_id, instrumento_id}
+router.post('/:id/inscripciones', verifyToken, requirePermiso('editar_estudiantes'), async (req, res) => {
+  const { curso_id, instrumento_id } = req.body;
+  if (!curso_id || !instrumento_id) return res.status(400).json({ error: 'curso_id e instrumento_id requeridos' });
+
+  const estId = Number(req.params.id);
+  try {
+    const { rows: est } = await db.execute({
+      sql: 'SELECT id FROM estudiantes WHERE id=? AND institucion_id=? AND activo=1',
+      args: [estId, req.user.institucion_id],
+    });
+    if (!est[0]) return res.status(404).json({ error: 'Estudiante no encontrado' });
+
+    const r = await db.execute({
+      sql: 'INSERT INTO inscripciones (estudiante_id, curso_id, instrumento_id) VALUES (?,?,?)',
+      args: [estId, Number(curso_id), Number(instrumento_id)],
+    });
+    res.status(201).json({ id: Number(r.lastInsertRowid) });
+  } catch (e) {
+    if (e.message?.includes('UNIQUE')) return res.status(409).json({ error: 'Este estudiante ya tiene una inscripción en ese instrumento' });
+    res.status(500).json({ error: 'Error al crear inscripción' });
+  }
+});
+
+// PUT /api/estudiantes/:id/inscripciones/:inscId — cambiar nivel (curso)
+router.put('/:id/inscripciones/:inscId', verifyToken, requirePermiso('editar_estudiantes'), async (req, res) => {
+  const { curso_id } = req.body;
+  if (!curso_id) return res.status(400).json({ error: 'curso_id requerido' });
+
+  const estId  = Number(req.params.id);
+  const inscId = Number(req.params.inscId);
+  try {
+    const { rows } = await db.execute({
+      sql: `SELECT ins.id, ins.instrumento_id, ins.curso_id FROM inscripciones ins
+            JOIN estudiantes e ON ins.estudiante_id = e.id
+            WHERE ins.id=? AND ins.estudiante_id=? AND e.institucion_id=? AND ins.activo=1`,
+      args: [inscId, estId, req.user.institucion_id],
+    });
+    if (!rows[0]) return res.status(404).json({ error: 'Inscripción no encontrada' });
+
+    const cursoAnterior = Number(rows[0].curso_id);
+    await db.execute({
+      sql: "UPDATE inscripciones SET curso_id=?, updated_at=datetime('now') WHERE id=?",
+      args: [Number(curso_id), inscId],
+    });
+
+    // Registrar en historial si hubo cambio de nivel
+    if (cursoAnterior !== Number(curso_id)) {
+      await db.execute({
+        sql: 'INSERT INTO historial_inscripciones (estudiante_id, instrumento_id, curso_id_prev, curso_id_nuevo, registrado_por) VALUES (?,?,?,?,?)',
+        args: [estId, Number(rows[0].instrumento_id), cursoAnterior, Number(curso_id), req.user.id],
+      });
+    }
+    res.json({ success: true });
+  } catch (e) {
+    res.status(500).json({ error: 'Error al actualizar inscripción' });
+  }
+});
+
+// DELETE /api/estudiantes/:id/inscripciones/:inscId
+router.delete('/:id/inscripciones/:inscId', verifyToken, requirePermiso('editar_estudiantes'), async (req, res) => {
+  const estId  = Number(req.params.id);
+  const inscId = Number(req.params.inscId);
+  try {
+    const { rows } = await db.execute({
+      sql: `SELECT ins.id FROM inscripciones ins JOIN estudiantes e ON ins.estudiante_id = e.id
+            WHERE ins.id=? AND ins.estudiante_id=? AND e.institucion_id=? AND ins.activo=1`,
+      args: [inscId, estId, req.user.institucion_id],
+    });
+    if (!rows[0]) return res.status(404).json({ error: 'Inscripción no encontrada' });
+    await db.execute({ sql: 'UPDATE inscripciones SET activo=0 WHERE id=?', args: [inscId] });
+    res.json({ success: true });
+  } catch (e) {
+    res.status(500).json({ error: 'Error al eliminar inscripción' });
   }
 });
 

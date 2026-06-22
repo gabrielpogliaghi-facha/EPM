@@ -74,6 +74,11 @@ async function runSeed(db) {
       await db.execute({ sql: 'INSERT INTO roles_permisos (rol_id, permiso_id) VALUES (?,?)', args: [dId, permisoIds[c]] });
     }
 
+    // Instrumentos iniciales
+    for (const nombre of ['Guitarra', 'Canto', 'Batería', 'Bajo', 'Piano', 'Violín', 'Flauta', 'Teclado']) {
+      await db.execute({ sql: 'INSERT INTO instrumentos (institucion_id, nombre) VALUES (?,?)', args: [epmId, nombre] });
+    }
+
     // Usuario inicial de Gestión
     await db.execute({
       sql: 'INSERT INTO usuarios (institucion_id, nombre, email, password_hash, rol_id) VALUES (?,?,?,?,?)',
