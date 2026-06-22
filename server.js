@@ -4,9 +4,6 @@ const express = require('express');
 const cors    = require('cors');
 const path    = require('path');
 
-// DB se inicializa aquí (schema + seed en el require)
-require('./db');
-
 const app  = express();
 const PORT = process.env.PORT || 3001;
 
@@ -27,31 +24,6 @@ app.use('/api/periodos',        require('./routes/periodos'));
 app.use('/api/reportes',        require('./routes/reportes'));
 app.use('/api/backup',          require('./routes/backup'));
 
-// ── BACKUP AUTOMÁTICO SEMANAL ─────────────────────────────────────────────────
-{
-  const { createBackupNow, backupDir, ensureBackupDir } = require('./utils/backup');
-  const fs   = require('fs');
-  const WEEK = 7 * 24 * 60 * 60 * 1000;
-
-  const runWeeklyBackup = () => {
-    try {
-      const { filename } = createBackupNow();
-      console.log(`✅ Backup automático: ${filename}`);
-    } catch(e) {
-      console.error('❌ Error en backup automático:', e.message);
-    }
-  };
-
-  // Backup inicial si no existe ninguno (primer uso del sistema)
-  setTimeout(() => {
-    ensureBackupDir();
-    const existing = fs.readdirSync(backupDir).filter(f => f.startsWith('backup_'));
-    if (existing.length === 0) runWeeklyBackup();
-    // Luego semanal
-    setInterval(runWeeklyBackup, WEEK);
-  }, 8000); // 8 seg después del arranque, para no bloquear la inicialización
-}
-
 // ── SPA FALLBACK ───────────────────────────────────────────────────────────────
 app.get('*', (req, res) => {
   const indexPath = path.join(__dirname, 'public', 'index.html');
@@ -63,8 +35,47 @@ app.get('*', (req, res) => {
   });
 });
 
-app.listen(PORT, () => {
-  console.log(`\n✅  EPM Sistema corriendo en http://localhost:${PORT}`);
-  console.log(`    DB:      ${process.env.DB_PATH || './epm.db'}`);
-  console.log(`    Entorno: ${process.env.NODE_ENV || 'development'}\n`);
+// ── INICIALIZACIÓN ─────────────────────────────────────────────────────────────
+async function init() {
+  const db              = require('./db');
+  const { runSchema }   = require('./db/schema');
+  const { runSeed }     = require('./db/seed');
+  const { IS_TURSO }    = require('./utils/backup');
+
+  await runSchema(db);
+  await runSeed(db);
+
+  // Backup automático semanal solo en modo local (SQLite file)
+  if (!IS_TURSO) {
+    const { createBackupNow, backupDir, ensureBackupDir } = require('./utils/backup');
+    const fs   = require('fs');
+    const WEEK = 7 * 24 * 60 * 60 * 1000;
+
+    const runWeeklyBackup = async () => {
+      try {
+        const { filename } = await createBackupNow();
+        console.log(`✅ Backup automático: ${filename}`);
+      } catch(e) {
+        console.error('❌ Error en backup automático:', e.message);
+      }
+    };
+
+    setTimeout(async () => {
+      ensureBackupDir();
+      const existing = fs.readdirSync(backupDir).filter(f => f.startsWith('backup_'));
+      if (existing.length === 0) await runWeeklyBackup();
+      setInterval(runWeeklyBackup, WEEK);
+    }, 8000);
+  }
+
+  app.listen(PORT, () => {
+    console.log(`\n✅  EPM Sistema corriendo en http://localhost:${PORT}`);
+    console.log(`    DB:      ${process.env.TURSO_URL || 'file:./epm.db'}`);
+    console.log(`    Entorno: ${process.env.NODE_ENV || 'development'}\n`);
+  });
+}
+
+init().catch(err => {
+  console.error('❌ Error crítico en inicialización:', err);
+  process.exit(1);
 });

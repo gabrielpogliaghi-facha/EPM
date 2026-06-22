@@ -1,15 +1,11 @@
-const { DatabaseSync } = require('node:sqlite');
-const path = require('path');
-const { runSchema } = require('./schema');
-const { runSeed }   = require('./seed');
+const { createClient } = require('@libsql/client');
 
-const dbPath = process.env.DB_PATH || './epm.db';
-const db = new DatabaseSync(path.resolve(dbPath));
+const url       = process.env.TURSO_URL || 'file:./epm.db';
+const authToken = process.env.TURSO_AUTH_TOKEN || undefined;
 
-db.exec('PRAGMA journal_mode = WAL');
-db.exec('PRAGMA foreign_keys = ON');
+const db = createClient({ url, authToken });
 
-runSchema(db);
-runSeed(db);
+// Flag accesible desde otros módulos para condicionar comportamiento file-only (ej: backup)
+db.IS_TURSO = url.startsWith('libsql://') || url.startsWith('https://');
 
 module.exports = db;

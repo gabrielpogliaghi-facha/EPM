@@ -4,13 +4,14 @@ const path    = require('path');
 const fs      = require('fs');
 const { verifyToken }    = require('../middleware/auth');
 const { requirePermiso } = require('../middleware/permission');
-const { backupDir, getDbPath, createBackupNow } = require('../utils/backup');
+const { backupDir, getDbPath, createBackupNow, IS_TURSO } = require('../utils/backup');
 
 const VALID_FILE = /^backup_\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}\.db$/;
 const sanitize   = s => s.replace(/[^a-zA-Z0-9_\-\.]/g, '');
 
 // GET /api/backup/lista
 router.get('/lista', verifyToken, requirePermiso('acceder_backup'), (req, res) => {
+  if (IS_TURSO) return res.json({ turso: true, files: [] });
   try {
     fs.mkdirSync(backupDir, { recursive: true });
     const files = fs.readdirSync(backupDir)
@@ -20,8 +21,8 @@ router.get('/lista', verifyToken, requirePermiso('acceder_backup'), (req, res) =
         return {
           filename:   f,
           size:       stat.size,
-          fecha:      f.slice(7, 17),           // YYYY-MM-DD
-          hora:       f.slice(18, 26).replace(/-/g, ':'), // HH:MM:SS
+          fecha:      f.slice(7, 17),
+          hora:       f.slice(18, 26).replace(/-/g, ':'),
           created_at: stat.mtime.toISOString(),
         };
       })
@@ -31,9 +32,10 @@ router.get('/lista', verifyToken, requirePermiso('acceder_backup'), (req, res) =
 });
 
 // POST /api/backup/crear
-router.post('/crear', verifyToken, requirePermiso('acceder_backup'), (req, res) => {
+router.post('/crear', verifyToken, requirePermiso('acceder_backup'), async (req, res) => {
+  if (IS_TURSO) return res.status(503).json({ error: 'Backup de archivos no disponible en modo nube. Usá el panel de Turso.' });
   try {
-    const result = createBackupNow();
+    const result = await createBackupNow();
     res.json({ success: true, ...result });
   } catch(e) {
     res.status(500).json({ error: `Error al crear backup: ${e.message}` });
@@ -42,6 +44,7 @@ router.post('/crear', verifyToken, requirePermiso('acceder_backup'), (req, res) 
 
 // GET /api/backup/descargar/:filename
 router.get('/descargar/:filename', verifyToken, requirePermiso('acceder_backup'), (req, res) => {
+  if (IS_TURSO) return res.status(503).json({ error: 'No disponible en modo nube.' });
   const filename = sanitize(req.params.filename);
   if (!VALID_FILE.test(filename)) return res.status(400).json({ error: 'Nombre de archivo inválido' });
   const filePath = path.join(backupDir, filename);
@@ -50,19 +53,16 @@ router.get('/descargar/:filename', verifyToken, requirePermiso('acceder_backup')
 });
 
 // POST /api/backup/restaurar/:filename
-// NOTA: cierra el servidor al final. El usuario debe reiniciarlo manualmente.
-// FUTURO NUBE: aquí se descargaría el backup desde el storage antes de aplicarlo.
-router.post('/restaurar/:filename', verifyToken, requirePermiso('acceder_backup'), (req, res) => {
+router.post('/restaurar/:filename', verifyToken, requirePermiso('acceder_backup'), async (req, res) => {
+  if (IS_TURSO) return res.status(503).json({ error: 'Restauración no disponible en modo nube.' });
   const filename = sanitize(req.params.filename);
   if (!VALID_FILE.test(filename)) return res.status(400).json({ error: 'Nombre de archivo inválido' });
   const srcPath = path.join(backupDir, filename);
   if (!fs.existsSync(srcPath)) return res.status(404).json({ error: 'Backup no encontrado' });
 
   try {
-    // Backup de seguridad del estado actual antes de restaurar
-    createBackupNow();
+    await createBackupNow();
 
-    // Copia el backup a un archivo de staging
     const stagingPath = getDbPath() + '.pending_restore';
     fs.copyFileSync(srcPath, stagingPath);
 
@@ -71,12 +71,11 @@ router.post('/restaurar/:filename', verifyToken, requirePermiso('acceder_backup'
       message: 'Restauración preparada. El servidor se cerrará en 2 segundos. Reinicialo manualmente para aplicar el backup.',
     });
 
-    // Después de enviar la respuesta: cerrar DB, swap de archivos, salir
-    setTimeout(() => {
+    setTimeout(async () => {
       try {
         const db = require('../db');
-        db.exec('PRAGMA wal_checkpoint(TRUNCATE)');
-        db.close(); // libera el lock del archivo en Windows
+        try { await db.execute('PRAGMA wal_checkpoint(TRUNCATE)'); } catch(e) {}
+        db.close();
         fs.copyFileSync(stagingPath, getDbPath());
         try { fs.unlinkSync(stagingPath); } catch(e) {}
       } catch(e) { console.error('Error aplicando restore:', e.message); }

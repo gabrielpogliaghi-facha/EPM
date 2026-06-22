@@ -1,6 +1,5 @@
-function runSchema(db) {
-  // ── INSTITUCIONES ──────────────────────────────────────────────────────────
-  db.exec(`
+async function runSchema(db) {
+  await db.execute(`
     CREATE TABLE IF NOT EXISTS instituciones (
       id          INTEGER PRIMARY KEY AUTOINCREMENT,
       nombre      TEXT NOT NULL,
@@ -11,8 +10,7 @@ function runSchema(db) {
     )
   `);
 
-  // ── CURSOS ─────────────────────────────────────────────────────────────────
-  db.exec(`
+  await db.execute(`
     CREATE TABLE IF NOT EXISTS cursos (
       id             INTEGER PRIMARY KEY AUTOINCREMENT,
       institucion_id INTEGER NOT NULL REFERENCES instituciones(id),
@@ -25,8 +23,7 @@ function runSchema(db) {
     )
   `);
 
-  // ── MATERIAS (futuro UNSAM) ────────────────────────────────────────────────
-  db.exec(`
+  await db.execute(`
     CREATE TABLE IF NOT EXISTS materias (
       id             INTEGER PRIMARY KEY AUTOINCREMENT,
       institucion_id INTEGER NOT NULL REFERENCES instituciones(id),
@@ -37,9 +34,7 @@ function runSchema(db) {
     )
   `);
 
-  // ── ROLES ─────────────────────────────────────────────────────────────────
-  // institucion_id NULL = rol de sistema global; NOT NULL = rol personalizado de institución
-  db.exec(`
+  await db.execute(`
     CREATE TABLE IF NOT EXISTS roles (
       id             INTEGER PRIMARY KEY AUTOINCREMENT,
       institucion_id INTEGER REFERENCES instituciones(id),
@@ -50,8 +45,7 @@ function runSchema(db) {
     )
   `);
 
-  // ── PERMISOS (catálogo) ────────────────────────────────────────────────────
-  db.exec(`
+  await db.execute(`
     CREATE TABLE IF NOT EXISTS permisos (
       id          INTEGER PRIMARY KEY AUTOINCREMENT,
       codigo      TEXT UNIQUE NOT NULL,
@@ -60,17 +54,15 @@ function runSchema(db) {
     )
   `);
 
-  // ── MATRIZ ROL → PERMISOS ─────────────────────────────────────────────────
-  db.exec(`
+  await db.execute(`
     CREATE TABLE IF NOT EXISTS roles_permisos (
-      rol_id    INTEGER NOT NULL REFERENCES roles(id) ON DELETE CASCADE,
+      rol_id     INTEGER NOT NULL REFERENCES roles(id) ON DELETE CASCADE,
       permiso_id INTEGER NOT NULL REFERENCES permisos(id) ON DELETE CASCADE,
       PRIMARY KEY (rol_id, permiso_id)
     )
   `);
 
-  // ── USUARIOS ───────────────────────────────────────────────────────────────
-  db.exec(`
+  await db.execute(`
     CREATE TABLE IF NOT EXISTS usuarios (
       id             INTEGER PRIMARY KEY AUTOINCREMENT,
       institucion_id INTEGER NOT NULL REFERENCES instituciones(id),
@@ -84,9 +76,7 @@ function runSchema(db) {
     )
   `);
 
-  // ── ASIGNACIÓN DOCENTE-CURSO (un docente puede tener múltiples cursos) ─────
-  // materia_id NULL = EPM (sin materias); NOT NULL = futuro UNSAM
-  db.exec(`
+  await db.execute(`
     CREATE TABLE IF NOT EXISTS usuarios_cursos (
       id         INTEGER PRIMARY KEY AUTOINCREMENT,
       usuario_id INTEGER NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
@@ -94,17 +84,16 @@ function runSchema(db) {
       materia_id INTEGER REFERENCES materias(id) ON DELETE CASCADE
     )
   `);
-  db.exec(`
+  await db.execute(`
     CREATE UNIQUE INDEX IF NOT EXISTS idx_ucursos_general
       ON usuarios_cursos(usuario_id, curso_id) WHERE materia_id IS NULL
   `);
-  db.exec(`
+  await db.execute(`
     CREATE UNIQUE INDEX IF NOT EXISTS idx_ucursos_materia
       ON usuarios_cursos(usuario_id, curso_id, materia_id) WHERE materia_id IS NOT NULL
   `);
 
-  // ── ESTUDIANTES ────────────────────────────────────────────────────────────
-  db.exec(`
+  await db.execute(`
     CREATE TABLE IF NOT EXISTS estudiantes (
       id               INTEGER PRIMARY KEY AUTOINCREMENT,
       institucion_id   INTEGER NOT NULL REFERENCES instituciones(id),
@@ -117,6 +106,7 @@ function runSchema(db) {
       tutor_nombre     TEXT,
       tutor_dni        TEXT,
       direccion        TEXT,
+      foto_path        TEXT,
       auth_imagen      INTEGER DEFAULT 0,
       auth_general     INTEGER DEFAULT 0,
       auth_boleto      INTEGER DEFAULT 0,
@@ -127,8 +117,7 @@ function runSchema(db) {
     )
   `);
 
-  // ── USUARIOS-ESTUDIANTES (futuro: acceso de padres/tutores) ────────────────
-  db.exec(`
+  await db.execute(`
     CREATE TABLE IF NOT EXISTS usuarios_estudiantes (
       usuario_id    INTEGER NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
       estudiante_id INTEGER NOT NULL REFERENCES estudiantes(id) ON DELETE CASCADE,
@@ -137,8 +126,7 @@ function runSchema(db) {
     )
   `);
 
-  // ── CICLOS LECTIVOS ────────────────────────────────────────────────────────
-  db.exec(`
+  await db.execute(`
     CREATE TABLE IF NOT EXISTS ciclos_lectivos (
       id             INTEGER PRIMARY KEY AUTOINCREMENT,
       institucion_id INTEGER NOT NULL REFERENCES instituciones(id),
@@ -151,20 +139,18 @@ function runSchema(db) {
     )
   `);
 
-  // ── SEMESTRES (hijos del ciclo lectivo, usados para reportes) ─────────────
-  db.exec(`
+  await db.execute(`
     CREATE TABLE IF NOT EXISTS semestres (
-      id                INTEGER PRIMARY KEY AUTOINCREMENT,
-      ciclo_lectivo_id  INTEGER NOT NULL REFERENCES ciclos_lectivos(id) ON DELETE CASCADE,
-      nombre            TEXT NOT NULL,
-      numero            INTEGER NOT NULL CHECK(numero IN (1,2)),
-      fecha_inicio      TEXT NOT NULL,
-      fecha_fin         TEXT NOT NULL
+      id               INTEGER PRIMARY KEY AUTOINCREMENT,
+      ciclo_lectivo_id INTEGER NOT NULL REFERENCES ciclos_lectivos(id) ON DELETE CASCADE,
+      nombre           TEXT NOT NULL,
+      numero           INTEGER NOT NULL CHECK(numero IN (1,2)),
+      fecha_inicio     TEXT NOT NULL,
+      fecha_fin        TEXT NOT NULL
     )
   `);
 
-  // ── PERÍODOS DE PLANIFICACIÓN (independientes de semestres) ───────────────
-  db.exec(`
+  await db.execute(`
     CREATE TABLE IF NOT EXISTS periodos_planificacion (
       id             INTEGER PRIMARY KEY AUTOINCREMENT,
       institucion_id INTEGER NOT NULL REFERENCES instituciones(id),
@@ -176,9 +162,7 @@ function runSchema(db) {
     )
   `);
 
-  // ── PLANIFICACIONES DE CONTENIDOS ─────────────────────────────────────────
-  // materia_id NULL = EPM; NOT NULL = futuro UNSAM (planificación por materia)
-  db.exec(`
+  await db.execute(`
     CREATE TABLE IF NOT EXISTS planificaciones (
       id             INTEGER PRIMARY KEY AUTOINCREMENT,
       institucion_id INTEGER NOT NULL REFERENCES instituciones(id),
@@ -193,8 +177,7 @@ function runSchema(db) {
     )
   `);
 
-  // ── CONTENIDOS DE PLANIFICACIONES (ítems ordenables) ─────────────────────
-  db.exec(`
+  await db.execute(`
     CREATE TABLE IF NOT EXISTS planificacion_contenidos (
       id               INTEGER PRIMARY KEY AUTOINCREMENT,
       planificacion_id INTEGER NOT NULL REFERENCES planificaciones(id) ON DELETE CASCADE,
@@ -205,10 +188,7 @@ function runSchema(db) {
     )
   `);
 
-  // ── ASISTENCIAS ────────────────────────────────────────────────────────────
-  // tipo_asistencia: 'general' (EPM) o 'materia' (futuro UNSAM)
-  // materia_id NULL cuando tipo = 'general'
-  db.exec(`
+  await db.execute(`
     CREATE TABLE IF NOT EXISTS asistencias (
       id               INTEGER PRIMARY KEY AUTOINCREMENT,
       institucion_id   INTEGER NOT NULL REFERENCES instituciones(id),
@@ -224,19 +204,14 @@ function runSchema(db) {
       updated_at       TEXT DEFAULT (datetime('now'))
     )
   `);
-  // Índices parciales: un registro por alumno/fecha para asistencia general
-  db.exec(`
+  await db.execute(`
     CREATE UNIQUE INDEX IF NOT EXISTS idx_asis_general
       ON asistencias(estudiante_id, fecha) WHERE tipo_asistencia = 'general'
   `);
-  // Un registro por alumno/fecha/materia para asistencia por materia
-  db.exec(`
+  await db.execute(`
     CREATE UNIQUE INDEX IF NOT EXISTS idx_asis_materia
       ON asistencias(estudiante_id, fecha, materia_id) WHERE tipo_asistencia = 'materia'
   `);
-
-  // Migraciones acumulativas (se ignoran si ya existen)
-  try { db.exec("ALTER TABLE estudiantes ADD COLUMN foto_path TEXT"); } catch(e) {}
 }
 
 module.exports = { runSchema };
