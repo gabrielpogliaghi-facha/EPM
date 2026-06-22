@@ -14,13 +14,16 @@ const PERMISOS = [
   { codigo: 'administrar_usuarios_roles', descripcion: 'Administrar usuarios y roles',       grupo: 'administracion' },
   { codigo: 'administrar_cursos',         descripcion: 'Administrar cursos',                 grupo: 'administracion' },
   { codigo: 'acceder_backup',             descripcion: 'Acceder a backup del sistema',       grupo: 'administracion' },
+  { codigo: 'ver_legajo_personal',        descripcion: 'Ver legajo personal de estudiantes',    grupo: 'estudiantes' },
+  { codigo: 'editar_legajo_personal',     descripcion: 'Editar legajo personal de estudiantes', grupo: 'estudiantes' },
 ];
 
 const ROL_OPERADOR = ['ver_estudiantes','crear_estudiantes','editar_estudiantes',
                       'ver_asistencias','cargar_asistencias','justificar_ausencias',
                       'ver_reportes','editar_reportes','administrar_cursos'];
 const ROL_DOCENTE  = ['ver_estudiantes','ver_asistencias','cargar_asistencias',
-                      'ver_reportes','ver_planificaciones','editar_planificaciones'];
+                      'ver_reportes','ver_planificaciones','editar_planificaciones',
+                      'ver_legajo_personal','editar_legajo_personal'];
 
 async function runSeed(db) {
   const check = await db.execute('SELECT COUNT(*) AS c FROM instituciones');

@@ -582,6 +582,33 @@
     .backup-meta   { font-size:11px; color:var(--text2); margin-top:2px; }
     .restore-warning { background:#fef2f2; border:2px solid var(--danger); border-radius:var(--radius); padding:18px; margin-bottom:16px; }
     .restore-warning strong { color:var(--danger); }
+
+    /* ── FICHA TABS ─────────────────────────────────────────────────────────── */
+    .ficha-tab-bar { display:flex; gap:0; border-bottom:2px solid var(--border); margin-bottom:12px; }
+    .ficha-tab-btn { flex:1; padding:11px 4px; text-align:center; font-size:13px; font-weight:600;
+                     color:var(--text2); border:none; background:none; cursor:pointer;
+                     border-bottom:3px solid transparent; margin-bottom:-2px; transition:color .15s; }
+    .ficha-tab-btn.active { color:var(--primary); border-bottom-color:var(--primary); }
+    .ficha-tab-btn:hover:not(.active) { color:var(--text); background:rgba(0,0,0,.03); }
+
+    /* ── LEGAJO TIMELINE ─────────────────────────────────────────────────────── */
+    .legajo-subtitle { font-size:12px; font-weight:700; color:var(--text2); text-transform:uppercase;
+                       letter-spacing:.5px; margin:14px 0 8px; }
+    .tl-list { margin:0; }
+    .tl-entry { display:flex; gap:10px; padding-bottom:12px; position:relative; }
+    .tl-entry::before { content:''; position:absolute; left:6px; top:18px; bottom:0;
+                        width:2px; background:var(--border); }
+    .tl-entry:last-child::before { display:none; }
+    .tl-dot  { width:14px; height:14px; border-radius:50%; background:var(--primary); flex-shrink:0;
+               margin-top:3px; box-shadow:0 0 0 3px var(--bg); }
+    .tl-body { flex:1; min-width:0; }
+    .tl-fecha { font-size:12px; font-weight:700; color:var(--primary); margin-bottom:2px; }
+    .tl-desc  { font-size:14px; color:var(--text); line-height:1.5; white-space:pre-wrap; }
+    .tl-meta  { font-size:11px; color:var(--text2); margin-top:3px; }
+    .tl-add   { display:flex; flex-direction:column; gap:8px; padding:12px;
+                background:var(--bg3); border-radius:var(--radius); margin-top:8px; }
+    .tl-empty { color:var(--text2); font-size:13px; font-style:italic; padding:4px 0; }
+    .legajo-save-bar { display:flex; justify-content:flex-end; padding:16px 0 0; }
   </style>
 </head>
 <body>
@@ -1604,6 +1631,240 @@ function InscripcionesPanel({ estudianteId, user }) {
   );
 }
 
+// ── LEGAJO: componentes auxiliares ───────────────────────────────────────────────
+function HistorialItem({ entry }) {
+  const fecha = entry.fecha ? entry.fecha.split('-').reverse().join('/') : '—';
+  const cuandoCargado = entry.created_at
+    ? new Date(entry.created_at).toLocaleDateString('es-AR')
+    : '';
+  return (
+    <div className="tl-entry">
+      <div className="tl-dot" />
+      <div className="tl-body">
+        <div className="tl-fecha">{fecha}</div>
+        <div className="tl-desc">{entry.descripcion}</div>
+        <div className="tl-meta">
+          {entry.autor ? `Cargado por ${entry.autor}` : 'Sistema'}
+          {cuandoCargado ? ` · ${cuandoCargado}` : ''}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function HistorialInput({ onAdd, placeholder }) {
+  const hoy = new Date().toISOString().slice(0,10);
+  const [fecha,  setFecha]  = useState(hoy);
+  const [desc,   setDesc]   = useState('');
+  const [saving, setSaving] = useState(false);
+
+  const agregar = async () => {
+    if (!desc.trim() || !fecha) return;
+    setSaving(true);
+    try { await onAdd({ fecha, descripcion: desc.trim() }); setDesc(''); }
+    catch(e) {}
+    finally { setSaving(false); }
+  };
+
+  return (
+    <div className="tl-add">
+      <input className="form-control" type="date" value={fecha} onChange={e=>setFecha(e.target.value)} />
+      <textarea className="form-control" rows={2} placeholder={placeholder||'Descripción…'}
+        value={desc} onChange={e=>setDesc(e.target.value)} />
+      <button className="btn btn-primary btn-auto" onClick={agregar}
+        disabled={saving || !desc.trim() || !fecha}>
+        {saving ? 'Guardando…' : '＋ Agregar entrada'}
+      </button>
+    </div>
+  );
+}
+
+const LEGAJO_VACIO = {
+  composicion_familiar:'', emergencia_nombre:'', emergencia_telefono:'', obra_social:'',
+  alergias:'', medicacion:'', condiciones_salud:'', instituciones_anteriores:'',
+};
+
+function LegajoTab({ estudianteId, user }) {
+  const [form,     setForm]     = useState(LEGAJO_VACIO);
+  const [savedForm,setSavedForm]= useState(LEGAJO_VACIO);
+  const [saludH,   setSaludH]   = useState([]);
+  const [trayH,    setTrayH]    = useState([]);
+  const [obsH,     setObsH]     = useState([]);
+  const [loading,  setLoading]  = useState(true);
+  const [saving,   setSaving]   = useState(false);
+  const [toast,    setToast]    = useState('');
+  const [error,    setError]    = useState('');
+
+  const puede   = (p) => user.permisos?.includes(p);
+  const setF    = (k, v) => setForm(prev => ({ ...prev, [k]: v }));
+  const isDirty = JSON.stringify(form) !== JSON.stringify(savedForm);
+
+  const cargar = async () => {
+    setLoading(true);
+    try {
+      const data = await apiFetch(`/api/legajo/${estudianteId}`);
+      const d = {
+        composicion_familiar:     data.datos?.composicion_familiar     || '',
+        emergencia_nombre:        data.datos?.emergencia_nombre        || '',
+        emergencia_telefono:      data.datos?.emergencia_telefono      || '',
+        obra_social:              data.datos?.obra_social              || '',
+        alergias:                 data.datos?.alergias                 || '',
+        medicacion:               data.datos?.medicacion               || '',
+        condiciones_salud:        data.datos?.condiciones_salud        || '',
+        instituciones_anteriores: data.datos?.instituciones_anteriores || '',
+      };
+      setForm(d); setSavedForm(d);
+      setSaludH(data.salud_historial      || []);
+      setTrayH(data.trayectoria_historial || []);
+      setObsH(data.observaciones          || []);
+    } catch(e) { setError(e.message); }
+    finally { setLoading(false); }
+  };
+
+  useEffect(() => { cargar(); }, [estudianteId]);
+
+  const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(''), 3000); };
+
+  const guardarDatos = async () => {
+    setSaving(true); setError('');
+    try {
+      await apiFetch(`/api/legajo/${estudianteId}/datos`, { method:'PUT', body: form });
+      setSavedForm(form); showToast('✅ Legajo guardado');
+    } catch(e) { setError(e.message); }
+    finally { setSaving(false); }
+  };
+
+  const addSalud = async (entry) => {
+    const r = await apiFetch(`/api/legajo/${estudianteId}/salud`, { method:'POST', body: entry });
+    setSaludH(prev => [{ ...entry, id:r.id, autor:user.nombre, created_at:new Date().toISOString() }, ...prev]);
+  };
+  const addTray = async (entry) => {
+    const r = await apiFetch(`/api/legajo/${estudianteId}/trayectoria`, { method:'POST', body: entry });
+    setTrayH(prev => [{ ...entry, id:r.id, autor:user.nombre, created_at:new Date().toISOString() }, ...prev]);
+  };
+  const addObs = async (entry) => {
+    const r = await apiFetch(`/api/legajo/${estudianteId}/observacion`, { method:'POST', body: entry });
+    setObsH(prev => [{ ...entry, id:r.id, autor:user.nombre, created_at:new Date().toISOString() }, ...prev]);
+  };
+
+  if (loading) return <div className="spinner"><div className="spin"/></div>;
+
+  const editable = puede('editar_legajo_personal');
+
+  return (
+    <div>
+      {toast && <div className="alert alert-success" style={{marginBottom:8}}>{toast}</div>}
+      {error && <div className="alert alert-error" style={{marginBottom:8}}>{error}</div>}
+
+      {/* ── 1. Grupo familiar ── */}
+      <div className="ficha-section">
+        <div className="ficha-section-title">👨‍👩‍👧 Grupo familiar</div>
+        <div className="form-group">
+          <label className="form-label">Composición familiar</label>
+          <textarea className="form-control" rows={2} value={form.composicion_familiar}
+            onChange={e=>setF('composicion_familiar',e.target.value)} disabled={!editable}
+            placeholder="Ej: Vive con madre y dos hermanos menores" />
+        </div>
+        <div className="form-grid">
+          <div className="form-group" style={{marginBottom:0}}>
+            <label className="form-label">Contacto de emergencia</label>
+            <input className="form-control" value={form.emergencia_nombre}
+              onChange={e=>setF('emergencia_nombre',e.target.value)} disabled={!editable}
+              placeholder="Nombre y relación" />
+          </div>
+          <div className="form-group" style={{marginBottom:0}}>
+            <label className="form-label">Teléfono de emergencia</label>
+            <input className="form-control" inputMode="tel" value={form.emergencia_telefono}
+              onChange={e=>setF('emergencia_telefono',e.target.value)} disabled={!editable}
+              placeholder="Ej: 11-1234-5678" />
+          </div>
+        </div>
+        <div className="form-group" style={{marginBottom:0,marginTop:12}}>
+          <label className="form-label">Obra social / cobertura médica</label>
+          <input className="form-control" value={form.obra_social}
+            onChange={e=>setF('obra_social',e.target.value)} disabled={!editable}
+            placeholder="Nombre de la cobertura o 'No tiene'" />
+        </div>
+      </div>
+
+      {/* ── 2. Salud ── */}
+      <div className="ficha-section">
+        <div className="ficha-section-title">🏥 Salud</div>
+        <div className="form-grid">
+          <div className="form-group" style={{marginBottom:0}}>
+            <label className="form-label">Alergias</label>
+            <input className="form-control" value={form.alergias}
+              onChange={e=>setF('alergias',e.target.value)} disabled={!editable}
+              placeholder="Ej: Penicilina, mariscos, o 'Ninguna'" />
+          </div>
+          <div className="form-group" style={{marginBottom:0}}>
+            <label className="form-label">Medicación actual</label>
+            <input className="form-control" value={form.medicacion}
+              onChange={e=>setF('medicacion',e.target.value)} disabled={!editable}
+              placeholder="Ej: Ritalin 10mg o 'Ninguna'" />
+          </div>
+        </div>
+        <div className="form-group" style={{marginTop:12,marginBottom:0}}>
+          <label className="form-label">Condiciones de salud a tener en cuenta</label>
+          <textarea className="form-control" rows={2} value={form.condiciones_salud}
+            onChange={e=>setF('condiciones_salud',e.target.value)} disabled={!editable}
+            placeholder="Ej: Asma, diabetes, condición motriz, etc." />
+        </div>
+
+        <div className="legajo-subtitle">Historial de salud</div>
+        <div className="tl-list">
+          {saludH.length === 0
+            ? <p className="tl-empty">Sin entradas registradas.</p>
+            : saludH.map(e => <HistorialItem key={e.id} entry={e} />)
+          }
+        </div>
+        {editable && <HistorialInput onAdd={addSalud} placeholder="Ej: Se detectó alergia a X. Se comunicó a la familia." />}
+      </div>
+
+      {/* ── 3. Trayectoria educativa ── */}
+      <div className="ficha-section">
+        <div className="ficha-section-title">🎓 Trayectoria educativa</div>
+        <div className="form-group">
+          <label className="form-label">Instituciones anteriores</label>
+          <textarea className="form-control" rows={2} value={form.instituciones_anteriores}
+            onChange={e=>setF('instituciones_anteriores',e.target.value)} disabled={!editable}
+            placeholder="Ej: Escuela N° 5 San Martín 2018-2023, Conservatorio municipal 2023-2024" />
+        </div>
+
+        <div className="legajo-subtitle">Historial de trayectoria</div>
+        <div className="tl-list">
+          {trayH.length === 0
+            ? <p className="tl-empty">Sin entradas registradas.</p>
+            : trayH.map(e => <HistorialItem key={e.id} entry={e} />)
+          }
+        </div>
+        {editable && <HistorialInput onAdd={addTray} placeholder="Ej: Ingresa a la EPM como Mojarrita de Guitarra." />}
+      </div>
+
+      {/* ── 4. Observaciones generales ── */}
+      <div className="ficha-section">
+        <div className="ficha-section-title">📝 Observaciones generales</div>
+        <div className="tl-list">
+          {obsH.length === 0
+            ? <p className="tl-empty">Sin observaciones registradas.</p>
+            : obsH.map(e => <HistorialItem key={e.id} entry={e} />)
+          }
+        </div>
+        {editable && <HistorialInput onAdd={addObs} placeholder="Cualquier observación relevante sobre el estudiante." />}
+      </div>
+
+      {/* Botón guardar campos fijos */}
+      {editable && isDirty && (
+        <div className="legajo-save-bar">
+          <button className="btn btn-primary btn-auto" onClick={guardarDatos} disabled={saving}>
+            {saving ? 'Guardando…' : '💾 Guardar legajo'}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── FICHA DE ESTUDIANTE ──────────────────────────────────────────────────────────
 const FORM_VACIO = {
   nombre:'', apellido:'', dni:'', cuit:'', fecha_nacimiento:'',
@@ -1629,6 +1890,7 @@ function Ficha({ user, estudianteId, onClose, onGuardarYCargarOtro, onCreado }) 
   const [fotoPend,     setFotoPend]    = useState(null);   // File object pendiente
   const [fotoPreview,  setFotoPreview] = useState(null);   // DataURL local
   const [fotoQuitada,  setFotoQuitada] = useState(false);
+  const [tab,          setTab]         = useState('datos');
 
   const puede = (p) => user.permisos?.includes(p);
   const set = (f, v) => setForm(prev => ({ ...prev, [f]: v }));
@@ -1729,6 +1991,14 @@ function Ficha({ user, estudianteId, onClose, onGuardarYCargarOtro, onCreado }) 
         </div>
       </div>
 
+      {!isNew && puede('ver_legajo_personal') && (
+        <div className="ficha-tab-bar">
+          <button className={`ficha-tab-btn ${tab==='datos'?'active':''}`} onClick={()=>setTab('datos')}>📋 Datos</button>
+          <button className={`ficha-tab-btn ${tab==='legajo'?'active':''}`} onClick={()=>setTab('legajo')}>📁 Legajo personal</button>
+        </div>
+      )}
+
+      {(isNew || tab === 'datos') && <>
       {isDirty && <div className="dirty-bar"><span>●</span> Cambios sin guardar</div>}
       {error   && <div className="alert alert-error">{error}</div>}
 
@@ -1839,6 +2109,11 @@ function Ficha({ user, estudianteId, onClose, onGuardarYCargarOtro, onCreado }) 
           </button>
         </>)}
       </div>
+      </>}
+
+      {!isNew && tab === 'legajo' && puede('ver_legajo_personal') && (
+        <LegajoTab estudianteId={estudianteId} user={user} />
+      )}
     </div>
   );
 }

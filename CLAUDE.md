@@ -38,11 +38,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 | +  | **Historial de asistencia** (calendario visual) | 2026-06-20 | Grilla mensual color-coded en Ficha de estudiante y en sección Asistencias |
 
 | 8  | **Instrumentos + Inscripciones** | 2026-06-22 | Nuevo modelo: estudiante puede tener múltiples cursos por instrumento. CRUD de instrumentos, panel de inscripciones en Ficha, filtros en lista, instrumento visible en asistencia. Historial de progresión preparado en DB sin UI aún. |
+| 9  | **Legajo personal** | 2026-06-22 | Segunda pestaña en la Ficha. Campos fijos: grupo familiar, salud, trayectoria. Tres timelines: historial de salud, historial de trayectoria, observaciones generales. Permisos `ver_legajo_personal` + `editar_legajo_personal` (Gestión + Docente; Operador no ve). Migración de permisos automática en `runSchema`. |
 | inf| **Migración a Turso (libSQL)** | 2026-06-22 | Reemplaza node:sqlite por @libsql/client. Dev usa file:./epm.db; prod usa TURSO_URL + TURSO_AUTH_TOKEN. |
 
 ### Estado general
 
-**Todos los módulos + modelo de inscripciones por instrumento + Turso en producción.**
+**Todos los módulos + inscripciones por instrumento + legajo personal con timeline + Turso en producción.**
 
 ### Decisiones tomadas
 

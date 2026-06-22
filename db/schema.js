@@ -253,6 +253,73 @@ async function runSchema(db) {
       notas          TEXT
     )
   `);
+
+  // ── LEGAJO PERSONAL ────────────────────────────────────────────────────────
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS legajo_personal (
+      id                       INTEGER PRIMARY KEY AUTOINCREMENT,
+      estudiante_id            INTEGER UNIQUE NOT NULL REFERENCES estudiantes(id) ON DELETE CASCADE,
+      composicion_familiar     TEXT,
+      emergencia_nombre        TEXT,
+      emergencia_telefono      TEXT,
+      obra_social              TEXT,
+      alergias                 TEXT,
+      medicacion               TEXT,
+      condiciones_salud        TEXT,
+      instituciones_anteriores TEXT,
+      updated_at               TEXT DEFAULT (datetime('now')),
+      updated_by               INTEGER REFERENCES usuarios(id)
+    )
+  `);
+
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS legajo_salud_historial (
+      id             INTEGER PRIMARY KEY AUTOINCREMENT,
+      estudiante_id  INTEGER NOT NULL REFERENCES estudiantes(id) ON DELETE CASCADE,
+      fecha          TEXT NOT NULL,
+      descripcion    TEXT NOT NULL,
+      registrado_por INTEGER REFERENCES usuarios(id),
+      created_at     TEXT DEFAULT (datetime('now'))
+    )
+  `);
+
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS legajo_trayectoria_historial (
+      id             INTEGER PRIMARY KEY AUTOINCREMENT,
+      estudiante_id  INTEGER NOT NULL REFERENCES estudiantes(id) ON DELETE CASCADE,
+      fecha          TEXT NOT NULL,
+      descripcion    TEXT NOT NULL,
+      registrado_por INTEGER REFERENCES usuarios(id),
+      created_at     TEXT DEFAULT (datetime('now'))
+    )
+  `);
+
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS legajo_observaciones (
+      id             INTEGER PRIMARY KEY AUTOINCREMENT,
+      estudiante_id  INTEGER NOT NULL REFERENCES estudiantes(id) ON DELETE CASCADE,
+      fecha          TEXT NOT NULL,
+      descripcion    TEXT NOT NULL,
+      registrado_por INTEGER REFERENCES usuarios(id),
+      created_at     TEXT DEFAULT (datetime('now'))
+    )
+  `);
+
+  // ── MIGRACIÓN PERMISOS legajo personal (idempotente para DBs existentes) ──
+  for (const p of [
+    { codigo:'ver_legajo_personal',    descripcion:'Ver legajo personal de estudiantes',    grupo:'estudiantes' },
+    { codigo:'editar_legajo_personal', descripcion:'Editar legajo personal de estudiantes', grupo:'estudiantes' },
+  ]) {
+    try {
+      await db.execute({ sql:'INSERT OR IGNORE INTO permisos (codigo, descripcion, grupo) VALUES (?,?,?)', args:[p.codigo, p.descripcion, p.grupo] });
+    } catch(e) {}
+  }
+  try {
+    await db.execute(`INSERT OR IGNORE INTO roles_permisos (rol_id, permiso_id)
+      SELECT r.id, p.id FROM roles r, permisos p
+      WHERE r.nombre IN ('Gestión','Docente')
+        AND p.codigo IN ('ver_legajo_personal','editar_legajo_personal')`);
+  } catch(e) {}
 }
 
 module.exports = { runSchema };
