@@ -810,6 +810,79 @@
     @media (max-width:768px) {
       .notif-panel { right:-40px; }
     }
+
+    /* ── SIDEBAR CON GRUPOS ─────────────────────────────────────────────────── */
+    .nav-group-label {
+      font-size:10px; font-weight:800; letter-spacing:.08em; text-transform:uppercase;
+      color:rgba(255,255,255,.28); padding:14px 18px 4px; margin-top:4px;
+    }
+
+    /* ── EQUIPO DOCENTE ─────────────────────────────────────────────────────── */
+    .docente-card {
+      display:flex; gap:12px; align-items:flex-start; padding:12px 14px;
+      border:1.5px solid var(--border); border-radius:var(--radius);
+      background:var(--card); margin-bottom:8px; cursor:pointer; transition:border-color .18s;
+    }
+    .docente-card:hover { border-color:var(--primary-l); }
+    .docente-avatar {
+      width:44px; height:44px; border-radius:11px; flex-shrink:0;
+      background:linear-gradient(135deg,#0ea5e9,#6366f1);
+      display:flex; align-items:center; justify-content:center;
+      font-size:16px; font-weight:800; color:#fff; overflow:hidden;
+    }
+    .docente-avatar img { width:100%; height:100%; object-fit:cover; }
+    .docente-nombre { font-size:14px; font-weight:700; margin-bottom:2px; }
+    .docente-meta   { font-size:11px; color:var(--text2); display:flex; flex-wrap:wrap; gap:6px; }
+
+    /* ── INVENTARIO ─────────────────────────────────────────────────────────── */
+    .inv-estado-disponible  { background:#dcfce7; color:#166534; }
+    .inv-estado-en_uso      { background:#dbeafe; color:#1e40af; }
+    .inv-estado-en_reparacion{ background:#fef9c3; color:#854d0e; }
+    .inv-estado-baja        { background:#fee2e2; color:#991b1b; }
+    .inv-badge {
+      font-size:11px; font-weight:700; border-radius:12px; padding:2px 9px; white-space:nowrap;
+    }
+
+    /* ── PROYECTOS ──────────────────────────────────────────────────────────── */
+    .proy-estado-borrador    { background:var(--bg3);   color:var(--text2);  }
+    .proy-estado-en_curso    { background:#dbeafe;      color:#1e40af;       }
+    .proy-estado-presentado  { background:#fef9c3;      color:#854d0e;       }
+    .proy-estado-aprobado    { background:#dcfce7;      color:#166534;       }
+    .proy-estado-rechazado   { background:#fee2e2;      color:#991b1b;       }
+    .proy-estado-finalizado  { background:#f3e8ff;      color:#6b21a8;       }
+    .proy-badge {
+      font-size:11px; font-weight:700; border-radius:12px; padding:3px 10px; white-space:nowrap;
+    }
+    .proy-card {
+      padding:14px 16px; border:1.5px solid var(--border); border-radius:var(--radius);
+      background:var(--card); margin-bottom:8px; cursor:pointer; transition:border-color .18s;
+    }
+    .proy-card:hover { border-color:var(--primary-l); }
+    .proy-card-titulo { font-size:14px; font-weight:700; margin-bottom:6px; }
+    .proy-card-meta   { font-size:12px; color:var(--text2); display:flex; flex-wrap:wrap; gap:10px; align-items:center; }
+
+    /* ── CUMPLEAÑOS ─────────────────────────────────────────────────────────── */
+    .cumple-dot {
+      width:8px; height:8px; border-radius:50%; background:#ec4899;
+      flex-shrink:0; display:inline-block;
+    }
+    .evtcal-cumple {
+      width:6px; height:6px; border-radius:50%; background:#ec4899;
+      display:inline-block; cursor:pointer; flex-shrink:0;
+    }
+    .cumple-card { padding:10px 12px; border-radius:10px; display:flex; gap:10px; align-items:flex-start; }
+    .cumple-card:hover { background:var(--bg3); }
+    .cumple-nombre { font-size:13px; font-weight:700; }
+    .cumple-tipo   { font-size:11px; color:var(--text2); }
+
+    /* ── FINANZAS PLACEHOLDER ───────────────────────────────────────────────── */
+    .construccion-wrap {
+      display:flex; flex-direction:column; align-items:center; justify-content:center;
+      padding:64px 24px; text-align:center; gap:16px;
+    }
+    .construccion-icon { font-size:64px; }
+    .construccion-titulo { font-size:22px; font-weight:800; }
+    .construccion-sub { font-size:14px; color:var(--text2); max-width:400px; line-height:1.7; }
   </style>
 </head>
 <body>
@@ -825,19 +898,35 @@
 <script type="text/babel" data-presets="react">
 const { useState, useEffect, useCallback } = React;
 
-// ── NAVEGACIÓN ─────────────────────────────────────────────────────────────────
-const NAV = [
-  { id:'dashboard',       label:'Dashboard',        icon:'🏠', permiso:null },
-  { id:'estudiantes',     label:'Estudiantes',       icon:'👥', permiso:'ver_estudiantes' },
-  { id:'asistencia',      label:'Tomar asistencia',  icon:'📋', permiso:'cargar_asistencias' },
-  { id:'reportes',        label:'Reportes',          icon:'📊', permiso:'ver_reportes' },
-  { id:'planificaciones', label:'Planificaciones',   icon:'📝', permiso:'ver_planificaciones' },
-  { id:'calendario',      label:'Calendario',         icon:'📅', permiso:'ver_calendario' },
-  { id:'cursos',          label:'Cursos (Niveles)',   icon:'🏫', permiso:'administrar_cursos' },
-  { id:'instrumentos',    label:'Instrumentos',       icon:'🎸', permiso:'administrar_cursos' },
-  { id:'usuarios',        label:'Usuarios y roles',  icon:'👤', permiso:'administrar_usuarios_roles' },
-  { id:'backup',          label:'Backup',            icon:'💾', permiso:'acceder_backup' },
+// ── NAVEGACIÓN CON GRUPOS ──────────────────────────────────────────────────────
+const NAV_GROUPS = [
+  { label: null, items: [
+    { id:'dashboard',       label:'Dashboard',        icon:'🏠', permiso:null },
+  ]},
+  { label: 'Alumnos', items: [
+    { id:'estudiantes',     label:'Estudiantes',       icon:'👥', permiso:'ver_estudiantes' },
+    { id:'asistencia',      label:'Tomar asistencia',  icon:'📋', permiso:'cargar_asistencias' },
+    { id:'reportes',        label:'Reportes',          icon:'📊', permiso:'ver_reportes' },
+  ]},
+  { label: 'Educación', items: [
+    { id:'planificaciones', label:'Planificaciones',   icon:'📝', permiso:'ver_planificaciones' },
+    { id:'calendario',      label:'Calendario',        icon:'📅', permiso:'ver_calendario' },
+    { id:'docentes',        label:'Equipo Docente',    icon:'👩‍🏫', permiso:'ver_equipo_docente' },
+  ]},
+  { label: 'Institución', items: [
+    { id:'proyectos',       label:'Proyectos',         icon:'📁', permiso:'ver_proyectos' },
+    { id:'inventario',      label:'Inventario',        icon:'🎻', permiso:'ver_inventario' },
+    { id:'finanzas',        label:'Finanzas',          icon:'💰', permiso:'ver_finanzas' },
+  ]},
+  { label: 'Administración', items: [
+    { id:'cursos',          label:'Cursos (Niveles)',  icon:'🏫', permiso:'administrar_cursos' },
+    { id:'instrumentos',    label:'Instrumentos',      icon:'🎸', permiso:'administrar_cursos' },
+    { id:'usuarios',        label:'Usuarios y roles',  icon:'👤', permiso:'administrar_usuarios_roles' },
+    { id:'backup',          label:'Backup',            icon:'💾', permiso:'acceder_backup' },
+  ]},
 ];
+// NAV flat (para búsquedas de label/icon por id)
+const NAV = NAV_GROUPS.flatMap(g => g.items);
 
 // ── HELPERS EVENTOS ────────────────────────────────────────────────────────────
 const TIPO_EVENTO = {
@@ -1221,14 +1310,23 @@ function Sidebar({ user, section, onSection, open, onClose }) {
           </div>
         </div>
         <div className="sidebar-nav">
-          {NAV.map(item => puede(item.permiso) ? (
-            <div key={item.id}
-              className={`nav-item ${section===item.id?'active':''}`}
-              onClick={() => { onSection(item.id); onClose(); }}>
-              <span className="nav-icon">{item.icon}</span>
-              <span>{item.label}</span>
-            </div>
-          ) : null)}
+          {NAV_GROUPS.map((grupo, gi) => {
+            const visibles = grupo.items.filter(item => puede(item.permiso));
+            if (!visibles.length) return null;
+            return (
+              <div key={gi}>
+                {grupo.label && <div className="nav-group-label">{grupo.label}</div>}
+                {visibles.map(item => (
+                  <div key={item.id}
+                    className={`nav-item ${section===item.id?'active':''}`}
+                    onClick={() => { onSection(item.id); onClose(); }}>
+                    <span className="nav-icon">{item.icon}</span>
+                    <span>{item.label}</span>
+                  </div>
+                ))}
+              </div>
+            );
+          })}
         </div>
         <div className="sidebar-user">
           <div className="user-avatar">{initials}</div>
@@ -1288,6 +1386,72 @@ function ProximosEventos({ user, onSection }) {
   );
 }
 
+function CumpleaniosMes({ user }) {
+  const MESES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+  const hoy   = new Date();
+  const [cumples,   setCumples]  = useState([]);
+  const [cargando,  setCargando] = useState(true);
+
+  useEffect(() => {
+    const mes  = hoy.getMonth() + 1;
+    const anio = hoy.getFullYear();
+    apiFetch(`/api/cumpleanios?mes=${mes}&anio=${anio}`)
+      .then(d => setCumples(d))
+      .catch(() => {})
+      .finally(() => setCargando(false));
+  }, []);
+
+  // Notificar cumpleaños cercanos una vez al día
+  useEffect(() => {
+    const key  = `epm_cumple_notif_${new Date().toISOString().slice(0,10)}`;
+    if (localStorage.getItem(key)) return;
+    apiFetch('/api/cumpleanios/notificar', { method:'POST' })
+      .then(() => localStorage.setItem(key, '1'))
+      .catch(() => {});
+  }, []);
+
+  if (cargando || cumples.length === 0) return null;
+
+  const hoyDia = hoy.getDate();
+  const cumpleHoy   = cumples.filter(c => c.dia === hoyDia);
+  const cumpleProx  = cumples.filter(c => c.dia > hoyDia && c.dia <= hoyDia + 7);
+  const cumpleResto = cumples.filter(c => c.dia < hoyDia || c.dia > hoyDia + 7);
+
+  return (
+    <div className="card" style={{marginBottom:16,borderColor:'#ec489920',background:'linear-gradient(135deg,#fff,#fdf2f8)'}}>
+      <div className="card-title" style={{marginBottom:8}}>
+        🎂 Cumpleaños de {MESES[hoy.getMonth()]}
+        <span style={{marginLeft:'auto',fontSize:12,color:'var(--text2)'}}>
+          {cumples.length} {cumples.length === 1 ? 'cumpleaños' : 'cumpleaños'}
+        </span>
+      </div>
+      {cumpleHoy.map((c, i) => (
+        <div key={i} className="cumple-card" style={{background:'#fce7f3',borderRadius:10,marginBottom:4}}>
+          <span style={{fontSize:20}}>🎂</span>
+          <div>
+            <div className="cumple-nombre">{c.nombre} — ¡HOY!</div>
+            <div className="cumple-tipo">{c.tipo === 'docente' ? '👩‍🏫 Docente' : '👦 Estudiante'}</div>
+          </div>
+        </div>
+      ))}
+      {cumpleProx.map((c, i) => (
+        <div key={i} className="cumple-card">
+          <span className="cumple-dot" style={{marginTop:4}} />
+          <div>
+            <div className="cumple-nombre">{c.nombre}</div>
+            <div className="cumple-tipo">{c.tipo === 'docente' ? '👩‍🏫 Docente' : '👦 Estudiante'} · {c.dia}/{hoy.getMonth()+1}</div>
+          </div>
+        </div>
+      ))}
+      {cumpleResto.length > 0 && (
+        <div style={{fontSize:12,color:'var(--text2)',padding:'4px 12px'}}>
+          + {cumpleResto.length} más este mes
+        </div>
+      )}
+    </div>
+  );
+}
+
 function Dashboard({ user, onSection }) {
   const puede = (p) => user.permisos?.includes(p);
   const items = NAV.filter(n => n.id !== 'dashboard' && (!n.permiso || puede(n.permiso)));
@@ -1299,6 +1463,7 @@ function Dashboard({ user, onSection }) {
         <p>{user.institucion_nombre} · {user.rol_nombre}</p>
       </div>
       <ProximosEventos user={user} onSection={onSection} />
+      <CumpleaniosMes user={user} />
       <div className="card">
         <div className="card-title">🗂 Módulos disponibles</div>
         <div className="modules-grid">
@@ -5090,23 +5255,27 @@ function Calendario({ user }) {
   const [modalCrear,   setModalCrear]   = useState(false);
   const [modalEditar,  setModalEditar]  = useState(null);
   const [modalDetalle, setModalDetalle] = useState(null);
-  const [modalCambio,  setModalCambio]  = useState(null); // {evento, modo}
+  const [modalCambio,  setModalCambio]  = useState(null);
+  const [cumplesMes,   setCumplesMes]   = useState([]); // cumpleaños del mes visible
+  const [modalCumple,  setModalCumple]  = useState(null); // {dia, lista}
 
   // Carga cursos una sola vez
   useEffect(() => {
     apiFetch('/api/cursos').then(d => setCursos(d)).catch(() => {});
   }, []);
 
-  // Carga eventos del mes actual + adj
+  // Carga eventos + cumpleaños al cambiar mes/año
   const cargarEventos = useCallback(async () => {
     setCargando(true);
     try {
-      const primerDia = new Date(año, mes, 1);
-      // Traer desde 1er día del mes anterior hasta último del mes siguiente
       const desde = new Date(año, mes - 1, 1).toISOString().slice(0, 10);
       const hasta  = new Date(año, mes + 2, 0).toISOString().slice(0, 10);
-      const data = await apiFetch(`/api/eventos?desde=${desde}&hasta=${hasta}`);
-      setEventos(data);
+      const [evData, cumpleData] = await Promise.all([
+        apiFetch(`/api/eventos?desde=${desde}&hasta=${hasta}`),
+        apiFetch(`/api/cumpleanios?mes=${mes + 1}&anio=${año}`),
+      ]);
+      setEventos(evData);
+      setCumplesMes(cumpleData);
     } catch(e) {}
     finally { setCargando(false); }
   }, [año, mes]);
@@ -5161,6 +5330,13 @@ function Calendario({ user }) {
     eventosPorFecha[ev.fecha].push(ev);
   });
 
+  // Mapa dia → cumpleaños del mes visible
+  const cumplesPorDia = {};
+  cumplesMes.forEach(c => {
+    if (!cumplesPorDia[c.dia]) cumplesPorDia[c.dia] = [];
+    cumplesPorDia[c.dia].push(c);
+  });
+
   // Vista agenda: eventos del mes actual ordenados
   const eventosDelMes = eventos
     .filter(ev => {
@@ -5213,9 +5389,12 @@ function Calendario({ user }) {
             <div key={d} className={`evtcal-header${i >= 5 ? ' wknd' : ''}`}>{d}</div>
           ))}
           {grid.map(({ fecha, actual }) => {
-            const evsDia   = eventosPorFecha[fecha] || [];
-            const isToday  = fecha === todayStr;
-            const dow      = new Date(fecha + 'T12:00:00').getDay(); // 0=Dom,6=Sáb
+            const evsDia    = eventosPorFecha[fecha] || [];
+            const dia       = parseInt(fecha.slice(8), 10);
+            const cumpleDia = (actual && fecha.slice(0,7) === `${año}-${String(mes+1).padStart(2,'0')}`)
+                              ? cumplesPorDia[dia] || [] : [];
+            const isToday   = fecha === todayStr;
+            const dow       = new Date(fecha + 'T12:00:00').getDay();
             const isWeekend = dow === 0 || dow === 6;
             const cls = [
               'evtcal-cell',
@@ -5225,41 +5404,47 @@ function Calendario({ user }) {
             ].filter(Boolean).join(' ');
             return (
               <div key={fecha} className={cls}>
-                <div className="evtcal-num">{parseInt(fecha.slice(8), 10)}</div>
+                <div className="evtcal-num">{dia}</div>
 
                 {/* Puntitos (mobile) */}
-                {evsDia.length > 0 && (
-                  <div className="evtcal-dots">
-                    {evsDia.slice(0, 6).map(ev => (
-                      <span key={ev.id}
-                        className={`evtcal-dot${ev.estado !== 'activo' ? ' inactive' : ''}`}
-                        style={{background: tipoColor(ev.tipo)}}
-                        title={ev.titulo}
-                        onClick={() => setModalDetalle(ev)}
-                      />
-                    ))}
-                  </div>
-                )}
+                <div className="evtcal-dots">
+                  {evsDia.slice(0, 5).map(ev => (
+                    <span key={ev.id}
+                      className={`evtcal-dot${ev.estado !== 'activo' ? ' inactive' : ''}`}
+                      style={{background: tipoColor(ev.tipo)}}
+                      title={ev.titulo}
+                      onClick={() => setModalDetalle(ev)}
+                    />
+                  ))}
+                  {cumpleDia.length > 0 && (
+                    <span className="evtcal-cumple" title={`🎂 ${cumpleDia.map(c=>c.nombre).join(', ')}`}
+                      onClick={() => setModalCumple({ dia, lista: cumpleDia })} />
+                  )}
+                </div>
 
-                {/* Chips de texto (desktop) */}
-                {evsDia.length > 0 && (
-                  <div className="evtcal-chips">
-                    {evsDia.slice(0, 2).map(ev => (
-                      <span key={ev.id}
-                        className={`evtcal-chip${ev.estado !== 'activo' ? ' inactive' : ''}`}
-                        style={{background: tipoColor(ev.tipo)}}
-                        title={ev.titulo}
-                        onClick={() => setModalDetalle(ev)}>
-                        {ev.titulo}
-                      </span>
-                    ))}
-                    {evsDia.length > 2 && (
-                      <span className="evtcal-more" onClick={() => setVista('agenda')}>
-                        +{evsDia.length - 2} más
-                      </span>
-                    )}
-                  </div>
-                )}
+                {/* Chips (desktop) */}
+                <div className="evtcal-chips">
+                  {evsDia.slice(0, 2).map(ev => (
+                    <span key={ev.id}
+                      className={`evtcal-chip${ev.estado !== 'activo' ? ' inactive' : ''}`}
+                      style={{background: tipoColor(ev.tipo)}}
+                      title={ev.titulo}
+                      onClick={() => setModalDetalle(ev)}>
+                      {ev.titulo}
+                    </span>
+                  ))}
+                  {cumpleDia.length > 0 && (
+                    <span className="evtcal-chip" style={{background:'#ec4899',cursor:'pointer'}}
+                      onClick={() => setModalCumple({ dia, lista: cumpleDia })}>
+                      🎂 {cumpleDia.length === 1 ? cumpleDia[0].nombre.split(' ')[0] : `${cumpleDia.length} cumpleaños`}
+                    </span>
+                  )}
+                  {evsDia.length > 2 && (
+                    <span className="evtcal-more" onClick={() => setVista('agenda')}>
+                      +{evsDia.length - 2} más
+                    </span>
+                  )}
+                </div>
               </div>
             );
           })}
@@ -5333,6 +5518,684 @@ function Calendario({ user }) {
         <ModalCambioEvento evento={modalCambio.evento} modo={modalCambio.modo}
           onClose={cerrarTodo} onGuardado={onCambioGuardado} />
       )}
+      {modalCumple && (
+        <div className="modal-overlay" onClick={() => setModalCumple(null)}>
+          <div className="modal" style={{maxWidth:340}} onClick={e=>e.stopPropagation()}>
+            <div className="modal-header">
+              <span className="modal-title">🎂 Cumpleaños del día {modalCumple.dia}</span>
+              <button className="modal-close" onClick={() => setModalCumple(null)}>×</button>
+            </div>
+            {modalCumple.lista.map((c,i) => (
+              <div key={i} style={{display:'flex',gap:10,alignItems:'center',padding:'10px 0',borderBottom:'1px solid var(--border)'}}>
+                <span style={{fontSize:22}}>🎂</span>
+                <div>
+                  <div style={{fontWeight:700,fontSize:14}}>{c.nombre}</div>
+                  <div style={{fontSize:12,color:'var(--text2)'}}>
+                    {c.tipo === 'docente' ? '👩‍🏫 Docente' : '👦 Estudiante'}
+                    {c.fecha_nacimiento && ` · ${new Date().getFullYear() - parseInt(c.fecha_nacimiento.slice(0,4))} años`}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── EQUIPO DOCENTE ───────────────────────────────────────────────────────────────
+function Docentes({ user }) {
+  const puede = (p) => user.permisos?.includes(p);
+  const [lista,     setLista]    = useState([]);
+  const [instrumentos, setInstrumentos] = useState([]);
+  const [cursos,    setCursos]   = useState([]);
+  const [busqueda,  setBusqueda] = useState('');
+  const [filtroInst, setFiltroInst] = useState('');
+  const [ficha,     setFicha]    = useState(null); // docente seleccionado
+  const [cargando,  setCargando] = useState(true);
+  const [editando,  setEditando] = useState(false);
+
+  useEffect(() => {
+    Promise.all([
+      apiFetch('/api/docentes'),
+      apiFetch('/api/instrumentos'),
+      apiFetch('/api/cursos'),
+    ]).then(([d, i, c]) => { setLista(d); setInstrumentos(i); setCursos(c); })
+      .catch(() => {})
+      .finally(() => setCargando(false));
+  }, []);
+
+  const cargarFicha = async (usuarioId) => {
+    try {
+      const d = await apiFetch(`/api/docentes/${usuarioId}`);
+      setFicha(d);
+    } catch(e) { alert(e.message); }
+  };
+
+  const listaFiltrada = lista.filter(d => {
+    const txt = `${d.nombre} ${d.instrumentos_nombres||''}`.toLowerCase();
+    if (busqueda && !txt.includes(busqueda.toLowerCase())) return false;
+    if (filtroInst && !(d.instrumentos_nombres||'').includes(filtroInst)) return false;
+    return true;
+  });
+
+  if (ficha) return <FichaDocente ficha={ficha} instrumentos={instrumentos} cursos={cursos}
+    user={user} puede={puede}
+    onVolver={() => { setFicha(null); apiFetch('/api/docentes').then(setLista).catch(()=>{}); }}
+  />;
+
+  return (
+    <div>
+      <div className="section-header">
+        <h2 style={{fontSize:18,fontWeight:800}}>👩‍🏫 Equipo Docente</h2>
+        <span className="badge-count">{listaFiltrada.length} profes</span>
+      </div>
+      <div style={{display:'flex',gap:8,marginBottom:14,flexWrap:'wrap'}}>
+        <input className="form-control" style={{flex:1,minWidth:160}}
+          placeholder="Buscar por nombre o instrumento..."
+          value={busqueda} onChange={e => setBusqueda(e.target.value)} />
+        <select className="form-control" style={{width:'auto'}} value={filtroInst}
+          onChange={e => setFiltroInst(e.target.value)}>
+          <option value="">Todos los instrumentos</option>
+          {instrumentos.map(i => <option key={i.id} value={i.nombre}>{i.nombre}</option>)}
+        </select>
+      </div>
+      {cargando ? <div className="spinner"><div className="spin" /></div>
+        : listaFiltrada.length === 0
+        ? <div className="empty-state"><div className="empty-state-icon">👩‍🏫</div><div>No hay docentes registrados</div></div>
+        : listaFiltrada.map(d => {
+            const iniciales = d.nombre.split(' ').map(p=>p[0]).join('').slice(0,2).toUpperCase();
+            return (
+              <div key={d.usuario_id} className="docente-card" onClick={() => cargarFicha(d.usuario_id)}>
+                <div className="docente-avatar">
+                  {d.foto_path ? <img src={d.foto_path} alt={d.nombre} /> : iniciales}
+                </div>
+                <div style={{flex:1,minWidth:0}}>
+                  <div className="docente-nombre">{d.nombre}</div>
+                  <div className="docente-meta">
+                    {d.instrumentos_nombres
+                      ? d.instrumentos_nombres.split(',').map((i,k) => (
+                          <span key={k} style={{background:'var(--bg3)',borderRadius:8,padding:'1px 7px',fontSize:11,fontWeight:600}}>{i.trim()}</span>
+                        ))
+                      : <span style={{color:'var(--text2)'}}>Sin instrumentos cargados</span>
+                    }
+                    {d.cursos_nombres && <span>· {d.cursos_nombres}</span>}
+                  </div>
+                </div>
+              </div>
+            );
+          })
+      }
+    </div>
+  );
+}
+
+function FichaDocente({ ficha, instrumentos, cursos, user, puede, onVolver }) {
+  const esPropio = user.id === ficha.usuario_id;
+  const puedeEd  = puede('editar_equipo_docente') || esPropio;
+  const [form,    setForm]    = useState({
+    dni:              ficha.dni || '',
+    fecha_nacimiento: ficha.fecha_nacimiento || '',
+    telefono:         ficha.telefono || '',
+    formacion:        ficha.formacion || '',
+    instrumento_ids:  (ficha.instrumentos || []).map(i => i.id),
+  });
+  const [saving, setSaving]  = useState(false);
+  const [msg,    setMsg]     = useState('');
+  const [foto,   setFoto]    = useState(ficha.foto_path);
+
+  const set = (k, v) => setForm(f => ({...f, [k]:v}));
+  const toggleInst = (id) => set('instrumento_ids', form.instrumento_ids.includes(id)
+    ? form.instrumento_ids.filter(x=>x!==id) : [...form.instrumento_ids, id]);
+
+  const guardar = async (e) => {
+    e.preventDefault(); setSaving(true); setMsg('');
+    try {
+      await apiFetch(`/api/docentes/${ficha.usuario_id}`, { method:'PUT', body: form });
+      setMsg('Ficha actualizada correctamente.');
+    } catch(err) { setMsg('Error: ' + err.message); }
+    finally { setSaving(false); }
+  };
+
+  const subirFoto = async (file) => {
+    if (!file) return;
+    const fd = new FormData();
+    fd.append('foto', file);
+    const token = localStorage.getItem('epm_token');
+    const res = await fetch(`/api/docentes/${ficha.usuario_id}/foto`, {
+      method:'POST', headers:{ Authorization:`Bearer ${token}` }, body:fd,
+    });
+    const d = await res.json();
+    if (res.ok) setFoto(d.foto_path);
+    else alert(d.error);
+  };
+
+  const iniciales = ficha.nombre.split(' ').map(p=>p[0]).join('').slice(0,2).toUpperCase();
+
+  return (
+    <div style={{maxWidth:640,margin:'0 auto'}}>
+      <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:18}}>
+        <button className="btn btn-secondary btn-auto" onClick={onVolver}>← Volver</button>
+        <h2 style={{fontSize:18,fontWeight:800}}>Ficha docente</h2>
+      </div>
+      <div className="ficha-section">
+        <div style={{display:'flex',alignItems:'center',gap:14,marginBottom:14}}>
+          <label style={{cursor: puedeEd ? 'pointer' : 'default', position:'relative'}}>
+            <div className="docente-avatar" style={{width:60,height:60,fontSize:22,borderRadius:14}}>
+              {foto ? <img src={foto} alt={ficha.nombre} style={{width:'100%',height:'100%',objectFit:'cover'}} />
+                    : iniciales}
+            </div>
+            {puedeEd && <input type="file" accept="image/*" style={{display:'none'}}
+              onChange={e => e.target.files[0] && subirFoto(e.target.files[0])} />}
+          </label>
+          <div>
+            <div style={{fontSize:18,fontWeight:800}}>{ficha.nombre}</div>
+            <div style={{fontSize:13,color:'var(--text2)'}}>{ficha.email}</div>
+            {ficha.cursos?.length > 0 && (
+              <div style={{fontSize:12,color:'var(--text2)',marginTop:2}}>
+                Cursos: {ficha.cursos.map(c=>c.nombre).join(', ')}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+      {msg && <div className={`alert ${msg.startsWith('Error') ? 'alert-error' : 'alert-success'}`}>{msg}</div>}
+      <form onSubmit={guardar}>
+        <div className="ficha-section">
+          <div className="ficha-section-title">Datos personales</div>
+          <div className="form-grid">
+            <div className="form-group">
+              <label className="form-label">DNI</label>
+              <input className="form-control" value={form.dni} disabled={!puedeEd}
+                onChange={e => set('dni', e.target.value)} placeholder="12345678" />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Fecha de nacimiento</label>
+              <input className="form-control" type="date" value={form.fecha_nacimiento} disabled={!puedeEd}
+                onChange={e => set('fecha_nacimiento', e.target.value)} />
+            </div>
+            <div className="form-group col-full">
+              <label className="form-label">Teléfono</label>
+              <input className="form-control" value={form.telefono} disabled={!puedeEd}
+                onChange={e => set('telefono', e.target.value)} placeholder="+54 11..." />
+            </div>
+          </div>
+        </div>
+        <div className="ficha-section">
+          <div className="ficha-section-title">Instrumentos que enseña</div>
+          <div className="curso-checks">
+            {instrumentos.map(i => (
+              <button key={i.id} type="button" disabled={!puedeEd}
+                className={`curso-check-btn ${form.instrumento_ids.includes(i.id) ? 'selected' : ''}`}
+                onClick={() => puedeEd && toggleInst(i.id)}>
+                {i.nombre}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="ficha-section">
+          <div className="ficha-section-title">Formación y experiencia</div>
+          <textarea className="form-control" rows={5} value={form.formacion} disabled={!puedeEd}
+            onChange={e => set('formacion', e.target.value)}
+            placeholder="Estudios, trayectoria, experiencia docente..." />
+        </div>
+        {puedeEd && (
+          <div style={{display:'flex',justifyContent:'flex-end',padding:'6px 0'}}>
+            <button type="submit" className="btn btn-primary btn-auto" disabled={saving}>
+              {saving ? 'Guardando...' : '💾 Guardar ficha'}
+            </button>
+          </div>
+        )}
+      </form>
+    </div>
+  );
+}
+
+// ── INVENTARIO ───────────────────────────────────────────────────────────────────
+const INV_ESTADOS = { disponible:'Disponible', en_uso:'En uso', en_reparacion:'En reparación', baja:'Baja' };
+
+function Inventario({ user }) {
+  const puede = (p) => user.permisos?.includes(p);
+  const [lista,       setLista]       = useState([]);
+  const [instrumentos,setInstrumentos]= useState([]);
+  const [filtroTipo,  setFiltroTipo]  = useState('');
+  const [filtroEst,   setFiltroEst]   = useState('');
+  const [busqueda,    setBusqueda]    = useState('');
+  const [cargando,    setCargando]    = useState(true);
+  const [modal,       setModal]       = useState(null); // null | 'nuevo' | item
+  const [error,       setError]       = useState('');
+
+  const cargar = useCallback(async () => {
+    setCargando(true);
+    try {
+      const [inv, inst] = await Promise.all([
+        apiFetch('/api/inventario'),
+        apiFetch('/api/instrumentos'),
+      ]);
+      setLista(inv); setInstrumentos(inst);
+    } catch(e) { setError(e.message); }
+    finally { setCargando(false); }
+  }, []);
+  useEffect(() => { cargar(); }, [cargar]);
+
+  const listaFiltrada = lista.filter(it => {
+    if (filtroTipo && String(it.instrumento_id) !== filtroTipo) return false;
+    if (filtroEst  && it.estado !== filtroEst) return false;
+    if (busqueda   && !`${it.nombre} ${it.tipo_instrumento_nombre||''}`.toLowerCase().includes(busqueda.toLowerCase())) return false;
+    return true;
+  });
+
+  const exportarCSV = () => {
+    const cols = ['Nombre','Tipo','Estado','Número de serie','Asignado a','Observaciones','Fecha de alta'];
+    const rows = listaFiltrada.map(it => [
+      it.nombre, it.tipo_instrumento_nombre||'', INV_ESTADOS[it.estado]||it.estado,
+      it.numero_serie||'', it.asignado_nombre||'', it.observaciones||'',
+      it.fecha_alta||'',
+    ]);
+    const csv = [cols,...rows].map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
+    const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8;'}));
+    a.download = 'EPM_inventario.csv'; document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  };
+
+  return (
+    <div>
+      <div className="section-header">
+        <h2 style={{fontSize:18,fontWeight:800}}>🎻 Inventario de instrumentos</h2>
+        <div style={{display:'flex',gap:6}}>
+          <button className="btn btn-secondary btn-auto" style={{fontSize:12}} onClick={exportarCSV}>⬇ CSV</button>
+          {puede('editar_inventario') && (
+            <button className="btn btn-primary btn-auto" onClick={() => setModal('nuevo')}>+ Agregar</button>
+          )}
+        </div>
+      </div>
+      <div style={{display:'flex',gap:8,marginBottom:14,flexWrap:'wrap'}}>
+        <input className="form-control" style={{flex:1,minWidth:140}}
+          placeholder="Buscar..." value={busqueda} onChange={e => setBusqueda(e.target.value)} />
+        <select className="form-control" style={{width:'auto'}} value={filtroTipo} onChange={e=>setFiltroTipo(e.target.value)}>
+          <option value="">Todos los tipos</option>
+          {instrumentos.map(i=><option key={i.id} value={i.id}>{i.nombre}</option>)}
+        </select>
+        <select className="form-control" style={{width:'auto'}} value={filtroEst} onChange={e=>setFiltroEst(e.target.value)}>
+          <option value="">Todos los estados</option>
+          {Object.entries(INV_ESTADOS).map(([k,v])=><option key={k} value={k}>{v}</option>)}
+        </select>
+      </div>
+      {error && <div className="alert alert-error">{error}</div>}
+      {cargando ? <div className="spinner"><div className="spin"/></div>
+        : listaFiltrada.length === 0
+        ? <div className="empty-state"><div className="empty-state-icon">🎻</div><div>Sin ítems en el inventario</div></div>
+        : listaFiltrada.map(it => (
+            <div key={it.id} className="list-row" style={{cursor: puede('editar_inventario') ? 'pointer' : 'default'}}
+              onClick={() => puede('editar_inventario') && setModal(it)}>
+              <div style={{flex:1,minWidth:0}}>
+                <div className="list-row-label">{it.nombre}</div>
+                <div style={{fontSize:12,color:'var(--text2)',marginTop:2,display:'flex',flexWrap:'wrap',gap:8}}>
+                  {it.tipo_instrumento_nombre && <span>{it.tipo_instrumento_nombre}</span>}
+                  {it.numero_serie && <span>N/S: {it.numero_serie}</span>}
+                  {it.asignado_nombre && <span>📎 {it.asignado_nombre}</span>}
+                </div>
+              </div>
+              <span className={`inv-badge inv-estado-${it.estado}`}>{INV_ESTADOS[it.estado]||it.estado}</span>
+            </div>
+          ))
+      }
+      {modal !== null && (
+        <ModalInventario item={modal === 'nuevo' ? null : modal}
+          instrumentos={instrumentos}
+          onClose={() => setModal(null)}
+          onGuardado={() => { setModal(null); cargar(); }}
+        />
+      )}
+    </div>
+  );
+}
+
+function ModalInventario({ item, instrumentos, onClose, onGuardado }) {
+  const [form, setForm] = useState({
+    nombre:        item?.nombre || '',
+    instrumento_id: item?.instrumento_id || '',
+    estado:        item?.estado || 'disponible',
+    numero_serie:  item?.numero_serie || '',
+    observaciones: item?.observaciones || '',
+    fecha_alta:    item?.fecha_alta || new Date().toISOString().slice(0,10),
+  });
+  const [saving, setSaving] = useState(false);
+  const [error,  setError]  = useState('');
+  const set = (k,v) => setForm(f=>({...f,[k]:v}));
+
+  const submit = async (e) => {
+    e.preventDefault(); setSaving(true); setError('');
+    try {
+      const method = item?.id ? 'PUT' : 'POST';
+      const url    = item?.id ? `/api/inventario/${item.id}` : '/api/inventario';
+      await apiFetch(url, { method, body: form });
+      onGuardado();
+    } catch(err) { setError(err.message); }
+    finally { setSaving(false); }
+  };
+
+  const eliminar = async () => {
+    if (!confirm('¿Eliminar este ítem del inventario?')) return;
+    try { await apiFetch(`/api/inventario/${item.id}`, { method:'DELETE' }); onGuardado(); }
+    catch(err) { setError(err.message); }
+  };
+
+  return (
+    <div className="modal-overlay" onClick={e => e.target===e.currentTarget && onClose()}>
+      <div className="modal">
+        <div className="modal-header">
+          <span className="modal-title">{item?.id ? 'Editar ítem' : 'Nuevo ítem de inventario'}</span>
+          <button className="modal-close" onClick={onClose}>×</button>
+        </div>
+        {error && <div className="alert alert-error">{error}</div>}
+        <form onSubmit={submit}>
+          <div className="form-group">
+            <label className="form-label">Nombre / descripción *</label>
+            <input className="form-control" value={form.nombre} onChange={e=>set('nombre',e.target.value)} required
+              placeholder='Ej: "Guitarra criolla Gracia Nº3"' />
+          </div>
+          <div className="form-grid">
+            <div className="form-group">
+              <label className="form-label">Tipo de instrumento</label>
+              <select className="form-control" value={form.instrumento_id} onChange={e=>set('instrumento_id',e.target.value||null)}>
+                <option value="">— Sin tipo —</option>
+                {instrumentos.map(i=><option key={i.id} value={i.id}>{i.nombre}</option>)}
+              </select>
+            </div>
+            <div className="form-group">
+              <label className="form-label">Estado</label>
+              <select className="form-control" value={form.estado} onChange={e=>set('estado',e.target.value)}>
+                {Object.entries(INV_ESTADOS).map(([k,v])=><option key={k} value={k}>{v}</option>)}
+              </select>
+            </div>
+            <div className="form-group">
+              <label className="form-label">Número de serie</label>
+              <input className="form-control" value={form.numero_serie} onChange={e=>set('numero_serie',e.target.value)} />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Fecha de alta</label>
+              <input className="form-control" type="date" value={form.fecha_alta} onChange={e=>set('fecha_alta',e.target.value)} />
+            </div>
+            <div className="form-group col-full">
+              <label className="form-label">Observaciones</label>
+              <textarea className="form-control" rows={2} value={form.observaciones} onChange={e=>set('observaciones',e.target.value)} />
+            </div>
+          </div>
+          <div className="modal-footer">
+            {item?.id && <button type="button" className="btn btn-danger btn-auto" onClick={eliminar}>🗑</button>}
+            <button type="button" className="btn btn-secondary btn-auto" onClick={onClose}>Cancelar</button>
+            <button type="submit" className="btn btn-primary btn-auto" disabled={saving}>
+              {saving ? 'Guardando...' : 'Guardar'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// ── PROYECTOS ────────────────────────────────────────────────────────────────────
+const PROY_ESTADOS = {
+  borrador:'Borrador', en_curso:'En curso', presentado:'Presentado',
+  aprobado:'Aprobado', rechazado:'Rechazado', finalizado:'Finalizado',
+};
+const PROY_ICONOS = {
+  borrador:'✏️', en_curso:'🔄', presentado:'📤', aprobado:'✅', rechazado:'❌', finalizado:'🏁',
+};
+
+function Proyectos({ user }) {
+  const puede = (p) => user.permisos?.includes(p);
+  const [lista,    setLista]   = useState([]);
+  const [filtroEst,setFiltroEst] = useState('');
+  const [cargando, setCargando] = useState(true);
+  const [detalleId,setDetalleId] = useState(null);
+  const [modalNuevo,setModalNuevo] = useState(false);
+
+  const cargar = useCallback(async () => {
+    setCargando(true);
+    try {
+      const url = filtroEst ? `/api/proyectos?estado=${filtroEst}` : '/api/proyectos';
+      setLista(await apiFetch(url));
+    } catch(e) {}
+    finally { setCargando(false); }
+  }, [filtroEst]);
+  useEffect(() => { cargar(); }, [cargar]);
+
+  if (detalleId) return <DetalleProy proyId={detalleId} user={user} puede={puede}
+    onVolver={() => { setDetalleId(null); cargar(); }} />;
+
+  return (
+    <div>
+      <div className="section-header">
+        <h2 style={{fontSize:18,fontWeight:800}}>📁 Proyectos</h2>
+        {puede('editar_proyectos') && (
+          <button className="btn btn-primary btn-auto" onClick={() => setModalNuevo(true)}>+ Nuevo proyecto</button>
+        )}
+      </div>
+      <div style={{display:'flex',gap:6,marginBottom:14,overflowX:'auto'}}>
+        {[['','Todos'],['borrador','Borrador'],['en_curso','En curso'],
+          ['presentado','Presentado'],['aprobado','Aprobado'],
+          ['rechazado','Rechazado'],['finalizado','Finalizado']].map(([k,v]) => (
+          <button key={k} className={`curso-tab ${filtroEst===k?'active':''}`} onClick={()=>setFiltroEst(k)}>{v}</button>
+        ))}
+      </div>
+      {cargando ? <div className="spinner"><div className="spin"/></div>
+        : lista.length === 0
+        ? <div className="empty-state"><div className="empty-state-icon">📁</div><div>No hay proyectos</div></div>
+        : lista.map(p => (
+            <div key={p.id} className="proy-card" onClick={() => setDetalleId(p.id)}>
+              <div className="proy-card-titulo">{PROY_ICONOS[p.estado]} {p.titulo}</div>
+              <div className="proy-card-meta">
+                <span className={`proy-badge proy-estado-${p.estado}`}>{PROY_ESTADOS[p.estado]}</span>
+                {p.destino && <span>📍 {p.destino}</span>}
+                {p.fecha_presentacion && <span>📅 {formatFechaCalendario(p.fecha_presentacion)}</span>}
+                <span style={{marginLeft:'auto',color:'var(--text2)'}}>{p.creado_por_nombre}</span>
+              </div>
+            </div>
+          ))
+      }
+      {modalNuevo && (
+        <ModalProy onClose={() => setModalNuevo(false)}
+          onGuardado={(p) => { setModalNuevo(false); setDetalleId(p.id); }} />
+      )}
+    </div>
+  );
+}
+
+function ModalProy({ proyecto, onClose, onGuardado }) {
+  const [form, setForm] = useState({
+    titulo:             proyecto?.titulo || '',
+    descripcion:        proyecto?.descripcion || '',
+    estado:             proyecto?.estado || 'borrador',
+    fecha_presentacion: proyecto?.fecha_presentacion || '',
+    destino:            proyecto?.destino || '',
+  });
+  const [saving, setSaving] = useState(false);
+  const [error,  setError]  = useState('');
+  const set = (k,v) => setForm(f=>({...f,[k]:v}));
+
+  const submit = async (e) => {
+    e.preventDefault(); setSaving(true); setError('');
+    try {
+      const method = proyecto?.id ? 'PUT' : 'POST';
+      const url    = proyecto?.id ? `/api/proyectos/${proyecto.id}` : '/api/proyectos';
+      const data   = await apiFetch(url, { method, body: form });
+      onGuardado(data);
+    } catch(err) { setError(err.message); }
+    finally { setSaving(false); }
+  };
+
+  return (
+    <div className="modal-overlay" onClick={e => e.target===e.currentTarget && onClose()}>
+      <div className="modal modal-lg">
+        <div className="modal-header">
+          <span className="modal-title">{proyecto?.id ? 'Editar proyecto' : 'Nuevo proyecto'}</span>
+          <button className="modal-close" onClick={onClose}>×</button>
+        </div>
+        {error && <div className="alert alert-error">{error}</div>}
+        <form onSubmit={submit}>
+          <div className="form-group">
+            <label className="form-label">Título *</label>
+            <input className="form-control" value={form.titulo} onChange={e=>set('titulo',e.target.value)} required />
+          </div>
+          <div className="form-group">
+            <label className="form-label">Descripción</label>
+            <textarea className="form-control" rows={4} value={form.descripcion} onChange={e=>set('descripcion',e.target.value)}
+              placeholder="Descripción detallada del proyecto..." />
+          </div>
+          <div className="form-grid">
+            <div className="form-group">
+              <label className="form-label">Estado</label>
+              <select className="form-control" value={form.estado} onChange={e=>set('estado',e.target.value)}>
+                {Object.entries(PROY_ESTADOS).map(([k,v])=><option key={k} value={k}>{v}</option>)}
+              </select>
+            </div>
+            <div className="form-group">
+              <label className="form-label">Fecha de presentación</label>
+              <input className="form-control" type="date" value={form.fecha_presentacion} onChange={e=>set('fecha_presentacion',e.target.value)} />
+            </div>
+            <div className="form-group col-full">
+              <label className="form-label">Destino de presentación</label>
+              <input className="form-control" value={form.destino} onChange={e=>set('destino',e.target.value)}
+                placeholder="Ej: Municipalidad de San Martín, Ministerio de Cultura..." />
+            </div>
+          </div>
+          <div className="modal-footer">
+            <button type="button" className="btn btn-secondary btn-auto" onClick={onClose}>Cancelar</button>
+            <button type="submit" className="btn btn-primary btn-auto" disabled={saving}>
+              {saving ? 'Guardando...' : proyecto?.id ? 'Guardar cambios' : 'Crear proyecto'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function DetalleProy({ proyId, user, puede, onVolver }) {
+  const [proy,    setProy]    = useState(null);
+  const [cargando,setCargando]= useState(true);
+  const [editando,setEditando]= useState(false);
+  const [subiendo,setSubiendo]= useState(false);
+  const [error,   setError]   = useState('');
+
+  const cargar = useCallback(async () => {
+    try { setProy(await apiFetch(`/api/proyectos/${proyId}`)); }
+    catch(e) { setError(e.message); }
+    finally { setCargando(false); }
+  }, [proyId]);
+  useEffect(() => { cargar(); }, [cargar]);
+
+  const subirAdjunto = async (file) => {
+    if (!file) return; setSubiendo(true);
+    try {
+      const fd = new FormData(); fd.append('archivo', file);
+      const token = localStorage.getItem('epm_token');
+      const res = await fetch(`/api/proyectos/${proyId}/adjuntos`, {
+        method:'POST', headers:{ Authorization:`Bearer ${token}` }, body:fd,
+      });
+      if (!res.ok) throw new Error((await res.json()).error);
+      cargar();
+    } catch(e) { alert(e.message); }
+    finally { setSubiendo(false); }
+  };
+
+  const eliminarAdjunto = async (adjId) => {
+    if (!confirm('¿Eliminar adjunto?')) return;
+    try { await apiFetch(`/api/proyectos/${proyId}/adjuntos/${adjId}`, { method:'DELETE' }); cargar(); }
+    catch(e) { alert(e.message); }
+  };
+
+  if (cargando) return <div className="spinner"><div className="spin"/></div>;
+  if (!proy)    return <div className="alert alert-error">{error || 'Proyecto no encontrado'}</div>;
+
+  return (
+    <div style={{maxWidth:720,margin:'0 auto'}}>
+      <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:18}}>
+        <button className="btn btn-secondary btn-auto" onClick={onVolver}>← Volver</button>
+        <h2 style={{fontSize:18,fontWeight:800,flex:1}}>{proy.titulo}</h2>
+        {puede('editar_proyectos') && (
+          <button className="btn btn-secondary btn-auto" onClick={() => setEditando(true)}>✏️ Editar</button>
+        )}
+      </div>
+      <div className="ficha-section">
+        <div style={{display:'flex',gap:8,flexWrap:'wrap',marginBottom:12}}>
+          <span className={`proy-badge proy-estado-${proy.estado}`}>{PROY_ICONOS[proy.estado]} {PROY_ESTADOS[proy.estado]}</span>
+          {proy.fecha_presentacion && <span style={{fontSize:13,color:'var(--text2)'}}>📅 {formatFechaCalendario(proy.fecha_presentacion)}</span>}
+          {proy.destino && <span style={{fontSize:13,color:'var(--text2)'}}>📍 {proy.destino}</span>}
+        </div>
+        {proy.descripcion && <p style={{fontSize:14,lineHeight:1.7,color:'var(--text)',whiteSpace:'pre-wrap'}}>{proy.descripcion}</p>}
+      </div>
+
+      {/* Adjuntos */}
+      <div className="ficha-section">
+        <div className="ficha-section-title" style={{justifyContent:'space-between'}}>
+          📎 Archivos adjuntos
+          {puede('editar_proyectos') && (
+            <label style={{cursor:'pointer',color:'var(--primary)',fontSize:12,fontWeight:700}}>
+              {subiendo ? 'Subiendo...' : '+ Subir archivo'}
+              <input type="file" style={{display:'none'}} accept=".pdf,.doc,.docx,.odt,.jpg,.png"
+                onChange={e => e.target.files[0] && subirAdjunto(e.target.files[0])} />
+            </label>
+          )}
+        </div>
+        {proy.adjuntos?.length === 0
+          ? <div style={{color:'var(--text2)',fontSize:13}}>Sin archivos adjuntos</div>
+          : proy.adjuntos?.map(adj => (
+              <div key={adj.id} style={{display:'flex',alignItems:'center',gap:8,padding:'8px 0',borderBottom:'1px solid var(--border)'}}>
+                <span style={{fontSize:18}}>{adj.mime_type?.includes('pdf') ? '📄' : adj.mime_type?.startsWith('image') ? '🖼' : '📝'}</span>
+                <a href={adj.path} target="_blank" style={{flex:1,fontSize:13,color:'var(--primary)',fontWeight:600}}>{adj.nombre}</a>
+                {puede('editar_proyectos') && (
+                  <button className="btn-icon btn-icon-danger" onClick={() => eliminarAdjunto(adj.id)}>🗑</button>
+                )}
+              </div>
+            ))
+        }
+      </div>
+
+      {/* Historial */}
+      <div className="ficha-section">
+        <div className="ficha-section-title">🕐 Historial de estados</div>
+        {proy.historial?.map((h, i) => (
+          <div key={i} className="tl-item">
+            <div className="tl-dot" style={{background: h.estado === 'aprobado' ? 'var(--success)' : h.estado === 'rechazado' ? 'var(--danger)' : 'var(--primary)'}} />
+            <div className="tl-body">
+              <div className="tl-header">
+                <span className={`proy-badge proy-estado-${h.estado}`}>{PROY_ESTADOS[h.estado] || h.estado}</span>
+                <span className="tl-fecha">{h.created_at.slice(0,10)}</span>
+              </div>
+              {h.nota && <div className="tl-desc">{h.nota}</div>}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {editando && (
+        <ModalProy proyecto={proy} onClose={() => setEditando(false)}
+          onGuardado={() => { setEditando(false); cargar(); }} />
+      )}
+    </div>
+  );
+}
+
+// ── FINANZAS (placeholder) ───────────────────────────────────────────────────────
+function Finanzas() {
+  return (
+    <div className="construccion-wrap">
+      <div className="construccion-icon">💰</div>
+      <div className="construccion-titulo">Módulo de Finanzas</div>
+      <div className="construccion-sub">
+        Este módulo estará disponible próximamente.<br/>
+        La EPM está completando los trámites de obtención del CUIT.
+        Cuando esté listo, vas a poder registrar ingresos y egresos, generar reportes
+        de balance e integrar pagos con Mercado Pago y facturación con AFIP.
+      </div>
+      <span className="badge-wip">🚧 En construcción</span>
+      <div style={{marginTop:16,fontSize:12,color:'var(--text2)',maxWidth:360}}>
+        Las tablas de datos ya están creadas en la base de datos y los permisos configurados.
+        Solo falta activar la lógica cuando la institución obtenga el CUIT.
+      </div>
     </div>
   );
 }
@@ -5377,6 +6240,14 @@ function Layout({ user }) {
             ? <Instrumentos user={user} />
             : section === 'calendario'
             ? <Calendario user={user} />
+            : section === 'docentes'
+            ? <Docentes user={user} />
+            : section === 'inventario'
+            ? <Inventario user={user} />
+            : section === 'proyectos'
+            ? <Proyectos user={user} />
+            : section === 'finanzas'
+            ? <Finanzas />
             : <Placeholder id={section} />}
         </div>
       </div>

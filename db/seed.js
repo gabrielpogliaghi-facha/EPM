@@ -16,19 +16,30 @@ const PERMISOS = [
   { codigo: 'acceder_backup',             descripcion: 'Acceder a backup del sistema',       grupo: 'administracion' },
   { codigo: 'ver_legajo_personal',        descripcion: 'Ver legajo personal de estudiantes',    grupo: 'estudiantes' },
   { codigo: 'editar_legajo_personal',     descripcion: 'Editar legajo personal de estudiantes', grupo: 'estudiantes' },
-  { codigo: 'ver_calendario',             descripcion: 'Ver calendario de eventos',              grupo: 'calendario'  },
-  { codigo: 'crear_eventos',              descripcion: 'Crear eventos en el calendario',          grupo: 'calendario'  },
-  { codigo: 'editar_eventos',             descripcion: 'Editar, cancelar y reprogramar eventos',  grupo: 'calendario'  },
+  { codigo: 'ver_calendario',             descripcion: 'Ver calendario de eventos',              grupo: 'calendario'     },
+  { codigo: 'crear_eventos',              descripcion: 'Crear eventos en el calendario',          grupo: 'calendario'     },
+  { codigo: 'editar_eventos',             descripcion: 'Editar, cancelar y reprogramar eventos',  grupo: 'calendario'     },
+  { codigo: 'ver_equipo_docente',         descripcion: 'Ver equipo docente',                      grupo: 'equipo_docente' },
+  { codigo: 'editar_equipo_docente',      descripcion: 'Editar fichas del equipo docente',        grupo: 'equipo_docente' },
+  { codigo: 'ver_inventario',             descripcion: 'Ver inventario de instrumentos',          grupo: 'inventario'     },
+  { codigo: 'editar_inventario',          descripcion: 'Gestionar inventario',                    grupo: 'inventario'     },
+  { codigo: 'ver_proyectos',              descripcion: 'Ver proyectos institucionales',            grupo: 'proyectos'      },
+  { codigo: 'editar_proyectos',           descripcion: 'Crear y editar proyectos',                grupo: 'proyectos'      },
+  { codigo: 'ver_finanzas',               descripcion: 'Ver movimientos financieros',             grupo: 'finanzas'       },
+  { codigo: 'editar_finanzas',            descripcion: 'Cargar movimientos financieros',          grupo: 'finanzas'       },
+  { codigo: 'administrar_finanzas',       descripcion: 'Administrar finanzas y categorías',       grupo: 'finanzas'       },
 ];
 
 const ROL_OPERADOR = ['ver_estudiantes','crear_estudiantes','editar_estudiantes',
                       'ver_asistencias','cargar_asistencias','justificar_ausencias',
                       'ver_reportes','editar_reportes','administrar_cursos',
-                      'ver_calendario','crear_eventos','editar_eventos'];
+                      'ver_calendario','crear_eventos','editar_eventos',
+                      'ver_equipo_docente','ver_inventario','editar_inventario',
+                      'ver_proyectos','editar_proyectos','ver_finanzas','editar_finanzas'];
 const ROL_DOCENTE  = ['ver_estudiantes','ver_asistencias','cargar_asistencias',
                       'ver_reportes','ver_planificaciones','editar_planificaciones',
                       'ver_legajo_personal','editar_legajo_personal',
-                      'ver_calendario'];
+                      'ver_calendario','ver_equipo_docente','ver_proyectos','ver_finanzas'];
 
 async function runSeed(db) {
   const check = await db.execute('SELECT COUNT(*) AS c FROM instituciones');

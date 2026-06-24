@@ -433,18 +433,157 @@ async function runSchema(db) {
     } catch(e) {}
   }
   try {
-    // Gestión y Operador: todos los permisos de calendario
     await db.execute(`INSERT OR IGNORE INTO roles_permisos (rol_id, permiso_id)
       SELECT r.id, p.id FROM roles r, permisos p
       WHERE r.nombre IN ('Gestión','Operador')
         AND p.codigo IN ('ver_calendario','crear_eventos','editar_eventos')`);
   } catch(e) {}
   try {
-    // Docente: solo ver
     await db.execute(`INSERT OR IGNORE INTO roles_permisos (rol_id, permiso_id)
       SELECT r.id, p.id FROM roles r, permisos p
       WHERE r.nombre = 'Docente'
         AND p.codigo = 'ver_calendario'`);
+  } catch(e) {}
+
+  // ── EQUIPO DOCENTE ─────────────────────────────────────────────────────────
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS docentes (
+      id               INTEGER PRIMARY KEY AUTOINCREMENT,
+      usuario_id       INTEGER UNIQUE NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+      institucion_id   INTEGER NOT NULL REFERENCES instituciones(id),
+      dni              TEXT,
+      fecha_nacimiento TEXT,
+      telefono         TEXT,
+      formacion        TEXT,
+      foto_path        TEXT,
+      created_at       TEXT DEFAULT (datetime('now')),
+      updated_at       TEXT DEFAULT (datetime('now'))
+    )
+  `);
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS docente_instrumentos (
+      docente_id     INTEGER NOT NULL REFERENCES docentes(id) ON DELETE CASCADE,
+      instrumento_id INTEGER NOT NULL REFERENCES instrumentos(id),
+      PRIMARY KEY (docente_id, instrumento_id)
+    )
+  `);
+
+  // ── INVENTARIO DE INSTRUMENTOS ────────────────────────────────────────────
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS inventario (
+      id             INTEGER PRIMARY KEY AUTOINCREMENT,
+      institucion_id INTEGER NOT NULL REFERENCES instituciones(id),
+      nombre         TEXT NOT NULL,
+      instrumento_id INTEGER REFERENCES instrumentos(id),
+      estado         TEXT NOT NULL DEFAULT 'disponible' CHECK(estado IN ('disponible','en_uso','en_reparacion','baja')),
+      asignado_tipo  TEXT,
+      asignado_id    INTEGER,
+      numero_serie   TEXT,
+      observaciones  TEXT,
+      fecha_alta     TEXT DEFAULT (date('now')),
+      created_at     TEXT DEFAULT (datetime('now')),
+      updated_at     TEXT DEFAULT (datetime('now'))
+    )
+  `);
+
+  // ── PROYECTOS ─────────────────────────────────────────────────────────────
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS proyectos (
+      id                 INTEGER PRIMARY KEY AUTOINCREMENT,
+      institucion_id     INTEGER NOT NULL REFERENCES instituciones(id),
+      titulo             TEXT NOT NULL,
+      descripcion        TEXT,
+      estado             TEXT NOT NULL DEFAULT 'borrador' CHECK(estado IN ('borrador','en_curso','presentado','aprobado','rechazado','finalizado')),
+      fecha_presentacion TEXT,
+      destino            TEXT,
+      created_by         INTEGER NOT NULL REFERENCES usuarios(id),
+      created_at         TEXT DEFAULT (datetime('now')),
+      updated_at         TEXT DEFAULT (datetime('now'))
+    )
+  `);
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS proyecto_historial (
+      id             INTEGER PRIMARY KEY AUTOINCREMENT,
+      proyecto_id    INTEGER NOT NULL REFERENCES proyectos(id) ON DELETE CASCADE,
+      estado         TEXT NOT NULL,
+      nota           TEXT,
+      registrado_por INTEGER REFERENCES usuarios(id),
+      created_at     TEXT DEFAULT (datetime('now'))
+    )
+  `);
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS proyecto_adjuntos (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      proyecto_id INTEGER NOT NULL REFERENCES proyectos(id) ON DELETE CASCADE,
+      nombre      TEXT NOT NULL,
+      path        TEXT NOT NULL,
+      mime_type   TEXT,
+      created_by  INTEGER REFERENCES usuarios(id),
+      created_at  TEXT DEFAULT (datetime('now'))
+    )
+  `);
+
+  // ── FINANZAS (estructura preparada, módulo pendiente) ─────────────────────
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS categorias_financieras (
+      id             INTEGER PRIMARY KEY AUTOINCREMENT,
+      institucion_id INTEGER NOT NULL REFERENCES instituciones(id),
+      nombre         TEXT NOT NULL,
+      tipo           TEXT NOT NULL CHECK(tipo IN ('ingreso','egreso')),
+      activo         INTEGER DEFAULT 1,
+      created_at     TEXT DEFAULT (datetime('now'))
+    )
+  `);
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS movimientos_financieros (
+      id               INTEGER PRIMARY KEY AUTOINCREMENT,
+      institucion_id   INTEGER NOT NULL REFERENCES instituciones(id),
+      fecha            TEXT NOT NULL,
+      concepto         TEXT NOT NULL,
+      tipo             TEXT NOT NULL CHECK(tipo IN ('ingreso','egreso')),
+      monto            REAL NOT NULL,
+      categoria_id     INTEGER REFERENCES categorias_financieras(id),
+      comprobante_path TEXT,
+      notas            TEXT,
+      registrado_por   INTEGER NOT NULL REFERENCES usuarios(id),
+      created_at       TEXT DEFAULT (datetime('now')),
+      updated_at       TEXT DEFAULT (datetime('now'))
+    )
+  `);
+  await db.execute(`CREATE INDEX IF NOT EXISTS idx_mov_fin ON movimientos_financieros(institucion_id, fecha)`);
+
+  // ── MIGRACIÓN PERMISOS módulos nuevos (idempotente) ───────────────────────
+  const permsNuevos = [
+    { codigo:'ver_equipo_docente',   descripcion:'Ver equipo docente',               grupo:'equipo_docente' },
+    { codigo:'editar_equipo_docente',descripcion:'Editar fichas del equipo docente',  grupo:'equipo_docente' },
+    { codigo:'ver_inventario',       descripcion:'Ver inventario de instrumentos',    grupo:'inventario'     },
+    { codigo:'editar_inventario',    descripcion:'Gestionar inventario',              grupo:'inventario'     },
+    { codigo:'ver_proyectos',        descripcion:'Ver proyectos institucionales',     grupo:'proyectos'      },
+    { codigo:'editar_proyectos',     descripcion:'Crear y editar proyectos',          grupo:'proyectos'      },
+    { codigo:'ver_finanzas',         descripcion:'Ver movimientos financieros',       grupo:'finanzas'       },
+    { codigo:'editar_finanzas',      descripcion:'Cargar movimientos financieros',    grupo:'finanzas'       },
+    { codigo:'administrar_finanzas', descripcion:'Administrar finanzas y categorías', grupo:'finanzas'       },
+  ];
+  for (const p of permsNuevos) {
+    try { await db.execute({ sql:'INSERT OR IGNORE INTO permisos (codigo, descripcion, grupo) VALUES (?,?,?)', args:[p.codigo, p.descripcion, p.grupo] }); } catch(e) {}
+  }
+  try {
+    await db.execute(`INSERT OR IGNORE INTO roles_permisos (rol_id, permiso_id)
+      SELECT r.id, p.id FROM roles r, permisos p
+      WHERE r.nombre='Gestión'
+        AND p.codigo IN ('ver_equipo_docente','editar_equipo_docente','ver_inventario','editar_inventario','ver_proyectos','editar_proyectos','ver_finanzas','editar_finanzas','administrar_finanzas')`);
+  } catch(e) {}
+  try {
+    await db.execute(`INSERT OR IGNORE INTO roles_permisos (rol_id, permiso_id)
+      SELECT r.id, p.id FROM roles r, permisos p
+      WHERE r.nombre='Operador'
+        AND p.codigo IN ('ver_equipo_docente','ver_inventario','editar_inventario','ver_proyectos','editar_proyectos','ver_finanzas','editar_finanzas')`);
+  } catch(e) {}
+  try {
+    await db.execute(`INSERT OR IGNORE INTO roles_permisos (rol_id, permiso_id)
+      SELECT r.id, p.id FROM roles r, permisos p
+      WHERE r.nombre='Docente'
+        AND p.codigo IN ('ver_equipo_docente','ver_proyectos','ver_finanzas')`);
   } catch(e) {}
 }
 

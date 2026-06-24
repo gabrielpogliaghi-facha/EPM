@@ -41,11 +41,17 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 | 9  | **Legajo personal** | 2026-06-22 | Segunda pestaña en la Ficha. Campos fijos: grupo familiar, salud, trayectoria. Tres timelines: historial de salud, historial de trayectoria, observaciones generales. Permisos `ver_legajo_personal` + `editar_legajo_personal` (Gestión + Docente; Operador no ve). Migración de permisos automática en `runSchema`. |
 | inf| **Migración a Turso (libSQL)** | 2026-06-22 | Reemplaza node:sqlite por @libsql/client. Dev usa file:./epm.db; prod usa TURSO_URL + TURSO_AUTH_TOKEN. |
 | 10 | **Recuperación de contraseña** | 2026-06-23 | Self-service vía email (Resend): link con token hasheado, expira 1 hora, uso único. Reseteo manual por Gestión ya existía. UI: "¿Olvidaste tu contraseña?" en login + pantalla de nueva contraseña vía `?token=` en URL. |
-| 11 | **Calendario de eventos + Notificaciones** | 2026-06-23 | Calendario mensual con tipos de eventos (muestra/feriado/reunión/ensayo/salida/otro), colores por tipo, vistas mes y agenda. Cancelar/reprogramar con motivo: notifica in-app (campanita en topbar) + email vía Resend. Tabla `eventos`, `evento_cursos`, `notificaciones`. Permisos `ver_calendario`, `crear_eventos`, `editar_eventos`. Dashboard muestra próximos eventos. |
+| 11 | **Calendario de eventos + Notificaciones** | 2026-06-23 | Calendario mensual con tipos de eventos (muestra/feriado/reunión/ensayo/salida/festival/otro), colores por tipo, vistas mes y agenda. Cancelar/reprogramar con motivo: notifica in-app (campanita en topbar) + email vía Resend. Tabla `eventos`, `evento_cursos`, `notificaciones`. Permisos `ver_calendario`, `crear_eventos`, `editar_eventos`. Dashboard muestra próximos eventos. |
+| 12 | **Equipo Docente** | 2026-06-24 | Ficha extendida de profes vinculada a `usuarios`. Tabla `docentes` + `docente_instrumentos`. Campos: DNI, fecha nacimiento, teléfono, foto, formación/experiencia, instrumentos que enseña. Docente puede editar su propio perfil. Permisos `ver_equipo_docente` + `editar_equipo_docente`. |
+| 13 | **Cumpleaños en calendario** | 2026-06-24 | Puntitos rosas en el calendario para cumpleaños de estudiantes y docentes. Modal al click con detalle. Card "Cumpleaños del mes" en Dashboard (hoy resaltado, próximos 7 días, resto del mes). Campanita notifica cumpleaños de la semana (deduplicado por día). Endpoint `GET /api/cumpleanios` + `POST /api/cumpleanios/notificar`. |
+| 14 | **Inventario de instrumentos** | 2026-06-24 | Inventario de instrumentos físicos (no tipos). Tabla `inventario` con nombre, tipo, estado (disponible/en uso/en reparación/baja), asignado a, número de serie, observaciones. Filtros por tipo y estado. Export CSV client-side. Permisos `ver_inventario` + `editar_inventario`. |
+| 15 | **Proyectos institucionales** | 2026-06-24 | Gestión de proyectos con estados (borrador/en curso/presentado/aprobado/rechazado/finalizado), timeline de historial de estados, adjuntos (PDF/Word/imagen hasta 20MB). Filtro por estado. Permisos `ver_proyectos` + `editar_proyectos`. Tablas `proyectos`, `proyecto_historial`, `proyecto_adjuntos`. |
+| 16 | **Finanzas (estructura)** | 2026-06-24 | Módulo pendiente de CUIT. Pantalla "en construcción" con explicación. Tablas `movimientos_financieros` + `categorias_financieras` ya creadas. Permisos `ver_finanzas` + `editar_finanzas` + `administrar_finanzas`. Listo para activar cuando la EPM tenga CUIT. |
+| +  | **Reorganización del menú** | 2026-06-24 | Sidebar con grupos: Alumnos / Educación / Institución / Administración. `NAV_GROUPS` reemplaza el array plano; `NAV` sigue existiendo como flat map para lookups. |
 
 ### Estado general
 
-**Todos los módulos + inscripciones por instrumento + legajo personal con timeline + Turso en producción + recuperación de contraseña por email + calendario de eventos con notificaciones.**
+**Todos los módulos completos. Menú reorganizado por grupos. Equipo docente, inventario, proyectos, finanzas (estructura), cumpleaños en calendario y dashboard.**
 
 ### Decisiones tomadas
 
@@ -61,6 +67,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **Notificaciones**: tabla `notificaciones` (usuario_id, titulo, mensaje, tipo, entidad_tipo, entidad_id, leida). `utils/notificaciones.js` crea registros en DB + envía emails. Campanita en topbar con badge de no-leídas, polling cada 30s. Panel desplegable al hacer click. `GET /api/notificaciones`, `PUT /api/notificaciones/leer-todas`, `PUT /api/notificaciones/:id/leer`. Sistema genérico reutilizable para otros avisos futuros.
 - **Filtro de visibilidad eventos**: Gestión/Operador ven todos. Docente: solo eventos `alcance='institucion'` + eventos de sus cursos asignados.
 - **Notificados en cancelación/reprogramación**: si alcance=`institucion` → todos los usuarios activos. Si alcance=`cursos` → usuarios con esos cursos en `usuarios_cursos` + usuarios con permiso `administrar_cursos`.
+- **Equipo Docente**: tabla `docentes` (usuario_id UNIQUE, dni, fecha_nacimiento, telefono, formacion, foto_path) + `docente_instrumentos` (docente_id, instrumento_id). La ficha se crea con `PUT /api/docentes/:usuarioId` (upsert). Un Docente puede editar SU PROPIO perfil (sin necesitar `editar_equipo_docente`). Fotos en `/uploads/docentes/`.
+- **Cumpleaños**: `GET /api/cumpleanios?mes=MM&anio=YYYY` → array con {nombre, tipo, dia, fecha_nacimiento}. `POST /api/cumpleanios/notificar` crea notificaciones in-app para cumpleaños de hoy y próximos 6 días (deduplicado por día via localStorage key). Se llama desde Dashboard `CumpleaniosMes` una vez por día.
+- **Inventario**: `GET/POST /api/inventario`, `PUT/DELETE /api/inventario/:id`. Sin FK rígida en `asignado_tipo`/`asignado_id` (texto libre + id). Export CSV client-side en el frontend.
+- **Proyectos**: `GET /api/proyectos`, `GET /api/proyectos/:id` (incluye historial + adjuntos), `POST/PUT/DELETE`. Al cambiar estado en PUT, se crea entrada en `proyecto_historial` automáticamente. Adjuntos con multer en `/uploads/proyectos/`.
+- **Finanzas**: solo esqueleto. Las tablas `movimientos_financieros` y `categorias_financieras` existen en DB. El endpoint GET retorna `{estado:'en_construccion'}`. Activar cuando la EPM obtenga CUIT.
+- **Menú**: `NAV_GROUPS` es el array de grupos para el sidebar. `NAV` es el flat map derivado de `NAV_GROUPS.flatMap(g=>g.items)` — todos los lookups por `id` siguen funcionando igual.
 
 ### Pendientes / por decidir
 
