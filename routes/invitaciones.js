@@ -41,16 +41,24 @@ async function enviarInvitacion(db, inv, req) {
            tHash, exp, JSON.stringify(inv.cursos_ids || []), req.user.id],
   });
 
-  // Enviar email
-  const baseUrl = `${req.protocol}://${req.get('host')}`;
+  // Protocolo: en Render (proxy SSL) usar x-forwarded-proto; fallback a req.protocol
+  const proto   = req.headers['x-forwarded-proto'] || req.protocol;
+  const baseUrl = `${proto}://${req.get('host')}`;
+  console.log(`📩 [Invitaciones] Enviando invitación a: ${inv.email} | baseUrl: ${baseUrl} | rol: ${rolNombre}`);
+
   try {
-    await sendMail({
+    const mailResult = await sendMail({
       to:      inv.email,
       subject: 'Te invitamos a unirte al sistema de gestión de la EPM',
       html:    buildInvitacionEmail({ baseUrl, token: rawToken, rolNombre, cursoNombres }),
     });
+    if (mailResult?.skipped) {
+      console.warn(`⚠️  [Invitaciones] Email NO enviado a ${inv.email} — Gmail no configurado`);
+    }
   } catch(e) {
-    console.error(`Error enviando email a ${inv.email}:`, e.message);
+    // El email falló pero la invitación ya está guardada en la DB.
+    // Loggeamos completo para verlo en Render, pero no fallamos el request.
+    console.error(`❌ [Invitaciones] Falló el envío a ${inv.email} — invitación guardada de todos modos (id=${Number(r.lastInsertRowid)})`);
   }
 
   return Number(r.lastInsertRowid);

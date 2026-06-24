@@ -1,28 +1,47 @@
 const nodemailer = require('nodemailer');
 
 function createTransporter() {
-  if (!process.env.GMAIL_USER || !process.env.GMAIL_APP_PASSWORD) return null;
+  const user = process.env.GMAIL_USER;
+  const pass = (process.env.GMAIL_APP_PASSWORD || '').replace(/\s/g, ''); // tolerar espacios en App Password
+  if (!user || !pass) return null;
+
+  // Configuración explícita: host + port 587 + STARTTLS
+  // Más compatible que service:'gmail' (que usa puerto 465/SSL, problemático en algunos entornos)
   return nodemailer.createTransport({
-    service: 'gmail',
-    auth: {
-      user: process.env.GMAIL_USER,
-      pass: process.env.GMAIL_APP_PASSWORD,
-    },
+    host:   'smtp.gmail.com',
+    port:   587,
+    secure: false, // STARTTLS — se negocia después de conectar
+    auth:   { user, pass },
   });
 }
 
 async function sendMail({ to, subject, html }) {
-  const t = createTransporter();
-  if (!t) {
-    console.warn('⚠️  Gmail no configurado (GMAIL_USER / GMAIL_APP_PASSWORD), email no enviado.');
+  const user = process.env.GMAIL_USER;
+  const pass = process.env.GMAIL_APP_PASSWORD;
+
+  if (!user || !pass) {
+    console.warn('⚠️  [Mailer] GMAIL_USER o GMAIL_APP_PASSWORD no configurados — email omitido.');
     return { skipped: true };
   }
-  return t.sendMail({
-    from: `EPM Escuela Popular de Música <${process.env.GMAIL_USER}>`,
-    to,
-    subject,
-    html,
-  });
+
+  console.log(`📧 [Mailer] Intentando enviar email a: ${to} | from: ${user}`);
+  const t = createTransporter();
+
+  try {
+    const info = await t.sendMail({
+      from:    `EPM Escuela Popular de Música <${user}>`,
+      to,
+      subject,
+      html,
+    });
+    console.log(`✅ [Mailer] Email enviado. messageId: ${info.messageId} | accepted: ${info.accepted?.join(', ')}`);
+    return info;
+  } catch(err) {
+    console.error(`❌ [Mailer] Error al enviar email a ${to}:`);
+    console.error(`   code: ${err.code} | command: ${err.command} | response: ${err.response}`);
+    console.error(`   message: ${err.message}`);
+    throw err; // re-lanzar para que el caller pueda manejar
+  }
 }
 
 function buildInvitacionEmail({ baseUrl, token, rolNombre, cursoNombres }) {
