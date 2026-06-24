@@ -3419,17 +3419,19 @@ function Reportes({ user }) {
 
 // ── GESTIÓN DE USUARIOS ─────────────────────────────────────────────────────────
 function GestionUsuarios({ self }) {
-  const [usuarios,setUsuarios]= useState([]);
-  const [cursos,  setCursos]  = useState([]);
-  const [roles,   setRoles]   = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [modal,   setModal]   = useState(null); // null|'form'|'password'|'delete'
-  const [target,  setTarget]  = useState(null);
-  const [form,    setForm]    = useState({ nombre:'', email:'', password:'', rol_id:'', cursos:[] });
-  const [pwForm,  setPwForm]  = useState({ password:'', confirm:'' });
-  const [saving,  setSaving]  = useState(false);
-  const [formErr, setFormErr] = useState('');
-  const [toast,   setToast]   = useState({ type:'', text:'' });
+  const [usuarios,    setUsuarios]    = useState([]);
+  const [inactivos,   setInactivos]   = useState([]);
+  const [mostrarBaja, setMostrarBaja] = useState(false);
+  const [cursos,      setCursos]      = useState([]);
+  const [roles,       setRoles]       = useState([]);
+  const [loading,     setLoading]     = useState(true);
+  const [modal,       setModal]       = useState(null); // null|'form'|'password'|'delete'
+  const [target,      setTarget]      = useState(null);
+  const [form,        setForm]        = useState({ nombre:'', email:'', password:'', rol_id:'', cursos:[] });
+  const [pwForm,      setPwForm]      = useState({ password:'', confirm:'' });
+  const [saving,      setSaving]      = useState(false);
+  const [formErr,     setFormErr]     = useState('');
+  const [toast,       setToast]       = useState({ type:'', text:'' });
 
   const showToast = (t,m) => { setToast({type:t,text:m}); setTimeout(()=>setToast({type:'',text:''}),4000); };
   const ini = n => n.split(' ').slice(0,2).map(w=>w[0]||'').join('').toUpperCase();
@@ -3438,10 +3440,13 @@ function GestionUsuarios({ self }) {
   const cargar = async () => {
     setLoading(true);
     try {
-      const [us,cs,rs] = await Promise.all([
-        apiFetch('/api/usuarios'), apiFetch('/api/cursos'), apiFetch('/api/roles')
+      const [us, inact, cs, rs] = await Promise.all([
+        apiFetch('/api/usuarios'),
+        apiFetch('/api/usuarios?inactivos=1'),
+        apiFetch('/api/cursos'),
+        apiFetch('/api/roles'),
       ]);
-      setUsuarios(us); setCursos(cs); setRoles(rs);
+      setUsuarios(us); setInactivos(inact); setCursos(cs); setRoles(rs);
     } catch(e) { showToast('error', e.message); }
     finally { setLoading(false); }
   };
@@ -3506,6 +3511,14 @@ function GestionUsuarios({ self }) {
     finally { setSaving(false); }
   };
 
+  const reactivarUsuario = async (u) => {
+    if (!confirm(`¿Reactivar la cuenta de "${u.nombre}"? Podrá volver a acceder al sistema.`)) return;
+    try {
+      await apiFetch(`/api/usuarios/${u.id}/reactivar`, { method:'POST' });
+      showToast('success', `"${u.nombre}" reactivado.`); cargar();
+    } catch(e) { showToast('error', e.message); }
+  };
+
   return (
     <div>
       {toast.text && <div className={`alert alert-${toast.type}`} style={{cursor:'pointer'}} onClick={()=>setToast({type:'',text:''})}>{toast.text}</div>}
@@ -3538,6 +3551,37 @@ function GestionUsuarios({ self }) {
           </div>
         ))}
       </div>
+
+      {/* Sección usuarios dados de baja */}
+      {inactivos.length > 0 && (
+        <div style={{marginTop:16}}>
+          <button
+            style={{background:'none',border:'none',cursor:'pointer',fontSize:13,color:'var(--text2)',
+                    fontWeight:700,padding:'6px 0',display:'flex',alignItems:'center',gap:6}}
+            onClick={() => setMostrarBaja(b => !b)}>
+            {mostrarBaja ? '▾' : '▸'} Usuarios dados de baja ({inactivos.length})
+          </button>
+          {mostrarBaja && (
+            <div style={{marginTop:8,opacity:.85}}>
+              {inactivos.map(u => (
+                <div key={u.id} className="usr-row" style={{borderStyle:'dashed'}}>
+                  <div className="usr-avatar" style={{opacity:.5}}>{ini(u.nombre)}</div>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div className="usr-nombre" style={{color:'var(--text2)',textDecoration:'line-through'}}>
+                      {u.nombre}
+                    </div>
+                    <div className="usr-meta">{u.email} · {u.rol_nombre}</div>
+                  </div>
+                  <button className="btn btn-secondary btn-auto" style={{fontSize:12,padding:'5px 10px'}}
+                    onClick={() => reactivarUsuario(u)}>
+                    ↩ Reactivar
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Modal form usuario */}
       {modal==='form' && (
@@ -5128,12 +5172,13 @@ function InvRow({ inv, onCancelar, onReenviar, onEliminar }) {
 }
 
 function ModalInvitar({ roles, cursos, onClose, onEnviado }) {
-  const [emailsRaw, setEmailsRaw] = useState('');
-  const [rolId,     setRolId]     = useState(String(roles[0]?.id || ''));
-  const [cursosIds, setCursosIds] = useState([]);
-  const [saving,    setSaving]    = useState(false);
-  const [error,     setError]     = useState('');
-  const [preview,   setPreview]   = useState(false);
+  const [emailsRaw,    setEmailsRaw]    = useState('');
+  const [rolId,        setRolId]        = useState(String(roles[0]?.id || ''));
+  const [cursosIds,    setCursosIds]    = useState([]);
+  const [saving,       setSaving]       = useState(false);
+  const [error,        setError]        = useState('');
+  // Usuarios inactivos detectados que esperan confirmación para reactivar
+  const [inactivosPendientes, setInactivosPendientes] = useState([]); // [{email, usuario_id}]
 
   const emails = emailsRaw.split(/[\n,;]+/).map(e => e.trim()).filter(e => e.includes('@'));
 
@@ -5149,11 +5194,20 @@ function ModalInvitar({ roles, cursos, onClose, onEnviado }) {
         method: 'POST',
         body:   { emails, rol_id: rolId, cursos_ids: cursosIds },
       });
+
+      // Detectar emails de usuarios dados de baja
+      const inactivos = data.resultados.filter(r => r.estado === 'ya_registrado_inactivo');
+      if (inactivos.length) {
+        setInactivosPendientes(inactivos);
+        setSaving(false);
+        return; // Esperar confirmación del usuario
+      }
+
       const enviadas = data.resultados.filter(r => r.estado === 'enviada').length;
       const omitidas = data.resultados.filter(r => r.estado !== 'enviada');
       let msg = `✅ ${enviadas} invitación/es enviada/s`;
       if (omitidas.length) {
-        msg += `. Omitidos: ${omitidas.map(r=>`${r.email} (${r.estado})`).join(', ')}`;
+        msg += `. Omitidos: ${omitidas.map(r=>`${r.email} (${r.estado === 'ya_registrado' ? 'ya tiene cuenta' : r.estado})`).join(', ')}`;
       }
       onEnviado({ enviadas, mensaje: msg });
     } catch(err) { setError(err.message); }
@@ -5164,7 +5218,7 @@ function ModalInvitar({ roles, cursos, onClose, onEnviado }) {
 
   return (
     <div className="modal-overlay" onClick={e => e.target===e.currentTarget && onClose()}>
-      <div className="modal modal-lg">
+      <div className="modal modal-lg" style={{position:'relative',overflow:'hidden'}}>
         <div className="modal-header">
           <span className="modal-title">📩 Invitar usuario/s</span>
           <button className="modal-close" onClick={onClose}>×</button>
@@ -5223,6 +5277,45 @@ function ModalInvitar({ roles, cursos, onClose, onEnviado }) {
             </button>
           </div>
         </form>
+
+        {/* Confirmación para usuarios dados de baja */}
+        {inactivosPendientes.length > 0 && (
+          <div style={{position:'absolute',inset:0,background:'rgba(0,0,0,.45)',borderRadius:'var(--radius)',
+                       display:'flex',alignItems:'center',justifyContent:'center',padding:24}}>
+            <div style={{background:'var(--card)',borderRadius:12,padding:24,width:'100%',maxWidth:380}}>
+              <div style={{fontWeight:800,fontSize:15,marginBottom:10}}>⚠️ Email/s con cuenta dada de baja</div>
+              {inactivosPendientes.map(r => (
+                <div key={r.email} style={{fontSize:13,background:'var(--bg3)',borderRadius:8,padding:'6px 10px',marginBottom:6}}>
+                  {r.email}
+                </div>
+              ))}
+              <p style={{fontSize:13,color:'var(--text2)',margin:'10px 0 16px',lineHeight:1.5}}>
+                {inactivosPendientes.length === 1
+                  ? 'Este email ya existía pero el usuario fue dado de baja.'
+                  : 'Estos emails ya existían pero los usuarios fueron dados de baja.'}
+                {' '}¿Querés reactivarlos para que puedan volver a acceder?
+              </p>
+              <div style={{display:'flex',gap:8,justifyContent:'flex-end'}}>
+                <button className="btn btn-secondary btn-auto" onClick={() => setInactivosPendientes([])}>
+                  Cancelar
+                </button>
+                <button className="btn btn-primary btn-auto" onClick={async () => {
+                  setSaving(true);
+                  try {
+                    for (const r of inactivosPendientes) {
+                      await apiFetch(`/api/usuarios/${r.usuario_id}/reactivar`, { method:'POST' });
+                    }
+                    setInactivosPendientes([]);
+                    onEnviado({ enviadas: 0, mensaje: `✅ ${inactivosPendientes.length} usuario/s reactivado/s. Ya pueden iniciar sesión con su contraseña anterior.` });
+                  } catch(e) { setError(e.message); setInactivosPendientes([]); }
+                  finally { setSaving(false); }
+                }}>
+                  ↩ Reactivar {inactivosPendientes.length > 1 ? `${inactivosPendientes.length} usuarios` : 'usuario'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

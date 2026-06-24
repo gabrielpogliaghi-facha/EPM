@@ -20,15 +20,18 @@ async function hayOtroAdmin(excludeId = null) {
   return Number(rows[0].c) > 0;
 }
 
-// GET /api/usuarios
+// GET /api/usuarios  →  solo activos
+// GET /api/usuarios?inactivos=1  →  solo inactivos
 router.get('/', ...admin, async (req, res) => {
+  const soloInactivos = req.query.inactivos === '1';
   try {
     const { rows: usuarios } = await db.execute({
       sql: `SELECT u.id, u.nombre, u.email, u.activo, u.created_at,
                    r.id AS rol_id, r.nombre AS rol_nombre
             FROM   usuarios u JOIN roles r ON u.rol_id = r.id
-            WHERE  u.institucion_id = ? ORDER BY u.nombre`,
-      args: [req.user.institucion_id],
+            WHERE  u.institucion_id = ? AND u.activo = ?
+            ORDER BY u.nombre`,
+      args: [req.user.institucion_id, soloInactivos ? 0 : 1],
     });
 
     const result = await Promise.all(usuarios.map(async u => {
@@ -42,6 +45,22 @@ router.get('/', ...admin, async (req, res) => {
     res.json(result);
   } catch (e) {
     res.status(500).json({ error: 'Error al obtener usuarios' });
+  }
+});
+
+// POST /api/usuarios/:id/reactivar  (debe ir ANTES de /:id para no colisionar)
+router.post('/:id/reactivar', ...admin, async (req, res) => {
+  const id = Number(req.params.id);
+  try {
+    const { rows } = await db.execute({
+      sql: 'SELECT id, nombre FROM usuarios WHERE id=? AND institucion_id=? AND activo=0',
+      args: [id, req.user.institucion_id],
+    });
+    if (!rows[0]) return res.status(404).json({ error: 'Usuario inactivo no encontrado' });
+    await db.execute({ sql: "UPDATE usuarios SET activo=1, updated_at=datetime('now') WHERE id=?", args: [id] });
+    res.json({ ok: true, nombre: rows[0].nombre });
+  } catch(e) {
+    res.status(500).json({ error: 'Error al reactivar usuario' });
   }
 });
 

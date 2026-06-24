@@ -104,9 +104,18 @@ router.post('/', verifyToken, requirePermiso('administrar_usuarios_roles'), asyn
   try {
     const resultados = [];
     for (const email of lista) {
-      // Verificar si ya existe usuario con ese email
-      const { rows: exist } = await db.execute({ sql: 'SELECT id FROM usuarios WHERE email=?', args: [email] });
-      if (exist[0]) { resultados.push({ email, estado: 'ya_registrado' }); continue; }
+      // Verificar si ya existe usuario con ese email (activo o inactivo)
+      const { rows: exist } = await db.execute({
+        sql: 'SELECT id, activo FROM usuarios WHERE email=? AND institucion_id=?',
+        args: [email, req.user.institucion_id],
+      });
+      if (exist[0]) {
+        if (Number(exist[0].activo) === 1) {
+          resultados.push({ email, estado: 'ya_registrado' }); continue;
+        }
+        // Existe pero inactivo → informar al frontend para que ofrezca reactivar
+        resultados.push({ email, estado: 'ya_registrado_inactivo', usuario_id: Number(exist[0].id) }); continue;
+      }
 
       // Verificar si ya hay invitación pendiente
       const { rows: pendiente } = await db.execute({
