@@ -5545,16 +5545,202 @@ function Calendario({ user }) {
 }
 
 // ── EQUIPO DOCENTE ───────────────────────────────────────────────────────────────
+// ── Modal para crear/vincular nuevo docente ──────────────────────────────────
+function ModalNuevoDocente({ onClose, onCreado }) {
+  const [modo,       setModo]      = useState('crear'); // 'crear' | 'vincular'
+  const [nombre,     setNombre]    = useState('');
+  const [email,      setEmail]     = useState('');
+  const [password,   setPassword]  = useState('');
+  const [showPwd,    setShowPwd]   = useState(false);
+  const [usuarios,   setUsuarios]  = useState([]);  // para modo vincular
+  const [selUsuario, setSelUsuario]= useState('');
+  const [cargandoU,  setCargandoU] = useState(false);
+  const [saving,     setSaving]    = useState(false);
+  const [error,      setError]     = useState('');
+  const [resultado,  setResultado] = useState(null); // {usuario_id, nombre, password_temporal?}
+
+  // Carga usuarios sin ficha cuando se cambia a modo vincular
+  useEffect(() => {
+    if (modo !== 'vincular') return;
+    setCargandoU(true);
+    apiFetch('/api/docentes/usuarios-sin-ficha')
+      .then(setUsuarios)
+      .catch(e => setError(e.message))
+      .finally(() => setCargandoU(false));
+  }, [modo]);
+
+  const submit = async (e) => {
+    e.preventDefault();
+    setError(''); setSaving(true);
+    try {
+      const body = modo === 'crear'
+        ? { modo: 'crear', nombre, email, password: password || undefined }
+        : { modo: 'vincular', vincular_usuario_id: selUsuario };
+
+      const data = await apiFetch('/api/docentes', { method: 'POST', body });
+      setResultado(data);
+    } catch(err) {
+      setError(err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Pantalla de éxito — muestra contraseña temporal si la hay y permite ir a la ficha
+  if (resultado) {
+    return (
+      <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
+        <div className="modal" style={{maxWidth:420}}>
+          <div className="modal-header">
+            <span className="modal-title">✅ Profe {resultado.modo === 'creado' ? 'creado' : 'vinculado'}</span>
+            <button className="modal-close" onClick={onClose}>×</button>
+          </div>
+          <div className="alert alert-success" style={{marginBottom:12}}>
+            <strong>{resultado.nombre}</strong> fue {resultado.modo === 'creado' ? 'agregado al sistema' : 'vinculado'} correctamente.
+          </div>
+          {resultado.password_temporal && (
+            <div style={{background:'var(--bg3)',border:'1.5px solid var(--border)',borderRadius:10,padding:14,marginBottom:14}}>
+              <div style={{fontSize:12,fontWeight:700,color:'var(--text2)',marginBottom:6}}>
+                🔑 Contraseña temporal — guardala ahora
+              </div>
+              <div style={{fontFamily:'monospace',fontSize:17,fontWeight:800,letterSpacing:2,
+                           background:'var(--bg2)',borderRadius:7,padding:'8px 12px',
+                           display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+                <span>{resultado.password_temporal}</span>
+                <button className="btn btn-secondary btn-auto" style={{fontSize:12,padding:'4px 8px'}}
+                  onClick={() => navigator.clipboard?.writeText(resultado.password_temporal)}>
+                  Copiar
+                </button>
+              </div>
+              <div style={{fontSize:11,color:'var(--text2)',marginTop:6}}>
+                El profe deberá cambiarla desde su perfil. Email: <strong>{resultado.email}</strong>
+              </div>
+            </div>
+          )}
+          <div className="modal-footer">
+            <button className="btn btn-secondary btn-auto" onClick={onClose}>Cerrar</button>
+            <button className="btn btn-primary btn-auto" onClick={() => onCreado(resultado.usuario_id)}>
+              Abrir ficha del profe →
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="modal">
+        <div className="modal-header">
+          <span className="modal-title">👩‍🏫 Nuevo profe</span>
+          <button className="modal-close" onClick={onClose}>×</button>
+        </div>
+
+        {/* Toggle modo */}
+        <div className="alcance-btns" style={{marginBottom:18}}>
+          <button type="button" className={`alcance-btn ${modo==='crear'?'selected':''}`}
+            onClick={() => { setModo('crear'); setError(''); }}>
+            ✨ Crear usuario nuevo
+          </button>
+          <button type="button" className={`alcance-btn ${modo==='vincular'?'selected':''}`}
+            onClick={() => { setModo('vincular'); setError(''); }}>
+            🔗 Vincular usuario existente
+          </button>
+        </div>
+
+        {error && <div className="alert alert-error">{error}</div>}
+
+        <form onSubmit={submit}>
+          {modo === 'crear' ? (
+            <>
+              <div className="form-group">
+                <label className="form-label">Nombre completo *</label>
+                <input className="form-control" value={nombre} required
+                  onChange={e => setNombre(e.target.value)}
+                  placeholder="Ej: María González" />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Email *</label>
+                <input className="form-control" type="email" value={email} required
+                  onChange={e => setEmail(e.target.value)}
+                  placeholder="profe@ejemplo.com" />
+              </div>
+              <div className="form-group">
+                <label className="form-label">
+                  Contraseña temporal
+                  <span style={{fontWeight:400,color:'var(--text2)',fontSize:11,marginLeft:6}}>
+                    (se auto-genera si la dejás vacía)
+                  </span>
+                </label>
+                <div style={{display:'flex',gap:6}}>
+                  <input className="form-control" type={showPwd ? 'text' : 'password'}
+                    value={password} onChange={e => setPassword(e.target.value)}
+                    placeholder="Mínimo 6 caracteres o dejar vacío" />
+                  <button type="button" className="btn btn-secondary btn-auto" style={{flexShrink:0,padding:'0 12px'}}
+                    onClick={() => setShowPwd(s => !s)}>
+                    {showPwd ? '🙈' : '👁'}
+                  </button>
+                </div>
+              </div>
+              <div className="alert alert-warning" style={{fontSize:12}}>
+                Se creará un usuario con rol <strong>Docente</strong>. Podés completar los demás datos (DNI, instrumentos, etc.) en la ficha.
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="form-group">
+                <label className="form-label">Seleccioná el usuario a vincular *</label>
+                {cargandoU ? (
+                  <div style={{fontSize:13,color:'var(--text2)'}}>Cargando usuarios...</div>
+                ) : usuarios.length === 0 ? (
+                  <div className="alert alert-warning" style={{fontSize:13}}>
+                    Todos los usuarios ya tienen ficha docente, o no hay usuarios sin asignar. Podés crear uno nuevo desde la otra pestaña.
+                  </div>
+                ) : (
+                  <select className="form-control" value={selUsuario} required
+                    onChange={e => setSelUsuario(e.target.value)}>
+                    <option value="">— Seleccioná un usuario —</option>
+                    {usuarios.map(u => (
+                      <option key={u.id} value={u.id}>
+                        {u.nombre} ({u.email}) — {u.rol_nombre}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
+              <div className="alert alert-warning" style={{fontSize:12}}>
+                Se creará una ficha docente para este usuario. Su usuario y contraseña no cambian.
+              </div>
+            </>
+          )}
+
+          <div className="modal-footer">
+            <button type="button" className="btn btn-secondary btn-auto" onClick={onClose}>Cancelar</button>
+            <button type="submit" className="btn btn-primary btn-auto" disabled={saving ||
+              (modo === 'vincular' && (usuarios.length === 0 || !selUsuario))}>
+              {saving ? 'Guardando...' : modo === 'crear' ? '+ Crear profe' : '🔗 Vincular'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 function Docentes({ user }) {
   const puede = (p) => user.permisos?.includes(p);
-  const [lista,     setLista]    = useState([]);
-  const [instrumentos, setInstrumentos] = useState([]);
-  const [cursos,    setCursos]   = useState([]);
-  const [busqueda,  setBusqueda] = useState('');
-  const [filtroInst, setFiltroInst] = useState('');
-  const [ficha,     setFicha]    = useState(null); // docente seleccionado
-  const [cargando,  setCargando] = useState(true);
-  const [editando,  setEditando] = useState(false);
+  const [lista,       setLista]      = useState([]);
+  const [instrumentos,setInstrumentos]= useState([]);
+  const [cursos,      setCursos]     = useState([]);
+  const [busqueda,    setBusqueda]   = useState('');
+  const [filtroInst,  setFiltroInst] = useState('');
+  const [ficha,       setFicha]      = useState(null);
+  const [cargando,    setCargando]   = useState(true);
+  const [modalNuevo,  setModalNuevo] = useState(false);
+
+  const cargarLista = useCallback(async () => {
+    try { setLista(await apiFetch('/api/docentes')); } catch(e) {}
+  }, []);
 
   useEffect(() => {
     Promise.all([
@@ -5580,16 +5766,25 @@ function Docentes({ user }) {
     return true;
   });
 
-  if (ficha) return <FichaDocente ficha={ficha} instrumentos={instrumentos} cursos={cursos}
-    user={user} puede={puede}
-    onVolver={() => { setFicha(null); apiFetch('/api/docentes').then(setLista).catch(()=>{}); }}
-  />;
+  if (ficha) return (
+    <FichaDocente ficha={ficha} instrumentos={instrumentos} cursos={cursos}
+      user={user} puede={puede}
+      onVolver={() => { setFicha(null); cargarLista(); }}
+    />
+  );
 
   return (
     <div>
       <div className="section-header">
         <h2 style={{fontSize:18,fontWeight:800}}>👩‍🏫 Equipo Docente</h2>
-        <span className="badge-count">{listaFiltrada.length} profes</span>
+        <div style={{display:'flex',gap:8,alignItems:'center'}}>
+          <span className="badge-count">{listaFiltrada.length} profes</span>
+          {puede('editar_equipo_docente') && (
+            <button className="btn btn-primary btn-auto" onClick={() => setModalNuevo(true)}>
+              + Nuevo profe
+            </button>
+          )}
+        </div>
       </div>
       <div style={{display:'flex',gap:8,marginBottom:14,flexWrap:'wrap'}}>
         <input className="form-control" style={{flex:1,minWidth:160}}
@@ -5603,7 +5798,18 @@ function Docentes({ user }) {
       </div>
       {cargando ? <div className="spinner"><div className="spin" /></div>
         : listaFiltrada.length === 0
-        ? <div className="empty-state"><div className="empty-state-icon">👩‍🏫</div><div>No hay docentes registrados</div></div>
+        ? (
+          <div className="empty-state">
+            <div className="empty-state-icon">👩‍🏫</div>
+            <div>No hay profes registrados</div>
+            {puede('editar_equipo_docente') && (
+              <button className="btn btn-primary btn-auto" style={{marginTop:12}}
+                onClick={() => setModalNuevo(true)}>
+                + Agregar el primer profe
+              </button>
+            )}
+          </div>
+        )
         : listaFiltrada.map(d => {
             const iniciales = d.nombre.split(' ').map(p=>p[0]).join('').slice(0,2).toUpperCase();
             return (
@@ -5627,6 +5833,16 @@ function Docentes({ user }) {
             );
           })
       }
+      {modalNuevo && (
+        <ModalNuevoDocente
+          onClose={() => setModalNuevo(false)}
+          onCreado={(usuarioId) => {
+            setModalNuevo(false);
+            cargarLista();
+            cargarFicha(usuarioId);
+          }}
+        />
+      )}
     </div>
   );
 }

@@ -3,6 +3,7 @@ const router  = express.Router();
 const path    = require('path');
 const fs      = require('fs');
 const multer  = require('multer');
+const bcrypt  = require('bcryptjs');
 const db      = require('../db');
 const { verifyToken }    = require('../middleware/auth');
 const { requirePermiso } = require('../middleware/permission');
@@ -48,6 +49,98 @@ router.get('/', verifyToken, requirePermiso('ver_equipo_docente'), async (req, r
   } catch(e) {
     console.error(e);
     res.status(500).json({ error: 'Error al obtener equipo docente' });
+  }
+});
+
+// ── Usuarios sin ficha docente (para vincular) — ANTES de /:usuarioId ────────
+router.get('/usuarios-sin-ficha', verifyToken, requirePermiso('editar_equipo_docente'), async (req, res) => {
+  try {
+    const { rows } = await db.execute({
+      sql: `SELECT u.id, u.nombre, u.email, r.nombre AS rol_nombre
+            FROM usuarios u
+            JOIN roles r ON r.id = u.rol_id
+            WHERE u.institucion_id=? AND u.activo=1
+              AND NOT EXISTS (SELECT 1 FROM docentes d WHERE d.usuario_id = u.id)
+            ORDER BY u.nombre`,
+      args: [req.user.institucion_id],
+    });
+    res.json(rows);
+  } catch(e) {
+    res.status(500).json({ error: 'Error al obtener usuarios' });
+  }
+});
+
+// ── Crear nuevo profe: opción A (nuevo usuario) o B (vincular existente) ──────
+router.post('/', verifyToken, requirePermiso('editar_equipo_docente'), async (req, res) => {
+  const { modo, nombre, email, password, vincular_usuario_id } = req.body;
+
+  try {
+    if (modo === 'vincular') {
+      // ── Opción B: vincular usuario ya existente ─────────────────────────────
+      if (!vincular_usuario_id) return res.status(400).json({ error: 'Seleccioná un usuario' });
+
+      const { rows: uRows } = await db.execute({
+        sql: 'SELECT id, nombre, email FROM usuarios WHERE id=? AND institucion_id=? AND activo=1',
+        args: [vincular_usuario_id, req.user.institucion_id],
+      });
+      if (!uRows[0]) return res.status(404).json({ error: 'Usuario no encontrado' });
+
+      // Upsert ficha docente
+      await db.execute({
+        sql: 'INSERT OR IGNORE INTO docentes (usuario_id, institucion_id) VALUES (?,?)',
+        args: [vincular_usuario_id, req.user.institucion_id],
+      });
+
+      return res.status(201).json({
+        usuario_id:  Number(vincular_usuario_id),
+        nombre:      uRows[0].nombre,
+        email:       uRows[0].email,
+        modo:        'vinculado',
+      });
+    }
+
+    // ── Opción A: crear nuevo usuario con rol Docente ───────────────────────
+    if (!nombre?.trim()) return res.status(400).json({ error: 'El nombre es requerido' });
+    if (!email?.trim())  return res.status(400).json({ error: 'El email es requerido' });
+
+    const emailNorm = email.toLowerCase().trim();
+    const { rows: dup } = await db.execute({
+      sql: 'SELECT id FROM usuarios WHERE email=?',
+      args: [emailNorm],
+    });
+    if (dup[0]) return res.status(400).json({ error: 'Ya existe un usuario con ese email' });
+
+    const { rows: rolRows } = await db.execute({
+      sql: "SELECT id FROM roles WHERE nombre='Docente' LIMIT 1",
+      args: [],
+    });
+    if (!rolRows[0]) return res.status(500).json({ error: 'Rol Docente no encontrado en el sistema' });
+
+    // Contraseña temporal: la que venga o auto-generada
+    const tempPwd  = password?.trim() || Math.random().toString(36).slice(-8) + '!';
+    const hashPwd  = bcrypt.hashSync(tempPwd, 10);
+
+    const r = await db.execute({
+      sql: 'INSERT INTO usuarios (institucion_id, nombre, email, password_hash, rol_id) VALUES (?,?,?,?,?)',
+      args: [req.user.institucion_id, nombre.trim(), emailNorm, hashPwd, rolRows[0].id],
+    });
+    const usuarioId = Number(r.lastInsertRowid);
+
+    await db.execute({
+      sql: 'INSERT INTO docentes (usuario_id, institucion_id) VALUES (?,?)',
+      args: [usuarioId, req.user.institucion_id],
+    });
+
+    res.status(201).json({
+      usuario_id:        usuarioId,
+      nombre:            nombre.trim(),
+      email:             emailNorm,
+      password_temporal: tempPwd,
+      modo:              'creado',
+    });
+  } catch(e) {
+    console.error(e);
+    res.status(500).json({ error: 'Error al crear el docente' });
   }
 });
 
