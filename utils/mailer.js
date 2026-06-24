@@ -1,47 +1,29 @@
-const nodemailer = require('nodemailer');
+const { Resend } = require('resend');
 
-function createTransporter() {
-  const user = process.env.GMAIL_USER;
-  const pass = (process.env.GMAIL_APP_PASSWORD || '').replace(/\s/g, ''); // tolerar espacios en App Password
-  if (!user || !pass) return null;
+const FROM = 'EPM Escuela Popular de Música <onboarding@resend.dev>';
 
-  // Configuración explícita: host + port 587 + STARTTLS
-  // Más compatible que service:'gmail' (que usa puerto 465/SSL, problemático en algunos entornos)
-  return nodemailer.createTransport({
-    host:   'smtp.gmail.com',
-    port:   587,
-    secure: false, // STARTTLS — se negocia después de conectar
-    auth:   { user, pass },
-  });
+function getResend() {
+  if (!process.env.RESEND_API_KEY) return null;
+  return new Resend(process.env.RESEND_API_KEY);
 }
 
 async function sendMail({ to, subject, html }) {
-  const user = process.env.GMAIL_USER;
-  const pass = process.env.GMAIL_APP_PASSWORD;
-
-  if (!user || !pass) {
-    console.warn('⚠️  [Mailer] GMAIL_USER o GMAIL_APP_PASSWORD no configurados — email omitido.');
+  const resend = getResend();
+  if (!resend) {
+    console.warn('⚠️  [Mailer] RESEND_API_KEY no configurada — email omitido.');
     return { skipped: true };
   }
 
-  console.log(`📧 [Mailer] Intentando enviar email a: ${to} | from: ${user}`);
-  const t = createTransporter();
+  console.log(`📧 [Mailer] Enviando email a: ${to} | subject: ${subject}`);
+  const { data, error } = await resend.emails.send({ from: FROM, to, subject, html });
 
-  try {
-    const info = await t.sendMail({
-      from:    `EPM Escuela Popular de Música <${user}>`,
-      to,
-      subject,
-      html,
-    });
-    console.log(`✅ [Mailer] Email enviado. messageId: ${info.messageId} | accepted: ${info.accepted?.join(', ')}`);
-    return info;
-  } catch(err) {
-    console.error(`❌ [Mailer] Error al enviar email a ${to}:`);
-    console.error(`   code: ${err.code} | command: ${err.command} | response: ${err.response}`);
-    console.error(`   message: ${err.message}`);
-    throw err; // re-lanzar para que el caller pueda manejar
+  if (error) {
+    console.error(`❌ [Mailer] Error Resend:`, error);
+    throw new Error(error.message || 'Error al enviar email');
   }
+
+  console.log(`✅ [Mailer] Email enviado. id: ${data.id}`);
+  return data;
 }
 
 function buildInvitacionEmail({ baseUrl, token, rolNombre, cursoNombres }) {
@@ -60,8 +42,8 @@ function buildInvitacionEmail({ baseUrl, token, rolNombre, cursoNombres }) {
       <table width="100%" style="max-width:520px;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(99,102,241,.15);">
         <!-- Header -->
         <tr><td style="background:linear-gradient(135deg,#1e1b4b,#312e81);padding:32px 40px;text-align:center;">
-          <h1 style="color:#a5b4fc;font-size:24px;font-weight:800;margin:0 0 4px;">EPM</h1>
-          <p style="color:rgba(255,255,255,.6);font-size:13px;margin:0;">Escuela Popular de Música</p>
+          <h1 style="color:#a5b4fc;font-size:26px;font-weight:800;margin:0 0 4px;letter-spacing:-1px;">EPM</h1>
+          <p style="color:rgba(255,255,255,.7);font-size:14px;margin:0;font-weight:500;">Escuela Popular de Música</p>
         </td></tr>
         <!-- Body -->
         <tr><td style="padding:36px 40px;">
@@ -69,7 +51,8 @@ function buildInvitacionEmail({ baseUrl, token, rolNombre, cursoNombres }) {
             🎵 Te invitamos a unirte al sistema de gestión
           </h2>
           <p style="color:#4b5563;font-size:15px;line-height:1.7;margin:0 0 20px;">
-            Fuiste invitado/a a crear tu cuenta en el sistema de gestión de la <strong>Escuela Popular de Música</strong>.
+            Fuiste invitado/a a crear tu cuenta en el sistema de gestión de la
+            <strong>Escuela Popular de Música</strong>.
           </p>
           <div style="background:#f0f2ff;border-radius:10px;padding:16px;margin-bottom:24px;">
             <p style="color:#4b5563;font-size:14px;margin:0 0 8px;"><strong>Tu rol:</strong>
@@ -81,7 +64,10 @@ function buildInvitacionEmail({ baseUrl, token, rolNombre, cursoNombres }) {
             Hacé click en el botón de abajo para completar tu registro y elegir tu contraseña.
           </p>
           <div style="text-align:center;margin:32px 0;">
-            <a href="${link}" style="background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#ffffff;text-decoration:none;padding:16px 36px;border-radius:12px;font-size:16px;font-weight:700;display:inline-block;letter-spacing:.3px;">
+            <a href="${link}"
+               style="background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;text-decoration:none;
+                      padding:16px 36px;border-radius:12px;font-size:16px;font-weight:700;
+                      display:inline-block;letter-spacing:.3px;">
               Crear mi cuenta →
             </a>
           </div>
