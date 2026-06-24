@@ -40,10 +40,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 | 8  | **Instrumentos + Inscripciones** | 2026-06-22 | Nuevo modelo: estudiante puede tener múltiples cursos por instrumento. CRUD de instrumentos, panel de inscripciones en Ficha, filtros en lista, instrumento visible en asistencia. Historial de progresión preparado en DB sin UI aún. |
 | 9  | **Legajo personal** | 2026-06-22 | Segunda pestaña en la Ficha. Campos fijos: grupo familiar, salud, trayectoria. Tres timelines: historial de salud, historial de trayectoria, observaciones generales. Permisos `ver_legajo_personal` + `editar_legajo_personal` (Gestión + Docente; Operador no ve). Migración de permisos automática en `runSchema`. |
 | inf| **Migración a Turso (libSQL)** | 2026-06-22 | Reemplaza node:sqlite por @libsql/client. Dev usa file:./epm.db; prod usa TURSO_URL + TURSO_AUTH_TOKEN. |
+| 10 | **Recuperación de contraseña** | 2026-06-23 | Self-service vía email (Resend): link con token hasheado, expira 1 hora, uso único. Reseteo manual por Gestión ya existía. UI: "¿Olvidaste tu contraseña?" en login + pantalla de nueva contraseña vía `?token=` en URL. |
 
 ### Estado general
 
-**Todos los módulos + inscripciones por instrumento + legajo personal con timeline + Turso en producción.**
+**Todos los módulos + inscripciones por instrumento + legajo personal con timeline + Turso en producción + recuperación de contraseña por email.**
 
 ### Decisiones tomadas
 
@@ -53,6 +54,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **Roles globales vs. por institución**: los tres roles base (`Gestión`, `Operador`, `Docente`) tienen `institucion_id = NULL` (globales). Los roles personalizados que Gestión cree tendrán `institucion_id` de la institución.
 - **Permisos en JWT**: los 13 permisos van en el payload del token para evitar una query extra por request. Si se cambian permisos de un rol, el usuario tiene que volver a loguearse para que se reflejen.
 - **DB**: `epm.db` (nueva). La DB anterior está en `escuela_v1.db` como backup.
+- **Recuperación de contraseña**: token = `crypto.randomBytes(32)` hex; se guarda SHA-256 en `password_reset_tokens`. El raw token va en el link. `POST /forgot-password` siempre responde genérico (no revela si el email existe). La URL base se detecta con `req.protocol + '://' + req.get('host')` → funciona en local y en Render. Remitente: `onboarding@resend.dev` (dominio gratuito de Resend). `RESEND_API_KEY` requerida en .env y en Render → Settings → Environment.
 - **Asistencia general vs. por materia**: columna `tipo_asistencia` + `materia_id` nullable + índices parciales únicos. La general es lo que usa EPM ahora; la por materia queda lista para UNSAM.
 
 ### Pendientes / por decidir

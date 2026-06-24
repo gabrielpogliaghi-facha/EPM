@@ -305,6 +305,18 @@ async function runSchema(db) {
     )
   `);
 
+  // ── RECUPERACIÓN DE CONTRASEÑA ────────────────────────────────────────────
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS password_reset_tokens (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      usuario_id INTEGER NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+      token_hash TEXT NOT NULL UNIQUE,
+      expires_at TEXT NOT NULL,
+      used       INTEGER DEFAULT 0,
+      created_at TEXT DEFAULT (datetime('now'))
+    )
+  `);
+
   // ── MIGRACIÓN PERMISOS legajo personal (idempotente para DBs existentes) ──
   for (const p of [
     { codigo:'ver_legajo_personal',    descripcion:'Ver legajo personal de estudiantes',    grupo:'estudiantes' },

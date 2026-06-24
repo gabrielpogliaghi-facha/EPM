@@ -782,10 +782,137 @@ async function apiFotoUpload(id, file) {
 }
 
 // ── LOGIN ───────────────────────────────────────────────────────────────────────
-function LoginPage({ onLogin }) {
-  const [form,    setForm]    = useState({ email:'', password:'' });
-  const [error,   setError]   = useState('');
+// ── FORGOT PASSWORD ─────────────────────────────────────────────────────────────
+function ForgotPasswordPage({ onBack }) {
+  const [email,   setEmail]   = useState('');
+  const [msg,     setMsg]     = useState('');
   const [loading, setLoading] = useState(false);
+
+  const submit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      const data = await apiFetch('/api/auth/forgot-password', { method:'POST', body:{ email } });
+      setMsg(data.message);
+    } catch {
+      setMsg('Si el email existe en el sistema, te enviamos un correo con instrucciones.');
+    } finally { setLoading(false); }
+  };
+
+  return (
+    <div className="login-page">
+      <div className="login-card">
+        <div className="login-logo">
+          <img src="/logo-epm.jpg" alt="Logo EPM" />
+          <h1>EPM</h1>
+          <p>Sistema de Gestión Escolar</p>
+        </div>
+        <h2 style={{fontSize:'17px',fontWeight:700,marginBottom:'8px',color:'var(--text)'}}>Recuperar contraseña</h2>
+        {msg ? (
+          <div style={{textAlign:'center'}}>
+            <div className="login-error" style={{background:'rgba(34,197,94,.12)',borderColor:'var(--success)',color:'var(--success)',marginBottom:'20px'}}>
+              {msg}
+            </div>
+            <button className="btn btn-primary" onClick={onBack}>Volver al inicio de sesión</button>
+          </div>
+        ) : (
+          <>
+            <p style={{fontSize:'13px',color:'var(--text2)',marginBottom:'18px',lineHeight:'1.5'}}>
+              Ingresá tu email y te enviaremos un enlace para restablecer tu contraseña.
+            </p>
+            <form onSubmit={submit}>
+              <div className="form-group">
+                <label className="form-label">Correo electrónico</label>
+                <input className="form-control" type="email" placeholder="usuario@epm.edu.ar"
+                  value={email} onChange={e => setEmail(e.target.value)} required />
+              </div>
+              <button className="btn btn-primary" type="submit" disabled={loading}>
+                {loading ? 'Enviando...' : 'Enviar enlace'}
+              </button>
+            </form>
+            <div style={{textAlign:'center',marginTop:'16px'}}>
+              <button onClick={onBack}
+                style={{background:'none',border:'none',color:'var(--primary)',cursor:'pointer',fontSize:'13px',textDecoration:'underline'}}>
+                Volver al inicio de sesión
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── RESET PASSWORD ───────────────────────────────────────────────────────────────
+function ResetPasswordPage({ token, onBack }) {
+  const [form,    setForm]    = useState({ password:'', confirm:'' });
+  const [error,   setError]   = useState('');
+  const [success, setSuccess] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  const submit = async (e) => {
+    e.preventDefault();
+    if (form.password !== form.confirm) return setError('Las contraseñas no coinciden.');
+    if (form.password.length < 6) return setError('La contraseña debe tener al menos 6 caracteres.');
+    setError(''); setLoading(true);
+    try {
+      await apiFetch('/api/auth/reset-password', { method:'POST', body:{ token, password: form.password } });
+      setSuccess(true);
+      // Limpiar el token de la URL sin recargar la página
+      window.history.replaceState({}, '', '/');
+    } catch (err) { setError(err.message); }
+    finally { setLoading(false); }
+  };
+
+  return (
+    <div className="login-page">
+      <div className="login-card">
+        <div className="login-logo">
+          <img src="/logo-epm.jpg" alt="Logo EPM" />
+          <h1>EPM</h1>
+          <p>Sistema de Gestión Escolar</p>
+        </div>
+        <h2 style={{fontSize:'17px',fontWeight:700,marginBottom:'8px',color:'var(--text)'}}>Nueva contraseña</h2>
+        {success ? (
+          <div style={{textAlign:'center'}}>
+            <div className="login-error" style={{background:'rgba(34,197,94,.12)',borderColor:'var(--success)',color:'var(--success)',marginBottom:'20px'}}>
+              ¡Contraseña actualizada! Ya podés iniciar sesión.
+            </div>
+            <button className="btn btn-primary" onClick={onBack}>Ir al inicio de sesión</button>
+          </div>
+        ) : (
+          <>
+            {error && <div className="login-error">{error}</div>}
+            <form onSubmit={submit}>
+              <div className="form-group">
+                <label className="form-label">Nueva contraseña</label>
+                <input className="form-control" type="password" placeholder="Mínimo 6 caracteres"
+                  value={form.password} onChange={e => setForm({...form, password:e.target.value})} required />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Confirmar contraseña</label>
+                <input className="form-control" type="password" placeholder="Repetí la contraseña"
+                  value={form.confirm} onChange={e => setForm({...form, confirm:e.target.value})} required />
+              </div>
+              <button className="btn btn-primary" type="submit" disabled={loading}>
+                {loading ? 'Guardando...' : 'Establecer contraseña'}
+              </button>
+            </form>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── LOGIN ────────────────────────────────────────────────────────────────────────
+function LoginPage({ onLogin }) {
+  const [form,        setForm]        = useState({ email:'', password:'' });
+  const [error,       setError]       = useState('');
+  const [loading,     setLoading]     = useState(false);
+  const [showForgot,  setShowForgot]  = useState(false);
+
+  if (showForgot) return <ForgotPasswordPage onBack={() => setShowForgot(false)} />;
 
   const submit = async (e) => {
     e.preventDefault();
@@ -823,6 +950,12 @@ function LoginPage({ onLogin }) {
             {loading ? 'Ingresando...' : 'Ingresar'}
           </button>
         </form>
+        <div style={{textAlign:'center',marginTop:'16px'}}>
+          <button onClick={() => setShowForgot(true)}
+            style={{background:'none',border:'none',color:'var(--primary)',cursor:'pointer',fontSize:'13px',textDecoration:'underline'}}>
+            ¿Olvidaste tu contraseña?
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -4353,10 +4486,16 @@ function Layout({ user }) {
 
 // ── APP ─────────────────────────────────────────────────────────────────────────
 function App() {
-  const [user,    setUser]    = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [user,       setUser]       = useState(null);
+  const [loading,    setLoading]    = useState(true);
+  const [resetToken, setResetToken] = useState(() => {
+    const p = new URLSearchParams(window.location.search);
+    return p.get('token') || null;
+  });
 
   useEffect(() => {
+    // Si hay un token de reseteo en la URL no intentamos autenticar
+    if (resetToken) { setLoading(false); return; }
     if (!getUser()) { setLoading(false); return; }
     apiFetch('/api/auth/me')
       .then(d => {
@@ -4381,6 +4520,8 @@ function App() {
       </div>
     </div>
   );
+
+  if (resetToken) return <ResetPasswordPage token={resetToken} onBack={() => { setResetToken(null); window.history.replaceState({}, '', '/'); }} />;
 
   return user ? <Layout user={user} /> : <LoginPage onLogin={setUser} />;
 }
