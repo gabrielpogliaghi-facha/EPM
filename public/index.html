@@ -841,12 +841,13 @@ const NAV = [
 
 // ── HELPERS EVENTOS ────────────────────────────────────────────────────────────
 const TIPO_EVENTO = {
-  muestra: { label:'Muestra',  color:'#f59e0b', cls:'evt-muestra' },
-  feriado: { label:'Feriado',  color:'#ef4444', cls:'evt-feriado' },
-  reunion: { label:'Reunión',  color:'#3b82f6', cls:'evt-reunion' },
-  ensayo:  { label:'Ensayo',   color:'#8b5cf6', cls:'evt-ensayo'  },
-  salida:  { label:'Salida',   color:'#22c55e', cls:'evt-salida'  },
-  otro:    { label:'Otro',     color:'#6b7280', cls:'evt-otro'    },
+  muestra:  { label:'Muestra',   color:'#f59e0b', cls:'evt-muestra'  },
+  feriado:  { label:'Feriado',   color:'#ef4444', cls:'evt-feriado'  },
+  reunion:  { label:'Reunión',   color:'#3b82f6', cls:'evt-reunion'  },
+  ensayo:   { label:'Ensayo',    color:'#8b5cf6', cls:'evt-ensayo'   },
+  salida:   { label:'Salida',    color:'#22c55e', cls:'evt-salida'   },
+  festival: { label:'Festival',  color:'#eab308', cls:'evt-festival' },
+  otro:     { label:'Otro',      color:'#6b7280', cls:'evt-otro'     },
 };
 function tipoColor(tipo) { return TIPO_EVENTO[tipo]?.color || '#6b7280'; }
 function tipoCls(tipo)   { return TIPO_EVENTO[tipo]?.cls   || 'evt-otro'; }

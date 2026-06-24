@@ -5,7 +5,7 @@ const { verifyToken }           = require('../middleware/auth');
 const { requirePermiso }        = require('../middleware/permission');
 const { notificarCambioEvento } = require('../utils/notificaciones');
 
-const TIPOS   = ['muestra','feriado','reunion','ensayo','salida','otro'];
+const TIPOS   = ['muestra','feriado','reunion','ensayo','salida','festival','otro'];
 const ALCANCE = ['institucion','cursos'];
 
 function esAdmin(user) {

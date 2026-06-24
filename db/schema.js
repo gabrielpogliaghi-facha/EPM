@@ -328,7 +328,7 @@ async function runSchema(db) {
       hora_inicio          TEXT,
       hora_fin             TEXT,
       lugar                TEXT,
-      tipo                 TEXT NOT NULL DEFAULT 'otro' CHECK(tipo IN ('muestra','feriado','reunion','ensayo','salida','otro')),
+      tipo                 TEXT NOT NULL DEFAULT 'otro' CHECK(tipo IN ('muestra','feriado','reunion','ensayo','salida','festival','otro')),
       alcance              TEXT NOT NULL DEFAULT 'institucion' CHECK(alcance IN ('institucion','cursos')),
       estado               TEXT NOT NULL DEFAULT 'activo' CHECK(estado IN ('activo','cancelado','reprogramado')),
       motivo_cambio        TEXT,
@@ -340,6 +340,47 @@ async function runSchema(db) {
     )
   `);
   await db.execute(`CREATE INDEX IF NOT EXISTS idx_eventos_fecha ON eventos(institucion_id, fecha)`);
+
+  // ── MIGRACIÓN: agregar 'festival' al CHECK de eventos.tipo ────────────────
+  // SQLite no soporta ALTER TABLE para cambiar CHECK constraints, hay que
+  // recrear la tabla usando RENAME (safe, no borra datos de evento_cursos).
+  try {
+    const { rows: schRows } = await db.execute({
+      sql: "SELECT sql FROM sqlite_master WHERE type='table' AND name='eventos'",
+      args: [],
+    });
+    if (schRows.length > 0 && schRows[0].sql && !schRows[0].sql.includes("'festival'")) {
+      console.log('🔄 Migrando eventos.tipo para incluir festival...');
+      await db.execute(`ALTER TABLE eventos RENAME TO eventos_pre_festival`);
+      await db.execute(`
+        CREATE TABLE eventos (
+          id                   INTEGER PRIMARY KEY AUTOINCREMENT,
+          institucion_id       INTEGER NOT NULL REFERENCES instituciones(id),
+          titulo               TEXT NOT NULL,
+          descripcion          TEXT,
+          fecha                TEXT NOT NULL,
+          hora_inicio          TEXT,
+          hora_fin             TEXT,
+          lugar                TEXT,
+          tipo                 TEXT NOT NULL DEFAULT 'otro' CHECK(tipo IN ('muestra','feriado','reunion','ensayo','salida','festival','otro')),
+          alcance              TEXT NOT NULL DEFAULT 'institucion' CHECK(alcance IN ('institucion','cursos')),
+          estado               TEXT NOT NULL DEFAULT 'activo' CHECK(estado IN ('activo','cancelado','reprogramado')),
+          motivo_cambio        TEXT,
+          fecha_original       TEXT,
+          hora_inicio_original TEXT,
+          created_by           INTEGER NOT NULL REFERENCES usuarios(id),
+          created_at           TEXT DEFAULT (datetime('now')),
+          updated_at           TEXT DEFAULT (datetime('now'))
+        )
+      `);
+      await db.execute(`INSERT INTO eventos SELECT * FROM eventos_pre_festival`);
+      await db.execute(`DROP TABLE eventos_pre_festival`);
+      await db.execute(`CREATE INDEX IF NOT EXISTS idx_eventos_fecha ON eventos(institucion_id, fecha)`);
+      console.log('✅ Migración eventos.tipo completada.');
+    }
+  } catch(e) {
+    console.error('❌ Error en migración eventos.tipo:', e.message);
+  }
 
   await db.execute(`
     CREATE TABLE IF NOT EXISTS evento_cursos (
