@@ -5047,6 +5047,12 @@ function GestionInvitaciones() {
     catch(e) { alert(e.message); }
   };
 
+  const eliminar = async (id) => {
+    if (!confirm('¿Eliminar esta invitación del historial?')) return;
+    try { await apiFetch(`/api/invitaciones/${id}`, { method:'DELETE' }); showToast('Eliminada'); cargar(); }
+    catch(e) { alert(e.message); }
+  };
+
   const pendientes = lista.filter(i => i.estado === 'pendiente');
   const resto      = lista.filter(i => i.estado !== 'pendiente');
 
@@ -5071,7 +5077,7 @@ function GestionInvitaciones() {
                   <div style={{fontSize:12,fontWeight:700,color:'var(--text2)',marginBottom:8,textTransform:'uppercase',letterSpacing:'.05em'}}>
                     Pendientes ({pendientes.length})
                   </div>
-                  {pendientes.map(inv => <InvRow key={inv.id} inv={inv} onCancelar={cancelar} onReenviar={reenviar} />)}
+                  {pendientes.map(inv => <InvRow key={inv.id} inv={inv} onCancelar={cancelar} onReenviar={reenviar} onEliminar={eliminar} />)}
                 </div>
               )}
               {resto.length > 0 && (
@@ -5079,7 +5085,7 @@ function GestionInvitaciones() {
                   <div style={{fontSize:12,fontWeight:700,color:'var(--text2)',marginBottom:8,textTransform:'uppercase',letterSpacing:'.05em'}}>
                     Historial
                   </div>
-                  {resto.map(inv => <InvRow key={inv.id} inv={inv} onCancelar={cancelar} onReenviar={reenviar} />)}
+                  {resto.map(inv => <InvRow key={inv.id} inv={inv} onCancelar={cancelar} onReenviar={reenviar} onEliminar={eliminar} />)}
                 </div>
               )}
             </>
@@ -5095,7 +5101,7 @@ function GestionInvitaciones() {
   );
 }
 
-function InvRow({ inv, onCancelar, onReenviar }) {
+function InvRow({ inv, onCancelar, onReenviar, onEliminar }) {
   const est = ESTADO_INVITE[inv.estado] || { label: inv.estado, cls: 'inv-pendiente' };
   const dias = Math.ceil((new Date(inv.expires_at) - Date.now()) / 86400000);
   return (
@@ -5113,9 +5119,10 @@ function InvRow({ inv, onCancelar, onReenviar }) {
       {inv.estado === 'pendiente' && (
         <button className="btn-icon" title="Cancelar" onClick={() => onCancelar(inv.id)}>✕</button>
       )}
-      {(inv.estado === 'expirada' || inv.estado === 'cancelada') && (
-        <button className="btn-icon" title="Reenviar" onClick={() => onReenviar(inv.id)}>↩</button>
-      )}
+      {(inv.estado === 'expirada' || inv.estado === 'cancelada') && (<>
+        <button className="btn-icon" title="Reenviar nueva invitación" onClick={() => onReenviar(inv.id)}>↩</button>
+        <button className="btn-icon btn-icon-danger" title="Eliminar del historial" onClick={() => onEliminar(inv.id)}>🗑</button>
+      </>)}
     </div>
   );
 }

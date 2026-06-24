@@ -156,7 +156,9 @@ router.post('/:id/reenviar', verifyToken, requirePermiso('administrar_usuarios_r
   }
 });
 
-// ── DELETE /api/invitaciones/:id — cancelar ───────────────────────────────────
+// ── DELETE /api/invitaciones/:id ─────────────────────────────────────────────
+// Pendiente → cancela (soft). Cancelada/expirada → elimina físicamente.
+// Aceptada → no se puede borrar (tiene usuario creado).
 router.delete('/:id', verifyToken, requirePermiso('administrar_usuarios_roles'), async (req, res) => {
   try {
     const { rows } = await db.execute({
@@ -164,15 +166,21 @@ router.delete('/:id', verifyToken, requirePermiso('administrar_usuarios_roles'),
       args: [req.params.id, req.user.institucion_id],
     });
     if (!rows[0]) return res.status(404).json({ error: 'Invitación no encontrada' });
-    if (rows[0].estado !== 'pendiente') return res.status(400).json({ error: 'Solo se pueden cancelar invitaciones pendientes' });
+    if (rows[0].estado === 'aceptada') return res.status(400).json({ error: 'No se puede eliminar una invitación ya aceptada' });
 
-    await db.execute({
-      sql: "UPDATE invitaciones SET estado='cancelada', updated_at=datetime('now') WHERE id=?",
-      args: [req.params.id],
-    });
+    if (rows[0].estado === 'pendiente') {
+      // Soft-cancel: mantener el registro para auditoría
+      await db.execute({
+        sql: "UPDATE invitaciones SET estado='cancelada', updated_at=datetime('now') WHERE id=?",
+        args: [req.params.id],
+      });
+    } else {
+      // Cancelada o expirada: eliminar físicamente
+      await db.execute({ sql: 'DELETE FROM invitaciones WHERE id=?', args: [req.params.id] });
+    }
     res.json({ ok: true });
   } catch(e) {
-    res.status(500).json({ error: 'Error al cancelar invitación' });
+    res.status(500).json({ error: 'Error al eliminar invitación' });
   }
 });
 
