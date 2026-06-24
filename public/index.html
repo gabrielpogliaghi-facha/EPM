@@ -683,22 +683,28 @@ function parseFecha(v) {
   if (m) return `${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`;
   return /^\d{4}-\d{2}-\d{2}$/.test(s) ? s : null;
 }
-function parseCsvLine(line) {
+function parseCsvLine(line, sep=',') {
   const res=[]; let cur='', inQ=false;
   for (let i=0; i<line.length; i++) {
     const c=line[i];
     if (c==='"') { if (inQ&&line[i+1]==='"'){cur+='"';i++;} else inQ=!inQ; }
-    else if (c===','&&!inQ) { res.push(cur.trim().replace(/^"|"$/g,'')); cur=''; }
+    else if (c===sep&&!inQ) { res.push(cur.trim()); cur=''; }
     else cur+=c;
   }
-  res.push(cur.trim().replace(/^"|"$/g,'')); return res;
+  res.push(cur.trim()); return res;
 }
 function parseCsv(text) {
-  const lines = text.replace(/^﻿/,'').replace(/\r\n/g,'\n').replace(/\r/g,'\n').trim().split('\n').filter(l=>l.trim());
+  // Strip BOM (both UTF-8 and UTF-16 variants), normalize line endings
+  const clean = text.replace(/^﻿/,'').replace(/\r\n/g,'\n').replace(/\r/g,'\n').trim();
+  const lines = clean.split('\n').filter(l=>l.trim());
   if (lines.length<2) return [];
-  const headers = parseCsvLine(lines[0]);
+  // Auto-detect delimiter: semicolon (Excel Spanish locale) vs comma
+  const firstLine = lines[0];
+  const sep = firstLine.split(';').length > firstLine.split(',').length ? ';' : ',';
+  // Normalize headers to NFC so accented chars match regardless of Unicode form
+  const headers = parseCsvLine(firstLine, sep).map(h => h.normalize('NFC'));
   return lines.slice(1).map(l => {
-    const vals = parseCsvLine(l);
+    const vals = parseCsvLine(l, sep);
     const row = {};
     headers.forEach((h,i)=>{ row[h] = vals[i]||''; });
     return row;

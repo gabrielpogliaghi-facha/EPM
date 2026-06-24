@@ -29,6 +29,9 @@ app.use('/api/backup',          require('./routes/backup'));
 // ── SPA FALLBACK ───────────────────────────────────────────────────────────────
 app.get('*', (req, res) => {
   const indexPath = path.join(__dirname, 'public', 'index.html');
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
   res.sendFile(indexPath, err => {
     if (err) {
       console.error('sendFile error:', err.message, '| path:', indexPath);
