@@ -317,6 +317,54 @@ async function runSchema(db) {
     )
   `);
 
+  // ── EVENTOS ───────────────────────────────────────────────────────────────
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS eventos (
+      id                   INTEGER PRIMARY KEY AUTOINCREMENT,
+      institucion_id       INTEGER NOT NULL REFERENCES instituciones(id),
+      titulo               TEXT NOT NULL,
+      descripcion          TEXT,
+      fecha                TEXT NOT NULL,
+      hora_inicio          TEXT,
+      hora_fin             TEXT,
+      lugar                TEXT,
+      tipo                 TEXT NOT NULL DEFAULT 'otro' CHECK(tipo IN ('muestra','feriado','reunion','ensayo','salida','otro')),
+      alcance              TEXT NOT NULL DEFAULT 'institucion' CHECK(alcance IN ('institucion','cursos')),
+      estado               TEXT NOT NULL DEFAULT 'activo' CHECK(estado IN ('activo','cancelado','reprogramado')),
+      motivo_cambio        TEXT,
+      fecha_original       TEXT,
+      hora_inicio_original TEXT,
+      created_by           INTEGER NOT NULL REFERENCES usuarios(id),
+      created_at           TEXT DEFAULT (datetime('now')),
+      updated_at           TEXT DEFAULT (datetime('now'))
+    )
+  `);
+  await db.execute(`CREATE INDEX IF NOT EXISTS idx_eventos_fecha ON eventos(institucion_id, fecha)`);
+
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS evento_cursos (
+      evento_id  INTEGER NOT NULL REFERENCES eventos(id) ON DELETE CASCADE,
+      curso_id   INTEGER NOT NULL REFERENCES cursos(id),
+      PRIMARY KEY (evento_id, curso_id)
+    )
+  `);
+
+  // ── NOTIFICACIONES ────────────────────────────────────────────────────────
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS notificaciones (
+      id           INTEGER PRIMARY KEY AUTOINCREMENT,
+      usuario_id   INTEGER NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+      titulo       TEXT NOT NULL,
+      mensaje      TEXT NOT NULL,
+      tipo         TEXT NOT NULL DEFAULT 'info' CHECK(tipo IN ('info','warning','success','danger')),
+      entidad_tipo TEXT,
+      entidad_id   INTEGER,
+      leida        INTEGER DEFAULT 0,
+      created_at   TEXT DEFAULT (datetime('now'))
+    )
+  `);
+  await db.execute(`CREATE INDEX IF NOT EXISTS idx_notif_usuario ON notificaciones(usuario_id, leida)`);
+
   // ── MIGRACIÓN PERMISOS legajo personal (idempotente para DBs existentes) ──
   for (const p of [
     { codigo:'ver_legajo_personal',    descripcion:'Ver legajo personal de estudiantes',    grupo:'estudiantes' },
@@ -331,6 +379,31 @@ async function runSchema(db) {
       SELECT r.id, p.id FROM roles r, permisos p
       WHERE r.nombre IN ('Gestión','Docente')
         AND p.codigo IN ('ver_legajo_personal','editar_legajo_personal')`);
+  } catch(e) {}
+
+  // ── MIGRACIÓN PERMISOS calendario (idempotente para DBs existentes) ───────
+  for (const p of [
+    { codigo:'ver_calendario',  descripcion:'Ver calendario de eventos',             grupo:'calendario' },
+    { codigo:'crear_eventos',   descripcion:'Crear eventos en el calendario',         grupo:'calendario' },
+    { codigo:'editar_eventos',  descripcion:'Editar, cancelar y reprogramar eventos', grupo:'calendario' },
+  ]) {
+    try {
+      await db.execute({ sql:'INSERT OR IGNORE INTO permisos (codigo, descripcion, grupo) VALUES (?,?,?)', args:[p.codigo, p.descripcion, p.grupo] });
+    } catch(e) {}
+  }
+  try {
+    // Gestión y Operador: todos los permisos de calendario
+    await db.execute(`INSERT OR IGNORE INTO roles_permisos (rol_id, permiso_id)
+      SELECT r.id, p.id FROM roles r, permisos p
+      WHERE r.nombre IN ('Gestión','Operador')
+        AND p.codigo IN ('ver_calendario','crear_eventos','editar_eventos')`);
+  } catch(e) {}
+  try {
+    // Docente: solo ver
+    await db.execute(`INSERT OR IGNORE INTO roles_permisos (rol_id, permiso_id)
+      SELECT r.id, p.id FROM roles r, permisos p
+      WHERE r.nombre = 'Docente'
+        AND p.codigo = 'ver_calendario'`);
   } catch(e) {}
 }
 

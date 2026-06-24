@@ -609,6 +609,177 @@
                 background:var(--bg3); border-radius:var(--radius); margin-top:8px; }
     .tl-empty { color:var(--text2); font-size:13px; font-style:italic; padding:4px 0; }
     .legajo-save-bar { display:flex; justify-content:flex-end; padding:16px 0 0; }
+
+    /* ── NOTIFICACIONES BELL ────────────────────────────────────────────────── */
+    .notif-bell-wrap  { position:relative; margin-left:auto; }
+    .notif-bell-btn   {
+      background:none; border:none; cursor:pointer; font-size:20px; padding:4px 8px;
+      border-radius:8px; color:var(--text); display:flex; align-items:center; position:relative;
+      transition:background .18s;
+    }
+    .notif-bell-btn:hover { background:var(--bg3); }
+    .notif-badge {
+      position:absolute; top:-2px; right:-2px; background:var(--danger); color:#fff;
+      border-radius:12px; font-size:10px; font-weight:800; min-width:16px; height:16px;
+      display:flex; align-items:center; justify-content:center; padding:0 4px;
+      border:2px solid var(--bg2); line-height:1;
+    }
+    .notif-panel {
+      position:absolute; right:0; top:calc(100% + 8px); width:340px; max-width:90vw;
+      background:var(--card); border:1.5px solid var(--border); border-radius:var(--radius);
+      box-shadow:0 8px 32px rgba(0,0,0,.18); z-index:500; overflow:hidden;
+    }
+    .notif-panel-header {
+      display:flex; align-items:center; justify-content:space-between;
+      padding:12px 16px; border-bottom:1px solid var(--border);
+      font-size:13px; font-weight:700;
+    }
+    .notif-panel-list { max-height:360px; overflow-y:auto; }
+    .notif-item {
+      padding:12px 16px; border-bottom:1px solid var(--border);
+      cursor:pointer; transition:background .15s;
+    }
+    .notif-item:last-child { border-bottom:none; }
+    .notif-item:hover { background:var(--bg3); }
+    .notif-item.unread { background:linear-gradient(90deg,rgba(99,102,241,.06),transparent); }
+    .notif-item-header { display:flex; align-items:flex-start; gap:8px; margin-bottom:4px; }
+    .notif-dot {
+      width:8px; height:8px; border-radius:50%; flex-shrink:0; margin-top:4px;
+    }
+    .notif-dot-danger  { background:var(--danger); }
+    .notif-dot-warning { background:var(--warning); }
+    .notif-dot-success { background:var(--success); }
+    .notif-dot-info    { background:var(--primary); }
+    .notif-item-titulo { font-size:13px; font-weight:700; flex:1; line-height:1.3; }
+    .notif-item-msg    { font-size:12px; color:var(--text2); line-height:1.4; }
+    .notif-item-time   { font-size:11px; color:var(--text2); margin-top:3px; }
+    .notif-empty       { padding:32px 16px; text-align:center; color:var(--text2); font-size:13px; }
+
+    /* ── CALENDARIO ─────────────────────────────────────────────────────────── */
+    .cal-wrap       { max-width:900px; margin:0 auto; }
+    .cal-toolbar    {
+      display:flex; align-items:center; gap:10px; margin-bottom:16px; flex-wrap:wrap;
+    }
+    .cal-toolbar-month {
+      font-size:18px; font-weight:800; flex:1; text-transform:capitalize;
+    }
+    .cal-view-toggle {
+      display:flex; gap:4px;
+    }
+    .cal-view-btn {
+      padding:7px 14px; border-radius:8px; font-size:13px; font-weight:600; cursor:pointer;
+      border:1.5px solid var(--border); background:var(--card); color:var(--text2); transition:all .18s;
+    }
+    .cal-view-btn.active { background:var(--primary); color:#fff; border-color:var(--primary); }
+
+    .cal-grid       { background:var(--card); border-radius:var(--radius); border:1.5px solid var(--border); overflow:hidden; }
+    .cal-weekdays   { display:grid; grid-template-columns:repeat(7,1fr); border-bottom:1.5px solid var(--border); }
+    .cal-weekday    { padding:8px 4px; text-align:center; font-size:11px; font-weight:700;
+                      color:var(--text2); text-transform:uppercase; letter-spacing:.04em; }
+    .cal-days       { display:grid; grid-template-columns:repeat(7,1fr); }
+    .cal-day {
+      min-height:72px; padding:4px; border-right:1px solid var(--border);
+      border-bottom:1px solid var(--border); position:relative; vertical-align:top;
+    }
+    .cal-day:nth-child(7n) { border-right:none; }
+    .cal-day-num {
+      font-size:12px; font-weight:700; width:22px; height:22px; border-radius:50%;
+      display:flex; align-items:center; justify-content:center; margin-bottom:2px;
+      color:var(--text2);
+    }
+    .cal-day.today .cal-day-num {
+      background:var(--primary); color:#fff;
+    }
+    .cal-day.other-month .cal-day-num { color:var(--border); }
+    .cal-day.other-month { background:var(--bg); }
+    .cal-event {
+      display:block; font-size:10px; font-weight:600; border-radius:4px;
+      padding:2px 5px; margin-bottom:2px; cursor:pointer; line-height:1.4;
+      white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+      color:#fff; transition:opacity .15s;
+    }
+    .cal-event:hover { opacity:.82; }
+    .cal-event-cancelado { opacity:.45; text-decoration:line-through; }
+    .cal-event-reprogramado { opacity:.7; }
+    .cal-more { font-size:10px; color:var(--text2); font-weight:600; cursor:pointer; padding-left:5px; }
+
+    /* Colores por tipo */
+    .evt-muestra  { background:#f59e0b; }
+    .evt-feriado  { background:#ef4444; }
+    .evt-reunion  { background:#3b82f6; }
+    .evt-ensayo   { background:#8b5cf6; }
+    .evt-salida   { background:#22c55e; }
+    .evt-otro     { background:#6b7280; }
+
+    /* ── AGENDA (vista lista) ─────────────────────────────────────────────── */
+    .agenda-group-date {
+      font-size:12px; font-weight:800; text-transform:uppercase; letter-spacing:.05em;
+      color:var(--text2); margin:16px 0 6px; padding-left:2px;
+    }
+    .agenda-item {
+      display:flex; gap:12px; padding:12px 14px; border:1.5px solid var(--border);
+      border-radius:var(--radius); background:var(--card); margin-bottom:6px;
+      cursor:pointer; transition:border-color .18s;
+    }
+    .agenda-item:hover { border-color:var(--primary-l); }
+    .agenda-item-stripe {
+      width:4px; border-radius:3px; flex-shrink:0; align-self:stretch;
+    }
+    .agenda-item-body { flex:1; min-width:0; }
+    .agenda-item-titulo { font-size:14px; font-weight:700; margin-bottom:3px; }
+    .agenda-item-meta   { font-size:12px; color:var(--text2); display:flex; flex-wrap:wrap; gap:8px; }
+    .agenda-item-badge  {
+      font-size:11px; font-weight:600; border-radius:12px;
+      padding:2px 8px; white-space:nowrap;
+    }
+    .badge-cancelado    { background:#fee2e2; color:#b91c1c; }
+    .badge-reprogramado { background:#fef9c3; color:#854d0e; }
+    .badge-activo       { background:#dcfce7; color:#166534; }
+
+    /* ── MODAL EVENTO ────────────────────────────────────────────────────── */
+    .modal-lg { max-width:580px; }
+    .tipo-selector { display:flex; flex-wrap:wrap; gap:6px; }
+    .tipo-btn {
+      padding:7px 14px; border-radius:20px; font-size:13px; font-weight:600;
+      cursor:pointer; border:2px solid transparent; transition:all .18s; color:#fff;
+    }
+    .tipo-btn.selected { box-shadow:0 0 0 3px rgba(99,102,241,.35); transform:scale(1.05); }
+    .tipo-btn:not(.selected) { opacity:.55; }
+    .alcance-btns { display:flex; gap:8px; }
+    .alcance-btn {
+      flex:1; padding:10px; border-radius:8px; font-size:13px; font-weight:600;
+      cursor:pointer; border:2px solid var(--border); background:var(--bg);
+      color:var(--text2); text-align:center; transition:all .18s;
+    }
+    .alcance-btn.selected { border-color:var(--primary); background:rgba(99,102,241,.1); color:var(--primary); }
+    .curso-checks { display:flex; flex-wrap:wrap; gap:8px; }
+    .curso-check-btn {
+      padding:6px 12px; border-radius:20px; font-size:12px; font-weight:600;
+      cursor:pointer; border:1.5px solid var(--border); background:var(--card);
+      color:var(--text2); transition:all .18s; white-space:nowrap;
+    }
+    .curso-check-btn.selected {
+      background:var(--primary); color:#fff; border-color:var(--primary);
+    }
+
+    /* ── DASHBOARD PRÓXIMOS EVENTOS ─────────────────────────────────────── */
+    .prox-evento {
+      display:flex; gap:10px; align-items:flex-start;
+      padding:10px 12px; border-radius:10px; cursor:pointer;
+      transition:background .15s;
+    }
+    .prox-evento:hover { background:var(--bg3); }
+    .prox-evento-dot {
+      width:10px; height:10px; border-radius:50%; flex-shrink:0; margin-top:4px;
+    }
+    .prox-evento-titulo { font-size:13px; font-weight:700; margin-bottom:2px; }
+    .prox-evento-fecha  { font-size:11px; color:var(--text2); }
+
+    @media (max-width:768px) {
+      .cal-day { min-height:48px; }
+      .cal-event { font-size:9px; }
+      .notif-panel { right:-40px; }
+    }
   </style>
 </head>
 <body>
@@ -631,11 +802,44 @@ const NAV = [
   { id:'asistencia',      label:'Tomar asistencia',  icon:'📋', permiso:'cargar_asistencias' },
   { id:'reportes',        label:'Reportes',          icon:'📊', permiso:'ver_reportes' },
   { id:'planificaciones', label:'Planificaciones',   icon:'📝', permiso:'ver_planificaciones' },
+  { id:'calendario',      label:'Calendario',         icon:'📅', permiso:'ver_calendario' },
   { id:'cursos',          label:'Cursos (Niveles)',   icon:'🏫', permiso:'administrar_cursos' },
   { id:'instrumentos',    label:'Instrumentos',       icon:'🎸', permiso:'administrar_cursos' },
   { id:'usuarios',        label:'Usuarios y roles',  icon:'👤', permiso:'administrar_usuarios_roles' },
   { id:'backup',          label:'Backup',            icon:'💾', permiso:'acceder_backup' },
 ];
+
+// ── HELPERS EVENTOS ────────────────────────────────────────────────────────────
+const TIPO_EVENTO = {
+  muestra: { label:'Muestra',  color:'#f59e0b', cls:'evt-muestra' },
+  feriado: { label:'Feriado',  color:'#ef4444', cls:'evt-feriado' },
+  reunion: { label:'Reunión',  color:'#3b82f6', cls:'evt-reunion' },
+  ensayo:  { label:'Ensayo',   color:'#8b5cf6', cls:'evt-ensayo'  },
+  salida:  { label:'Salida',   color:'#22c55e', cls:'evt-salida'  },
+  otro:    { label:'Otro',     color:'#6b7280', cls:'evt-otro'    },
+};
+function tipoColor(tipo) { return TIPO_EVENTO[tipo]?.color || '#6b7280'; }
+function tipoCls(tipo)   { return TIPO_EVENTO[tipo]?.cls   || 'evt-otro'; }
+function tipoLabel(tipo) { return TIPO_EVENTO[tipo]?.label || tipo; }
+
+function formatFechaCalendario(iso) {
+  if (!iso) return '';
+  const [y, m, d] = iso.split('-');
+  return `${d}/${m}/${y}`;
+}
+function formatHora(h) { return h ? h.slice(0,5) : ''; }
+
+function tiempoRelativo(isoStr) {
+  const diff = Date.now() - new Date(isoStr).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1)   return 'ahora';
+  if (mins < 60)  return `hace ${mins} min`;
+  const hs = Math.floor(mins / 60);
+  if (hs  < 24)  return `hace ${hs}h`;
+  const ds = Math.floor(hs  / 24);
+  if (ds  < 7)   return `hace ${ds}d`;
+  return formatFechaCalendario(isoStr.slice(0,10));
+}
 
 // ── UTILS ───────────────────────────────────────────────────────────────────────
 const getToken = () => localStorage.getItem('epm_token');
@@ -1009,6 +1213,50 @@ function Sidebar({ user, section, onSection, open, onClose }) {
 }
 
 // ── DASHBOARD ───────────────────────────────────────────────────────────────────
+function ProximosEventos({ user, onSection }) {
+  const [eventos, setEventos] = useState([]);
+  const [cargando, setCargando] = useState(true);
+
+  useEffect(() => {
+    if (!user.permisos?.includes('ver_calendario')) { setCargando(false); return; }
+    apiFetch('/api/eventos/proximos?limite=5')
+      .then(data => setEventos(data))
+      .catch(() => {})
+      .finally(() => setCargando(false));
+  }, []);
+
+  if (!user.permisos?.includes('ver_calendario') || (!cargando && eventos.length === 0)) return null;
+
+  return (
+    <div className="card" style={{marginBottom:16}}>
+      <div className="card-title" style={{marginBottom:8}}>
+        📅 Próximos eventos
+        <button className="btn btn-secondary btn-auto" style={{marginLeft:'auto',fontSize:12,padding:'4px 10px'}}
+          onClick={() => onSection('calendario')}>Ver todos</button>
+      </div>
+      {cargando ? <div style={{color:'var(--text2)',fontSize:13}}>Cargando...</div> : (
+        eventos.map(ev => (
+          <div key={ev.id} className="prox-evento" onClick={() => onSection('calendario')}>
+            <div className="prox-evento-dot" style={{background:tipoColor(ev.tipo)}} />
+            <div>
+              <div className="prox-evento-titulo">{ev.titulo}</div>
+              <div className="prox-evento-fecha">
+                {formatFechaCalendario(ev.fecha)}
+                {ev.hora_inicio ? ` · ${formatHora(ev.hora_inicio)}` : ''}
+                {ev.lugar ? ` · ${ev.lugar}` : ''}
+                <span style={{marginLeft:6,background:tipoColor(ev.tipo)+'22',color:tipoColor(ev.tipo),
+                  borderRadius:8,padding:'1px 7px',fontSize:10,fontWeight:700}}>
+                  {tipoLabel(ev.tipo)}
+                </span>
+              </div>
+            </div>
+          </div>
+        ))
+      )}
+    </div>
+  );
+}
+
 function Dashboard({ user, onSection }) {
   const puede = (p) => user.permisos?.includes(p);
   const items = NAV.filter(n => n.id !== 'dashboard' && (!n.permiso || puede(n.permiso)));
@@ -1019,6 +1267,7 @@ function Dashboard({ user, onSection }) {
         <h2>Bienvenido/a, {user.nombre.split(' ')[0]} 👋</h2>
         <p>{user.institucion_nombre} · {user.rol_nombre}</p>
       </div>
+      <ProximosEventos user={user} onSection={onSection} />
       <div className="card">
         <div className="card-title">🗂 Módulos disponibles</div>
         <div className="modules-grid">
@@ -4440,6 +4689,596 @@ function Instrumentos({ user }) {
   );
 }
 
+// ── NOTIFICACIONES BELL ─────────────────────────────────────────────────────────
+function NotificacionesBell({ user }) {
+  const [open,          setOpen]         = useState(false);
+  const [notifs,        setNotifs]       = useState([]);
+  const [noLeidas,      setNoLeidas]     = useState(0);
+  const [cargando,      setCargando]     = useState(false);
+
+  const fetchCount = useCallback(async () => {
+    try {
+      const d = await apiFetch('/api/notificaciones/no-leidas');
+      setNoLeidas(d.total);
+    } catch(e) {}
+  }, []);
+
+  // Poll cada 30 s
+  useEffect(() => {
+    fetchCount();
+    const t = setInterval(fetchCount, 30000);
+    return () => clearInterval(t);
+  }, [fetchCount]);
+
+  const abrirPanel = async () => {
+    if (open) { setOpen(false); return; }
+    setOpen(true);
+    setCargando(true);
+    try {
+      const data = await apiFetch('/api/notificaciones');
+      setNotifs(data);
+      if (noLeidas > 0) {
+        await apiFetch('/api/notificaciones/leer-todas', { method:'PUT' });
+        setNoLeidas(0);
+      }
+    } catch(e) {}
+    finally { setCargando(false); }
+  };
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e) => {
+      if (!e.target.closest('.notif-bell-wrap')) setOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [open]);
+
+  const dotCls = (tipo) => `notif-dot notif-dot-${tipo}`;
+
+  return (
+    <div className="notif-bell-wrap">
+      <button className="notif-bell-btn" onClick={abrirPanel} title="Notificaciones">
+        🔔
+        {noLeidas > 0 && <span className="notif-badge">{noLeidas > 9 ? '9+' : noLeidas}</span>}
+      </button>
+      {open && (
+        <div className="notif-panel">
+          <div className="notif-panel-header">
+            <span>Notificaciones</span>
+            {notifs.some(n => !n.leida) && (
+              <button className="btn btn-secondary btn-auto" style={{fontSize:11,padding:'3px 8px'}}
+                onClick={async () => {
+                  await apiFetch('/api/notificaciones/leer-todas', { method:'PUT' });
+                  setNotifs(ns => ns.map(n => ({...n, leida:1})));
+                  setNoLeidas(0);
+                }}>
+                ✓ Leer todo
+              </button>
+            )}
+          </div>
+          <div className="notif-panel-list">
+            {cargando ? (
+              <div className="notif-empty">Cargando...</div>
+            ) : notifs.length === 0 ? (
+              <div className="notif-empty">Sin notificaciones</div>
+            ) : notifs.map(n => (
+              <div key={n.id} className={`notif-item ${!n.leida ? 'unread' : ''}`}
+                onClick={async () => {
+                  if (!n.leida) {
+                    await apiFetch(`/api/notificaciones/${n.id}/leer`, { method:'PUT' });
+                    setNotifs(ns => ns.map(x => x.id===n.id ? {...x,leida:1} : x));
+                  }
+                }}>
+                <div className="notif-item-header">
+                  <div className={dotCls(n.tipo)} />
+                  <div className="notif-item-titulo">{n.titulo}</div>
+                </div>
+                <div className="notif-item-msg">{n.mensaje}</div>
+                <div className="notif-item-time">{tiempoRelativo(n.created_at)}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── MODAL EVENTO ─────────────────────────────────────────────────────────────────
+function ModalEvento({ evento, cursos, onClose, onGuardado }) {
+  const inicial = evento ? {
+    titulo:      evento.titulo || '',
+    descripcion: evento.descripcion || '',
+    fecha:       evento.fecha || '',
+    hora_inicio: evento.hora_inicio || '',
+    hora_fin:    evento.hora_fin || '',
+    lugar:       evento.lugar || '',
+    tipo:        evento.tipo || 'otro',
+    alcance:     evento.alcance || 'institucion',
+    cursos_ids:  evento.cursos_ids || [],
+  } : { titulo:'', descripcion:'', fecha:'', hora_inicio:'', hora_fin:'', lugar:'',
+        tipo:'otro', alcance:'institucion', cursos_ids:[] };
+
+  const [form,    setForm]   = useState(inicial);
+  const [saving,  setSaving] = useState(false);
+  const [error,   setError]  = useState('');
+
+  const set = (k, v) => setForm(f => ({...f, [k]:v}));
+
+  const toggleCurso = (id) => {
+    setForm(f => {
+      const ids = f.cursos_ids.includes(id) ? f.cursos_ids.filter(x=>x!==id) : [...f.cursos_ids, id];
+      return {...f, cursos_ids: ids};
+    });
+  };
+
+  const submit = async (e) => {
+    e.preventDefault();
+    setError(''); setSaving(true);
+    try {
+      const method = evento?.id ? 'PUT' : 'POST';
+      const url    = evento?.id ? `/api/eventos/${evento.id}` : '/api/eventos';
+      const data   = await apiFetch(url, { method, body: form });
+      onGuardado(data);
+    } catch(e) { setError(e.message); }
+    finally { setSaving(false); }
+  };
+
+  return (
+    <div className="modal-overlay" onClick={e => e.target===e.currentTarget && onClose()}>
+      <div className="modal modal-lg">
+        <div className="modal-header">
+          <span className="modal-title">{evento?.id ? 'Editar evento' : 'Nuevo evento'}</span>
+          <button className="modal-close" onClick={onClose}>×</button>
+        </div>
+        {error && <div className="alert alert-error">{error}</div>}
+        <form onSubmit={submit}>
+          <div className="form-group">
+            <label className="form-label">Título *</label>
+            <input className="form-control" value={form.titulo}
+              onChange={e => set('titulo', e.target.value)} required placeholder="Ej: Muestra de fin de año" />
+          </div>
+          <div className="form-group">
+            <label className="form-label">Tipo *</label>
+            <div className="tipo-selector">
+              {Object.entries(TIPO_EVENTO).map(([k,v]) => (
+                <button key={k} type="button"
+                  className={`tipo-btn ${form.tipo===k?'selected':''}`}
+                  style={{background:v.color}}
+                  onClick={() => set('tipo', k)}>
+                  {v.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="form-grid">
+            <div className="form-group">
+              <label className="form-label">Fecha *</label>
+              <input className="form-control" type="date" value={form.fecha}
+                onChange={e => set('fecha', e.target.value)} required />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Lugar</label>
+              <input className="form-control" value={form.lugar}
+                onChange={e => set('lugar', e.target.value)} placeholder="Aula, Salón, etc." />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Hora inicio</label>
+              <input className="form-control" type="time" value={form.hora_inicio}
+                onChange={e => set('hora_inicio', e.target.value)} />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Hora fin</label>
+              <input className="form-control" type="time" value={form.hora_fin}
+                onChange={e => set('hora_fin', e.target.value)} />
+            </div>
+          </div>
+          <div className="form-group col-full">
+            <label className="form-label">Descripción</label>
+            <textarea className="form-control" rows={2} value={form.descripcion}
+              onChange={e => set('descripcion', e.target.value)} placeholder="Detalles del evento..." />
+          </div>
+          <div className="form-group">
+            <label className="form-label">Dirigido a</label>
+            <div className="alcance-btns">
+              <button type="button" className={`alcance-btn ${form.alcance==='institucion'?'selected':''}`}
+                onClick={() => set('alcance','institucion')}>
+                🏫 Toda la institución
+              </button>
+              <button type="button" className={`alcance-btn ${form.alcance==='cursos'?'selected':''}`}
+                onClick={() => set('alcance','cursos')}>
+                👥 Cursos específicos
+              </button>
+            </div>
+          </div>
+          {form.alcance === 'cursos' && (
+            <div className="form-group">
+              <label className="form-label">Seleccioná los cursos</label>
+              <div className="curso-checks">
+                {cursos.map(c => (
+                  <button key={c.id} type="button"
+                    className={`curso-check-btn ${form.cursos_ids.includes(c.id)?'selected':''}`}
+                    onClick={() => toggleCurso(c.id)}>
+                    {c.nombre}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+          <div className="modal-footer">
+            <button type="button" className="btn btn-secondary btn-auto" onClick={onClose}>Cancelar</button>
+            <button type="submit" className="btn btn-primary btn-auto" disabled={saving}>
+              {saving ? 'Guardando...' : evento?.id ? 'Guardar cambios' : 'Crear evento'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// ── MODAL CANCELAR / REPROGRAMAR ─────────────────────────────────────────────────
+function ModalCambioEvento({ evento, modo, onClose, onGuardado }) {
+  const [motivo,     setMotivo]   = useState('');
+  const [nuevaFecha, setNuevaFecha] = useState('');
+  const [nuevaHI,    setNuevaHI]  = useState(evento.hora_inicio || '');
+  const [nuevaHF,    setNuevaHF]  = useState(evento.hora_fin || '');
+  const [saving,     setSaving]   = useState(false);
+  const [error,      setError]    = useState('');
+  const esCancelar = modo === 'cancelar';
+
+  const submit = async (e) => {
+    e.preventDefault();
+    setError(''); setSaving(true);
+    try {
+      const url  = `/api/eventos/${evento.id}/${esCancelar ? 'cancelar' : 'reprogramar'}`;
+      const body = esCancelar
+        ? { motivo }
+        : { motivo, nueva_fecha: nuevaFecha, nueva_hora_inicio: nuevaHI || null, nueva_hora_fin: nuevaHF || null };
+      await apiFetch(url, { method:'POST', body });
+      onGuardado();
+    } catch(e) { setError(e.message); }
+    finally { setSaving(false); }
+  };
+
+  return (
+    <div className="modal-overlay" onClick={e => e.target===e.currentTarget && onClose()}>
+      <div className="modal">
+        <div className="modal-header">
+          <span className="modal-title">{esCancelar ? '❌ Cancelar evento' : '📅 Reprogramar evento'}</span>
+          <button className="modal-close" onClick={onClose}>×</button>
+        </div>
+        <div style={{background:'var(--bg3)',borderRadius:8,padding:12,marginBottom:14,fontSize:13}}>
+          <strong>{evento.titulo}</strong> — {formatFechaCalendario(evento.fecha)}
+          {evento.hora_inicio ? ` a las ${formatHora(evento.hora_inicio)}` : ''}
+        </div>
+        {error && <div className="alert alert-error">{error}</div>}
+        <form onSubmit={submit}>
+          {!esCancelar && (
+            <div className="form-grid" style={{marginBottom:14}}>
+              <div className="form-group">
+                <label className="form-label">Nueva fecha *</label>
+                <input className="form-control" type="date" value={nuevaFecha}
+                  onChange={e => setNuevaFecha(e.target.value)} required />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Nueva hora inicio</label>
+                <input className="form-control" type="time" value={nuevaHI}
+                  onChange={e => setNuevaHI(e.target.value)} />
+              </div>
+            </div>
+          )}
+          <div className="form-group">
+            <label className="form-label">Motivo {esCancelar ? 'de cancelación' : 'de reprogramación'} *</label>
+            <textarea className="form-control" rows={3} value={motivo}
+              onChange={e => setMotivo(e.target.value)} required
+              placeholder={esCancelar ? 'Ej: Problemas climáticos, enfermedad del docente...' : 'Ej: Conflicto con otro evento, solicitud de familias...'} />
+          </div>
+          <div className="alert alert-warning" style={{fontSize:12,marginBottom:0}}>
+            Se enviará una notificación in-app y por email a todos los afectados.
+          </div>
+          <div className="modal-footer">
+            <button type="button" className="btn btn-secondary btn-auto" onClick={onClose}>Volver</button>
+            <button type="submit"
+              className={`btn btn-auto ${esCancelar ? 'btn-danger' : 'btn-primary'}`}
+              disabled={saving}>
+              {saving ? 'Enviando...' : esCancelar ? 'Cancelar evento' : 'Reprogramar y notificar'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// ── DETALLE EVENTO ───────────────────────────────────────────────────────────────
+function ModalDetalleEvento({ evento, cursos, user, onClose, onEditar, onCambio }) {
+  const puede = (p) => user.permisos?.includes(p);
+  const cursoNombres = (evento.cursos_ids || []).map(id => cursos.find(c=>c.id===id)?.nombre).filter(Boolean);
+  const estadoBadge = {
+    activo:       <span className="agenda-item-badge badge-activo">Activo</span>,
+    cancelado:    <span className="agenda-item-badge badge-cancelado">Cancelado</span>,
+    reprogramado: <span className="agenda-item-badge badge-reprogramado">Reprogramado</span>,
+  };
+
+  return (
+    <div className="modal-overlay" onClick={e => e.target===e.currentTarget && onClose()}>
+      <div className="modal">
+        <div className="modal-header">
+          <span className="modal-title">{evento.titulo}</span>
+          <button className="modal-close" onClick={onClose}>×</button>
+        </div>
+        <div style={{display:'flex',gap:8,flexWrap:'wrap',marginBottom:14}}>
+          <span style={{background:tipoColor(evento.tipo)+'22',color:tipoColor(evento.tipo),
+            borderRadius:12,padding:'3px 10px',fontSize:12,fontWeight:700}}>
+            {tipoLabel(evento.tipo)}
+          </span>
+          {estadoBadge[evento.estado]}
+        </div>
+        <div style={{fontSize:14,display:'flex',flexDirection:'column',gap:8}}>
+          <div><strong>📅 Fecha:</strong> {formatFechaCalendario(evento.fecha)}
+            {evento.hora_inicio ? ` · ${formatHora(evento.hora_inicio)}` : ''}
+            {evento.hora_fin    ? ` – ${formatHora(evento.hora_fin)}`    : ''}
+          </div>
+          {evento.lugar && <div><strong>📍 Lugar:</strong> {evento.lugar}</div>}
+          {evento.descripcion && <div><strong>📝 Descripción:</strong> {evento.descripcion}</div>}
+          <div><strong>👥 Dirigido a:</strong> {evento.alcance==='institucion' ? 'Toda la institución' : cursoNombres.join(', ') || 'Cursos específicos'}</div>
+          {evento.estado !== 'activo' && evento.motivo_cambio && (
+            <div style={{background:'var(--bg3)',borderRadius:8,padding:10,fontSize:13}}>
+              <strong>Motivo del cambio:</strong> {evento.motivo_cambio}
+              {evento.fecha_original && <div style={{marginTop:4,color:'var(--text2)'}}>Fecha original: {formatFechaCalendario(evento.fecha_original)}</div>}
+            </div>
+          )}
+        </div>
+        {puede('editar_eventos') && evento.estado === 'activo' && (
+          <div className="modal-footer" style={{flexWrap:'wrap'}}>
+            <button className="btn btn-secondary btn-auto" onClick={() => onEditar(evento)}>✏️ Editar</button>
+            <button className="btn btn-secondary btn-auto" style={{color:'var(--warning)',borderColor:'var(--warning)'}}
+              onClick={() => onCambio(evento, 'reprogramar')}>📅 Reprogramar</button>
+            <button className="btn btn-danger btn-auto" onClick={() => onCambio(evento, 'cancelar')}>❌ Cancelar</button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── CALENDARIO ───────────────────────────────────────────────────────────────────
+function Calendario({ user }) {
+  const puede = (p) => user.permisos?.includes(p);
+
+  const hoy = new Date();
+  const [año,     setAnio]     = useState(hoy.getFullYear());
+  const [mes,     setMes]      = useState(hoy.getMonth()); // 0-based
+  const [vista,   setVista]    = useState('calendario'); // 'calendario' | 'agenda'
+  const [eventos, setEventos]  = useState([]);
+  const [cursos,  setCursos]   = useState([]);
+  const [cargando, setCargando] = useState(false);
+
+  const [modalCrear,   setModalCrear]   = useState(false);
+  const [modalEditar,  setModalEditar]  = useState(null);
+  const [modalDetalle, setModalDetalle] = useState(null);
+  const [modalCambio,  setModalCambio]  = useState(null); // {evento, modo}
+
+  // Carga cursos una sola vez
+  useEffect(() => {
+    apiFetch('/api/cursos').then(d => setCursos(d)).catch(() => {});
+  }, []);
+
+  // Carga eventos del mes actual + adj
+  const cargarEventos = useCallback(async () => {
+    setCargando(true);
+    try {
+      const primerDia = new Date(año, mes, 1);
+      // Traer desde 1er día del mes anterior hasta último del mes siguiente
+      const desde = new Date(año, mes - 1, 1).toISOString().slice(0, 10);
+      const hasta  = new Date(año, mes + 2, 0).toISOString().slice(0, 10);
+      const data = await apiFetch(`/api/eventos?desde=${desde}&hasta=${hasta}`);
+      setEventos(data);
+    } catch(e) {}
+    finally { setCargando(false); }
+  }, [año, mes]);
+
+  useEffect(() => { cargarEventos(); }, [cargarEventos]);
+
+  const navMes = (dir) => {
+    if (mes + dir < 0)  { setAnio(a => a-1); setMes(11); }
+    else if (mes + dir > 11) { setAnio(a => a+1); setMes(0); }
+    else setMes(m => m + dir);
+  };
+
+  const MESES_ES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+  const DIAS_ES  = ['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'];
+
+  // Construye la grilla del mes
+  const buildGrid = () => {
+    const primer = new Date(año, mes, 1);
+    const ultimo = new Date(año, mes + 1, 0);
+    let dow = primer.getDay(); // 0=Dom
+    dow = dow === 0 ? 6 : dow - 1; // convertir a 0=Lun
+
+    const dias = [];
+    // días del mes anterior para completar la primera fila
+    for (let i = dow - 1; i >= 0; i--) {
+      const d = new Date(año, mes, -i);
+      dias.push({ fecha: d.toISOString().slice(0,10), actual: false });
+    }
+    // días del mes actual
+    for (let i = 1; i <= ultimo.getDate(); i++) {
+      const d = new Date(año, mes, i);
+      dias.push({ fecha: d.toISOString().slice(0,10), actual: true });
+    }
+    // días del mes siguiente para completar la última fila
+    let resto = dias.length % 7;
+    if (resto !== 0) {
+      for (let i = 1; i <= 7 - resto; i++) {
+        const d = new Date(año, mes + 1, i);
+        dias.push({ fecha: d.toISOString().slice(0,10), actual: false });
+      }
+    }
+    return dias;
+  };
+
+  const todayStr = hoy.toISOString().slice(0,10);
+  const grid = buildGrid();
+
+  // Mapa fecha → eventos
+  const eventosPorFecha = {};
+  eventos.forEach(ev => {
+    if (!eventosPorFecha[ev.fecha]) eventosPorFecha[ev.fecha] = [];
+    eventosPorFecha[ev.fecha].push(ev);
+  });
+
+  // Vista agenda: eventos del mes actual ordenados
+  const eventosDelMes = eventos
+    .filter(ev => {
+      const [y,m] = ev.fecha.split('-').map(Number);
+      return y === año && m - 1 === mes;
+    })
+    .sort((a,b) => a.fecha.localeCompare(b.fecha) || (a.hora_inicio||'').localeCompare(b.hora_inicio||''));
+
+  const cerrarTodo = () => {
+    setModalCrear(false); setModalEditar(null); setModalDetalle(null); setModalCambio(null);
+  };
+
+  const onGuardado = (ev) => {
+    cargarEventos();
+    cerrarTodo();
+  };
+
+  const onCambioGuardado = () => {
+    cargarEventos();
+    cerrarTodo();
+  };
+
+  return (
+    <div className="cal-wrap">
+      {/* Toolbar */}
+      <div className="cal-toolbar">
+        <button className="btn btn-secondary btn-auto" style={{padding:'8px 12px'}} onClick={() => navMes(-1)}>‹</button>
+        <span className="cal-toolbar-month">{MESES_ES[mes]} {año}</span>
+        <button className="btn btn-secondary btn-auto" style={{padding:'8px 12px'}} onClick={() => navMes(1)}>›</button>
+        <button className="btn btn-secondary btn-auto" style={{padding:'7px 12px',fontSize:12}}
+          onClick={() => { setAnio(hoy.getFullYear()); setMes(hoy.getMonth()); }}>
+          Hoy
+        </button>
+        <div className="cal-view-toggle">
+          <button className={`cal-view-btn ${vista==='calendario'?'active':''}`} onClick={() => setVista('calendario')}>📅 Mes</button>
+          <button className={`cal-view-btn ${vista==='agenda'?'active':''}`}     onClick={() => setVista('agenda')}>📋 Agenda</button>
+        </div>
+        {puede('crear_eventos') && (
+          <button className="btn btn-primary btn-auto" style={{marginLeft:'auto',whiteSpace:'nowrap'}}
+            onClick={() => setModalCrear(true)}>
+            + Nuevo evento
+          </button>
+        )}
+      </div>
+
+      {/* Vista calendario */}
+      {vista === 'calendario' && (
+        <div className="cal-grid">
+          <div className="cal-weekdays">
+            {DIAS_ES.map(d => <div key={d} className="cal-weekday">{d}</div>)}
+          </div>
+          <div className="cal-days">
+            {grid.map(({ fecha, actual }) => {
+              const evsDia = eventosPorFecha[fecha] || [];
+              const visible = evsDia.slice(0, 3);
+              const mas     = evsDia.length - visible.length;
+              const isToday = fecha === todayStr;
+              return (
+                <div key={fecha} className={`cal-day ${!actual ? 'other-month' : ''} ${isToday ? 'today' : ''}`}>
+                  <div className="cal-day-num">{fecha.slice(8)}</div>
+                  {visible.map(ev => (
+                    <span key={ev.id}
+                      className={`cal-event ${tipoCls(ev.tipo)} ${ev.estado !== 'activo' ? `cal-event-${ev.estado}` : ''}`}
+                      title={ev.titulo}
+                      onClick={() => setModalDetalle(ev)}>
+                      {ev.titulo}
+                    </span>
+                  ))}
+                  {mas > 0 && (
+                    <span className="cal-more" onClick={() => setVista('agenda')}>+{mas} más</span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Vista agenda */}
+      {vista === 'agenda' && (
+        <div>
+          {eventosDelMes.length === 0 ? (
+            <div className="empty-state">
+              <div className="empty-state-icon">📅</div>
+              <div>No hay eventos en {MESES_ES[mes]}</div>
+            </div>
+          ) : (() => {
+            // Agrupa por fecha
+            const grupos = {};
+            eventosDelMes.forEach(ev => {
+              if (!grupos[ev.fecha]) grupos[ev.fecha] = [];
+              grupos[ev.fecha].push(ev);
+            });
+            return Object.entries(grupos).map(([fecha, evs]) => (
+              <div key={fecha}>
+                <div className="agenda-group-date">
+                  {new Date(fecha + 'T12:00:00').toLocaleDateString('es-AR',{weekday:'long',day:'numeric',month:'long'})}
+                </div>
+                {evs.map(ev => (
+                  <div key={ev.id} className="agenda-item" onClick={() => setModalDetalle(ev)}>
+                    <div className="agenda-item-stripe" style={{background:tipoColor(ev.tipo)}} />
+                    <div className="agenda-item-body">
+                      <div className="agenda-item-titulo">{ev.titulo}</div>
+                      <div className="agenda-item-meta">
+                        <span style={{background:tipoColor(ev.tipo)+'22',color:tipoColor(ev.tipo),
+                          borderRadius:8,padding:'1px 7px',fontSize:11,fontWeight:700}}>
+                          {tipoLabel(ev.tipo)}
+                        </span>
+                        {ev.hora_inicio && <span>⏰ {formatHora(ev.hora_inicio)}{ev.hora_fin ? ` – ${formatHora(ev.hora_fin)}` : ''}</span>}
+                        {ev.lugar && <span>📍 {ev.lugar}</span>}
+                        {ev.alcance === 'institucion'
+                          ? <span>🏫 Toda la institución</span>
+                          : <span>👥 Cursos específicos</span>
+                        }
+                        <span className={`agenda-item-badge badge-${ev.estado}`}>
+                          {ev.estado.charAt(0).toUpperCase() + ev.estado.slice(1)}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ));
+          })()}
+        </div>
+      )}
+
+      {/* Modales */}
+      {modalCrear && (
+        <ModalEvento cursos={cursos} onClose={cerrarTodo} onGuardado={onGuardado} />
+      )}
+      {modalEditar && (
+        <ModalEvento evento={modalEditar} cursos={cursos} onClose={cerrarTodo} onGuardado={onGuardado} />
+      )}
+      {modalDetalle && !modalCambio && (
+        <ModalDetalleEvento evento={modalDetalle} cursos={cursos} user={user}
+          onClose={cerrarTodo}
+          onEditar={(ev) => { setModalDetalle(null); setModalEditar(ev); }}
+          onCambio={(ev, modo) => setModalCambio({ evento: ev, modo })}
+        />
+      )}
+      {modalCambio && (
+        <ModalCambioEvento evento={modalCambio.evento} modo={modalCambio.modo}
+          onClose={cerrarTodo} onGuardado={onCambioGuardado} />
+      )}
+    </div>
+  );
+}
+
 // ── LAYOUT ──────────────────────────────────────────────────────────────────────
 function Layout({ user }) {
   const [section, setSection] = useState('dashboard');
@@ -4457,6 +5296,7 @@ function Layout({ user }) {
         <div className="topbar">
           <button className="topbar-menu" onClick={() => setMenuOpen(o => !o)}>☰</button>
           <span className="topbar-title">{title}</span>
+          <NotificacionesBell user={user} />
         </div>
         <div className="page">
           {section === 'dashboard'
@@ -4477,6 +5317,8 @@ function Layout({ user }) {
             ? <Cursos user={user} />
             : section === 'instrumentos'
             ? <Instrumentos user={user} />
+            : section === 'calendario'
+            ? <Calendario user={user} />
             : <Placeholder id={section} />}
         </div>
       </div>

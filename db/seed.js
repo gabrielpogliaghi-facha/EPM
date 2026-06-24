@@ -16,14 +16,19 @@ const PERMISOS = [
   { codigo: 'acceder_backup',             descripcion: 'Acceder a backup del sistema',       grupo: 'administracion' },
   { codigo: 'ver_legajo_personal',        descripcion: 'Ver legajo personal de estudiantes',    grupo: 'estudiantes' },
   { codigo: 'editar_legajo_personal',     descripcion: 'Editar legajo personal de estudiantes', grupo: 'estudiantes' },
+  { codigo: 'ver_calendario',             descripcion: 'Ver calendario de eventos',              grupo: 'calendario'  },
+  { codigo: 'crear_eventos',              descripcion: 'Crear eventos en el calendario',          grupo: 'calendario'  },
+  { codigo: 'editar_eventos',             descripcion: 'Editar, cancelar y reprogramar eventos',  grupo: 'calendario'  },
 ];
 
 const ROL_OPERADOR = ['ver_estudiantes','crear_estudiantes','editar_estudiantes',
                       'ver_asistencias','cargar_asistencias','justificar_ausencias',
-                      'ver_reportes','editar_reportes','administrar_cursos'];
+                      'ver_reportes','editar_reportes','administrar_cursos',
+                      'ver_calendario','crear_eventos','editar_eventos'];
 const ROL_DOCENTE  = ['ver_estudiantes','ver_asistencias','cargar_asistencias',
                       'ver_reportes','ver_planificaciones','editar_planificaciones',
-                      'ver_legajo_personal','editar_legajo_personal'];
+                      'ver_legajo_personal','editar_legajo_personal',
+                      'ver_calendario'];
 
 async function runSeed(db) {
   const check = await db.execute('SELECT COUNT(*) AS c FROM instituciones');

@@ -25,6 +25,8 @@ app.use('/api/planificaciones', require('./routes/planificaciones'));
 app.use('/api/periodos',        require('./routes/periodos'));
 app.use('/api/reportes',        require('./routes/reportes'));
 app.use('/api/backup',          require('./routes/backup'));
+app.use('/api/eventos',         require('./routes/eventos'));
+app.use('/api/notificaciones',  require('./routes/notificaciones'));
 
 // ── SPA FALLBACK ───────────────────────────────────────────────────────────────
 app.get('*', (req, res) => {

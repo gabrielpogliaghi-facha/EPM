@@ -41,10 +41,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 | 9  | **Legajo personal** | 2026-06-22 | Segunda pestaña en la Ficha. Campos fijos: grupo familiar, salud, trayectoria. Tres timelines: historial de salud, historial de trayectoria, observaciones generales. Permisos `ver_legajo_personal` + `editar_legajo_personal` (Gestión + Docente; Operador no ve). Migración de permisos automática en `runSchema`. |
 | inf| **Migración a Turso (libSQL)** | 2026-06-22 | Reemplaza node:sqlite por @libsql/client. Dev usa file:./epm.db; prod usa TURSO_URL + TURSO_AUTH_TOKEN. |
 | 10 | **Recuperación de contraseña** | 2026-06-23 | Self-service vía email (Resend): link con token hasheado, expira 1 hora, uso único. Reseteo manual por Gestión ya existía. UI: "¿Olvidaste tu contraseña?" en login + pantalla de nueva contraseña vía `?token=` en URL. |
+| 11 | **Calendario de eventos + Notificaciones** | 2026-06-23 | Calendario mensual con tipos de eventos (muestra/feriado/reunión/ensayo/salida/otro), colores por tipo, vistas mes y agenda. Cancelar/reprogramar con motivo: notifica in-app (campanita en topbar) + email vía Resend. Tabla `eventos`, `evento_cursos`, `notificaciones`. Permisos `ver_calendario`, `crear_eventos`, `editar_eventos`. Dashboard muestra próximos eventos. |
 
 ### Estado general
 
-**Todos los módulos + inscripciones por instrumento + legajo personal con timeline + Turso en producción + recuperación de contraseña por email.**
+**Todos los módulos + inscripciones por instrumento + legajo personal con timeline + Turso en producción + recuperación de contraseña por email + calendario de eventos con notificaciones.**
 
 ### Decisiones tomadas
 
@@ -56,6 +57,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **DB**: `epm.db` (nueva). La DB anterior está en `escuela_v1.db` como backup.
 - **Recuperación de contraseña**: token = `crypto.randomBytes(32)` hex; se guarda SHA-256 en `password_reset_tokens`. El raw token va en el link. `POST /forgot-password` siempre responde genérico (no revela si el email existe). La URL base se detecta con `req.protocol + '://' + req.get('host')` → funciona en local y en Render. Remitente: `onboarding@resend.dev` (dominio gratuito de Resend). `RESEND_API_KEY` requerida en .env y en Render → Settings → Environment.
 - **Asistencia general vs. por materia**: columna `tipo_asistencia` + `materia_id` nullable + índices parciales únicos. La general es lo que usa EPM ahora; la por materia queda lista para UNSAM.
+- **Calendario de eventos**: tabla `eventos` (titulo, fecha, hora_inicio, hora_fin, lugar, tipo, alcance, estado, motivo_cambio, fecha_original). `evento_cursos` para eventos dirigidos a cursos específicos. Tipos: muestra/feriado/reunion/ensayo/salida/otro (colores distintos). Alcance: `institucion` (todos) o `cursos` (específicos). Estado: activo/cancelado/reprogramado. Cancelar/reprogramar requiere motivo → notifica a usuarios afectados.
+- **Notificaciones**: tabla `notificaciones` (usuario_id, titulo, mensaje, tipo, entidad_tipo, entidad_id, leida). `utils/notificaciones.js` crea registros en DB + envía emails. Campanita en topbar con badge de no-leídas, polling cada 30s. Panel desplegable al hacer click. `GET /api/notificaciones`, `PUT /api/notificaciones/leer-todas`, `PUT /api/notificaciones/:id/leer`. Sistema genérico reutilizable para otros avisos futuros.
+- **Filtro de visibilidad eventos**: Gestión/Operador ven todos. Docente: solo eventos `alcance='institucion'` + eventos de sus cursos asignados.
+- **Notificados en cancelación/reprogramación**: si alcance=`institucion` → todos los usuarios activos. Si alcance=`cursos` → usuarios con esos cursos en `usuarios_cursos` + usuarios con permiso `administrar_cursos`.
 
 ### Pendientes / por decidir
 
