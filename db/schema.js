@@ -553,11 +553,13 @@ async function runSchema(db) {
   await db.execute(`CREATE INDEX IF NOT EXISTS idx_mov_fin ON movimientos_financieros(institucion_id, fecha)`);
 
   // ── INVITACIONES ──────────────────────────────────────────────────────────
+  // email nullable: las invitaciones por link no requieren email previo
   await db.execute(`
     CREATE TABLE IF NOT EXISTS invitaciones (
       id             INTEGER PRIMARY KEY AUTOINCREMENT,
       institucion_id INTEGER NOT NULL REFERENCES instituciones(id),
-      email          TEXT NOT NULL,
+      email          TEXT,
+      nota           TEXT,
       rol_id         INTEGER NOT NULL REFERENCES roles(id),
       token_hash     TEXT NOT NULL UNIQUE,
       estado         TEXT NOT NULL DEFAULT 'pendiente' CHECK(estado IN ('pendiente','aceptada','expirada','cancelada')),
@@ -570,6 +572,45 @@ async function runSchema(db) {
     )
   `);
   await db.execute(`CREATE INDEX IF NOT EXISTS idx_invit ON invitaciones(institucion_id, estado)`);
+
+  // Migración: hacer email nullable y agregar nota (para DBs existentes)
+  try {
+    const { rows: schRows } = await db.execute({
+      sql: "SELECT sql FROM sqlite_master WHERE type='table' AND name='invitaciones'",
+      args: [],
+    });
+    const sql = schRows[0]?.sql || '';
+    if (sql.includes('email          TEXT NOT NULL')) {
+      await db.execute(`ALTER TABLE invitaciones RENAME TO invitaciones_pre_link`);
+      await db.execute(`
+        CREATE TABLE invitaciones (
+          id             INTEGER PRIMARY KEY AUTOINCREMENT,
+          institucion_id INTEGER NOT NULL REFERENCES instituciones(id),
+          email          TEXT,
+          nota           TEXT,
+          rol_id         INTEGER NOT NULL REFERENCES roles(id),
+          token_hash     TEXT NOT NULL UNIQUE,
+          estado         TEXT NOT NULL DEFAULT 'pendiente' CHECK(estado IN ('pendiente','aceptada','expirada','cancelada')),
+          expires_at     TEXT NOT NULL,
+          cursos_ids     TEXT DEFAULT '[]',
+          created_by     INTEGER NOT NULL REFERENCES usuarios(id),
+          accepted_by    INTEGER REFERENCES usuarios(id),
+          created_at     TEXT DEFAULT (datetime('now')),
+          updated_at     TEXT DEFAULT (datetime('now'))
+        )
+      `);
+      await db.execute(`INSERT INTO invitaciones SELECT id,institucion_id,email,NULL,rol_id,token_hash,estado,expires_at,cursos_ids,created_by,accepted_by,created_at,updated_at FROM invitaciones_pre_link`);
+      await db.execute(`DROP TABLE invitaciones_pre_link`);
+      await db.execute(`CREATE INDEX IF NOT EXISTS idx_invit ON invitaciones(institucion_id, estado)`);
+      console.log('✅ Migración invitaciones: email nullable + campo nota.');
+    }
+  } catch(e) { console.error('❌ Migración invitaciones:', e.message); }
+
+  // Migración: agregar instrumento_principal_id a docentes
+  try {
+    await db.execute(`ALTER TABLE docentes ADD COLUMN instrumento_principal_id INTEGER REFERENCES instrumentos(id)`);
+    console.log('✅ Migración docentes: campo instrumento_principal_id.');
+  } catch(e) { /* columna ya existe — ignorar */ }
 
   // ── MIGRACIÓN PERMISOS módulos nuevos (idempotente) ───────────────────────
   const permsNuevos = [

@@ -48,11 +48,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 | 15 | **Proyectos institucionales** | 2026-06-24 | Gestión de proyectos con estados (borrador/en curso/presentado/aprobado/rechazado/finalizado), timeline de historial de estados, adjuntos (PDF/Word/imagen hasta 20MB). Filtro por estado. Permisos `ver_proyectos` + `editar_proyectos`. Tablas `proyectos`, `proyecto_historial`, `proyecto_adjuntos`. |
 | 16 | **Finanzas (estructura)** | 2026-06-24 | Módulo pendiente de CUIT. Pantalla "en construcción" con explicación. Tablas `movimientos_financieros` + `categorias_financieras` ya creadas. Permisos `ver_finanzas` + `editar_finanzas` + `administrar_finanzas`. Listo para activar cuando la EPM tenga CUIT. |
 | +  | **Reorganización del menú** | 2026-06-24 | Sidebar con grupos: Alumnos / Educación / Institución / Administración. `NAV_GROUPS` reemplaza el array plano; `NAV` sigue existiendo como flat map para lookups. |
-| 17 | **Sistema de invitaciones por email** | 2026-06-24 | Gmail SMTP (Nodemailer) desde escuelapopular.ar@gmail.com. Token hasheado (SHA-256), expira 7 días, uso único. Envío individual o masivo (pegar lista de emails). Estados: pendiente/aceptada/expirada/cancelada. Reenvío y cancelación. Página de registro para el invitado (`?invite=TOKEN`). Tab "Invitaciones" en Usuarios y Roles. |
+| 17 | **Invitaciones por link** | 2026-06-24 | Link con token (SHA-256, 7 días, uso único). Sin email: el admin genera el link y lo comparte por WhatsApp vía "📋 Copiar" o "📱 Compartir" (Web Share API). El invitado completa nombre, email y contraseña. Tab "Invitaciones" en Usuarios y Roles con nota interna, estados y regenerar. |
+| 18 | **Limpieza total de emails** | 2026-06-24 | Eliminados Nodemailer, Resend y Gmail SMTP del código. `utils/mailer.js` eliminado. `utils/notificaciones.js` ya no envía emails (solo notificaciones in-app). Login: "¿Olvidaste tu contraseña?" muestra mensaje para contactar a Gestión. |
+| 19 | **Instrumentos de docentes fix** | 2026-06-24 | Corregido selector múltiple en FichaDocente (conversión Number() para evitar fallos de tipo). Nuevo campo `instrumento_principal_id` en tabla `docentes`. El listado muestra ★ instrumento principal. |
 
 ### Estado general
 
-**Sistema completo. Menú reorganizado. Equipo docente, inventario, proyectos, finanzas (estructura), cumpleaños, invitaciones por email.**
+**Sistema completo sin dependencia de email. Invitaciones por link. Equipo docente con instrumento principal. Finanzas en estructura.**
 
 ### Decisiones tomadas
 

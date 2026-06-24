@@ -1,73 +1,23 @@
-const express  = require('express');
-const router   = express.Router();
-const crypto   = require('crypto');
-const bcrypt   = require('bcryptjs');
-const db       = require('../db');
-const { verifyToken }         = require('../middleware/auth');
-const { requirePermiso }      = require('../middleware/permission');
-const { sendMail, buildInvitacionEmail } = require('../utils/mailer');
+const express = require('express');
+const router  = express.Router();
+const crypto  = require('crypto');
+const bcrypt  = require('bcryptjs');
+const db      = require('../db');
+const { verifyToken }    = require('../middleware/auth');
+const { requirePermiso } = require('../middleware/permission');
 
 const EXPIRA_DIAS = 7;
 
 function hashToken(raw) {
   return crypto.createHash('sha256').update(raw).digest('hex');
 }
-function expiresAt() {
+function calcExpires() {
   return new Date(Date.now() + EXPIRA_DIAS * 24 * 60 * 60 * 1000).toISOString();
 }
 
-async function enviarInvitacion(db, inv, req) {
-  const rawToken = crypto.randomBytes(32).toString('hex');
-  const tHash    = hashToken(rawToken);
-  const exp      = expiresAt();
-
-  // Obtener nombre del rol
-  const { rows: rolRows } = await db.execute({ sql: 'SELECT nombre FROM roles WHERE id=?', args: [inv.rol_id] });
-  const rolNombre = rolRows[0]?.nombre || 'Docente';
-
-  // Obtener nombres de cursos
-  let cursoNombres = [];
-  if (inv.cursos_ids?.length) {
-    const ph = inv.cursos_ids.map(() => '?').join(',');
-    const { rows: cRows } = await db.execute({ sql: `SELECT nombre FROM cursos WHERE id IN (${ph})`, args: inv.cursos_ids });
-    cursoNombres = cRows.map(r => r.nombre);
-  }
-
-  // Guardar en DB
-  const r = await db.execute({
-    sql: `INSERT INTO invitaciones (institucion_id, email, rol_id, token_hash, expires_at, cursos_ids, created_by)
-          VALUES (?,?,?,?,?,?,?)`,
-    args: [req.user.institucion_id, inv.email.toLowerCase().trim(), inv.rol_id,
-           tHash, exp, JSON.stringify(inv.cursos_ids || []), req.user.id],
-  });
-
-  // Protocolo: en Render (proxy SSL) usar x-forwarded-proto; fallback a req.protocol
-  const proto   = req.headers['x-forwarded-proto'] || req.protocol;
-  const baseUrl = `${proto}://${req.get('host')}`;
-  console.log(`📩 [Invitaciones] Enviando invitación a: ${inv.email} | baseUrl: ${baseUrl} | rol: ${rolNombre}`);
-
-  try {
-    const mailResult = await sendMail({
-      to:      inv.email,
-      subject: 'Te invitamos a unirte al sistema de gestión de la EPM',
-      html:    buildInvitacionEmail({ baseUrl, token: rawToken, rolNombre, cursoNombres }),
-    });
-    if (mailResult?.skipped) {
-      console.warn(`⚠️  [Invitaciones] Email NO enviado a ${inv.email} — Gmail no configurado`);
-    }
-  } catch(e) {
-    // El email falló pero la invitación ya está guardada en la DB.
-    // Loggeamos completo para verlo en Render, pero no fallamos el request.
-    console.error(`❌ [Invitaciones] Falló el envío a ${inv.email} — invitación guardada de todos modos (id=${Number(r.lastInsertRowid)})`);
-  }
-
-  return Number(r.lastInsertRowid);
-}
-
-// ── GET /api/invitaciones — lista (requiere admin) ────────────────────────────
+// ── GET /api/invitaciones ─────────────────────────────────────────────────────
 router.get('/', verifyToken, requirePermiso('administrar_usuarios_roles'), async (req, res) => {
   try {
-    // Marcar expiradas automáticamente
     await db.execute({
       sql: `UPDATE invitaciones SET estado='expirada', updated_at=datetime('now')
             WHERE estado='pendiente' AND expires_at < datetime('now')`,
@@ -88,54 +38,38 @@ router.get('/', verifyToken, requirePermiso('administrar_usuarios_roles'), async
   }
 });
 
-// ── POST /api/invitaciones — crear (simple o bulk) ────────────────────────────
+// ── POST /api/invitaciones — genera link de invitación ────────────────────────
 router.post('/', verifyToken, requirePermiso('administrar_usuarios_roles'), async (req, res) => {
-  const { emails, rol_id, cursos_ids } = req.body;
-  if (!emails?.length) return res.status(400).json({ error: 'Al menos un email es requerido' });
-  if (!rol_id)         return res.status(400).json({ error: 'El rol es requerido' });
-
-  // Normalizar lista de emails
-  const lista = (Array.isArray(emails) ? emails : [emails])
-    .map(e => e.toLowerCase().trim())
-    .filter(e => e && e.includes('@'));
-
-  if (!lista.length) return res.status(400).json({ error: 'No hay emails válidos' });
+  const { rol_id, cursos_ids, nota } = req.body;
+  if (!rol_id) return res.status(400).json({ error: 'El rol es requerido' });
 
   try {
-    const resultados = [];
-    for (const email of lista) {
-      // Verificar si ya existe usuario con ese email (activo o inactivo)
-      const { rows: exist } = await db.execute({
-        sql: 'SELECT id, activo FROM usuarios WHERE email=? AND institucion_id=?',
-        args: [email, req.user.institucion_id],
-      });
-      if (exist[0]) {
-        if (Number(exist[0].activo) === 1) {
-          resultados.push({ email, estado: 'ya_registrado' }); continue;
-        }
-        // Existe pero inactivo → informar al frontend para que ofrezca reactivar
-        resultados.push({ email, estado: 'ya_registrado_inactivo', usuario_id: Number(exist[0].id) }); continue;
-      }
+    const rawToken = crypto.randomBytes(32).toString('hex');
+    const tHash    = hashToken(rawToken);
 
-      // Verificar si ya hay invitación pendiente
-      const { rows: pendiente } = await db.execute({
-        sql: "SELECT id FROM invitaciones WHERE email=? AND estado='pendiente' AND expires_at > datetime('now') AND institucion_id=?",
-        args: [email, req.user.institucion_id],
-      });
-      if (pendiente[0]) { resultados.push({ email, estado: 'ya_invitado' }); continue; }
+    const r = await db.execute({
+      sql: `INSERT INTO invitaciones (institucion_id, nota, rol_id, token_hash, expires_at, cursos_ids, created_by)
+            VALUES (?,?,?,?,?,?,?)`,
+      args: [req.user.institucion_id, nota?.trim() || null, rol_id,
+             tHash, calcExpires(), JSON.stringify(cursos_ids || []), req.user.id],
+    });
 
-      await enviarInvitacion(db, { email, rol_id, cursos_ids: cursos_ids || [] }, req);
-      resultados.push({ email, estado: 'enviada' });
-    }
-    res.status(201).json({ resultados });
+    const id = Number(r.lastInsertRowid);
+    const { rows: rolRows } = await db.execute({ sql: 'SELECT nombre FROM roles WHERE id=?', args: [rol_id] });
+
+    res.status(201).json({
+      id,
+      token:      rawToken,
+      rol_nombre: rolRows[0]?.nombre || '',
+      expires_at: calcExpires(),
+    });
   } catch(e) {
     console.error(e);
     res.status(500).json({ error: 'Error al crear invitación' });
   }
 });
 
-// ── POST /api/invitaciones/:id/reenviar ──────────────────────────────────────
-// Debe ir ANTES de /:id para que Express no lo confunda
+// ── POST /api/invitaciones/:id/reenviar — regenera token ─────────────────────
 router.post('/:id/reenviar', verifyToken, requirePermiso('administrar_usuarios_roles'), async (req, res) => {
   try {
     const { rows } = await db.execute({
@@ -146,28 +80,20 @@ router.post('/:id/reenviar', verifyToken, requirePermiso('administrar_usuarios_r
     if (!inv) return res.status(404).json({ error: 'Invitación no encontrada' });
     if (inv.estado === 'aceptada') return res.status(400).json({ error: 'La invitación ya fue aceptada' });
 
-    // Cancelar la vieja y crear una nueva
+    const rawToken = crypto.randomBytes(32).toString('hex');
     await db.execute({
-      sql: "UPDATE invitaciones SET estado='cancelada', updated_at=datetime('now') WHERE id=?",
-      args: [inv.id],
+      sql: `UPDATE invitaciones SET token_hash=?, estado='pendiente', expires_at=?, updated_at=datetime('now') WHERE id=?`,
+      args: [hashToken(rawToken), calcExpires(), inv.id],
     });
 
-    await enviarInvitacion(db, {
-      email:      inv.email,
-      rol_id:     inv.rol_id,
-      cursos_ids: JSON.parse(inv.cursos_ids || '[]'),
-    }, req);
-
-    res.json({ ok: true });
+    const { rows: rolRows } = await db.execute({ sql: 'SELECT nombre FROM roles WHERE id=?', args: [inv.rol_id] });
+    res.json({ id: inv.id, token: rawToken, rol_nombre: rolRows[0]?.nombre || '' });
   } catch(e) {
-    console.error(e);
-    res.status(500).json({ error: 'Error al reenviar invitación' });
+    res.status(500).json({ error: 'Error al regenerar invitación' });
   }
 });
 
 // ── DELETE /api/invitaciones/:id ─────────────────────────────────────────────
-// Pendiente → cancela (soft). Cancelada/expirada → elimina físicamente.
-// Aceptada → no se puede borrar (tiene usuario creado).
 router.delete('/:id', verifyToken, requirePermiso('administrar_usuarios_roles'), async (req, res) => {
   try {
     const { rows } = await db.execute({
@@ -178,13 +104,8 @@ router.delete('/:id', verifyToken, requirePermiso('administrar_usuarios_roles'),
     if (rows[0].estado === 'aceptada') return res.status(400).json({ error: 'No se puede eliminar una invitación ya aceptada' });
 
     if (rows[0].estado === 'pendiente') {
-      // Soft-cancel: mantener el registro para auditoría
-      await db.execute({
-        sql: "UPDATE invitaciones SET estado='cancelada', updated_at=datetime('now') WHERE id=?",
-        args: [req.params.id],
-      });
+      await db.execute({ sql: "UPDATE invitaciones SET estado='cancelada', updated_at=datetime('now') WHERE id=?", args: [req.params.id] });
     } else {
-      // Cancelada o expirada: eliminar físicamente
       await db.execute({ sql: 'DELETE FROM invitaciones WHERE id=?', args: [req.params.id] });
     }
     res.json({ ok: true });
@@ -193,7 +114,7 @@ router.delete('/:id', verifyToken, requirePermiso('administrar_usuarios_roles'),
   }
 });
 
-// ── GET /api/invitaciones/verificar/:token — público ──────────────────────────
+// ── GET /api/invitaciones/verificar/:token — público ─────────────────────────
 router.get('/verificar/:token', async (req, res) => {
   try {
     const tHash = hashToken(req.params.token);
@@ -207,9 +128,13 @@ router.get('/verificar/:token', async (req, res) => {
     if (!inv)                                   return res.status(404).json({ error: 'Invitación no encontrada' });
     if (inv.estado === 'aceptada')              return res.status(400).json({ error: 'Esta invitación ya fue utilizada' });
     if (inv.estado === 'cancelada')             return res.status(400).json({ error: 'Esta invitación fue cancelada' });
-    if (new Date(inv.expires_at) < new Date())  return res.status(400).json({ error: 'Esta invitación expiró. Pedí una nueva.' });
+    if (new Date(inv.expires_at) < new Date())  return res.status(400).json({ error: 'Esta invitación expiró. Pedí un nuevo link.' });
 
-    res.json({ email: inv.email, rol_nombre: inv.rol_nombre, rol_id: inv.rol_id });
+    res.json({
+      rol_nombre: inv.rol_nombre,
+      rol_id:     inv.rol_id,
+      nota:       inv.nota || null,
+    });
   } catch(e) {
     res.status(500).json({ error: 'Error al verificar invitación' });
   }
@@ -217,33 +142,28 @@ router.get('/verificar/:token', async (req, res) => {
 
 // ── POST /api/invitaciones/aceptar — público ─────────────────────────────────
 router.post('/aceptar', async (req, res) => {
-  const { token, nombre, password } = req.body;
-  if (!token || !nombre?.trim() || !password || password.length < 6)
-    return res.status(400).json({ error: 'Token, nombre y contraseña (mín. 6 caracteres) requeridos' });
+  const { token, nombre, email, password } = req.body;
+  if (!token || !nombre?.trim() || !email?.trim() || !password || password.length < 6)
+    return res.status(400).json({ error: 'Token, nombre, email y contraseña (mín. 6 caracteres) requeridos' });
 
   try {
     const tHash = hashToken(token);
-    const { rows } = await db.execute({
-      sql: 'SELECT * FROM invitaciones WHERE token_hash=?',
-      args: [tHash],
-    });
+    const { rows } = await db.execute({ sql: 'SELECT * FROM invitaciones WHERE token_hash=?', args: [tHash] });
     const inv = rows[0];
     if (!inv)                                  return res.status(404).json({ error: 'Invitación no encontrada' });
     if (inv.estado !== 'pendiente')            return res.status(400).json({ error: 'Esta invitación ya fue utilizada o cancelada' });
-    if (new Date(inv.expires_at) < new Date()) return res.status(400).json({ error: 'Esta invitación expiró. Pedí una nueva.' });
+    if (new Date(inv.expires_at) < new Date()) return res.status(400).json({ error: 'Esta invitación expiró. Pedí un nuevo link.' });
 
-    // Verificar que el email no esté ya registrado
-    const { rows: dup } = await db.execute({ sql: 'SELECT id FROM usuarios WHERE email=?', args: [inv.email] });
+    const emailNorm = email.toLowerCase().trim();
+    const { rows: dup } = await db.execute({ sql: 'SELECT id FROM usuarios WHERE email=?', args: [emailNorm] });
     if (dup[0]) return res.status(400).json({ error: 'Ya existe una cuenta con ese email. Iniciá sesión.' });
 
-    const hash = bcrypt.hashSync(password, 10);
     const r = await db.execute({
       sql: 'INSERT INTO usuarios (institucion_id, nombre, email, password_hash, rol_id) VALUES (?,?,?,?,?)',
-      args: [inv.institucion_id, nombre.trim(), inv.email, hash, inv.rol_id],
+      args: [inv.institucion_id, nombre.trim(), emailNorm, bcrypt.hashSync(password, 10), inv.rol_id],
     });
     const usuarioId = Number(r.lastInsertRowid);
 
-    // Asignar cursos
     const cursosIds = JSON.parse(inv.cursos_ids || '[]');
     for (const cid of cursosIds) {
       await db.execute({
@@ -252,10 +172,9 @@ router.post('/aceptar', async (req, res) => {
       });
     }
 
-    // Marcar invitación como aceptada
     await db.execute({
-      sql: "UPDATE invitaciones SET estado='aceptada', accepted_by=?, updated_at=datetime('now') WHERE id=?",
-      args: [usuarioId, inv.id],
+      sql: "UPDATE invitaciones SET estado='aceptada', email=?, accepted_by=?, updated_at=datetime('now') WHERE id=?",
+      args: [emailNorm, usuarioId, inv.id],
     });
 
     res.json({ ok: true, mensaje: '¡Cuenta creada! Ya podés iniciar sesión.' });

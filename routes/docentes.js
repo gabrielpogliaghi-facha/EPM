@@ -24,18 +24,21 @@ const upload = multer({
     file.mimetype.startsWith('image/') ? cb(null, true) : cb(new Error('Solo imágenes')),
 });
 
-// ── Lista todos los docentes (usuarios con rol Docente + sus fichas) ──────────
+// ── Lista todos los docentes ──────────────────────────────────────────────────
 router.get('/', verifyToken, requirePermiso('ver_equipo_docente'), async (req, res) => {
   try {
     const { rows } = await db.execute({
       sql: `SELECT u.id AS usuario_id, u.nombre, u.email, u.activo,
                    d.id AS docente_id, d.dni, d.fecha_nacimiento, d.telefono,
                    d.formacion, d.foto_path,
+                   d.instrumento_principal_id,
+                   ip.nombre AS instrumento_principal_nombre,
                    GROUP_CONCAT(DISTINCT i.nombre ORDER BY i.nombre) AS instrumentos_nombres,
                    GROUP_CONCAT(DISTINCT c.nombre ORDER BY c.nombre) AS cursos_nombres
             FROM usuarios u
             JOIN roles r ON r.id = u.rol_id AND r.nombre = 'Docente'
             LEFT JOIN docentes d ON d.usuario_id = u.id
+            LEFT JOIN instrumentos ip ON ip.id = d.instrumento_principal_id
             LEFT JOIN docente_instrumentos di ON di.docente_id = d.id
             LEFT JOIN instrumentos i ON i.id = di.instrumento_id
             LEFT JOIN usuarios_cursos uc ON uc.usuario_id = u.id AND uc.materia_id IS NULL
@@ -150,7 +153,8 @@ router.get('/:usuarioId', verifyToken, requirePermiso('ver_equipo_docente'), asy
   try {
     const { rows: uRows } = await db.execute({
       sql: `SELECT u.id AS usuario_id, u.nombre, u.email,
-                   d.id AS docente_id, d.dni, d.fecha_nacimiento, d.telefono, d.formacion, d.foto_path
+                   d.id AS docente_id, d.dni, d.fecha_nacimiento, d.telefono, d.formacion, d.foto_path,
+                   d.instrumento_principal_id
             FROM usuarios u
             LEFT JOIN docentes d ON d.usuario_id = u.id
             WHERE u.id=? AND u.institucion_id=? AND u.activo=1`,
@@ -162,7 +166,8 @@ router.get('/:usuarioId', verifyToken, requirePermiso('ver_equipo_docente'), asy
     const { rows: instRows } = await db.execute({
       sql: `SELECT di.instrumento_id AS id, i.nombre
             FROM docente_instrumentos di JOIN instrumentos i ON i.id=di.instrumento_id
-            WHERE di.docente_id=(SELECT id FROM docentes WHERE usuario_id=?)`,
+            WHERE di.docente_id=(SELECT id FROM docentes WHERE usuario_id=?)
+            ORDER BY i.nombre`,
       args: [uid],
     });
     const { rows: cursosRows } = await db.execute({
@@ -172,7 +177,12 @@ router.get('/:usuarioId', verifyToken, requirePermiso('ver_equipo_docente'), asy
       args: [uid],
     });
 
-    res.json({ ...doc, instrumentos: instRows, cursos: cursosRows });
+    res.json({
+      ...doc,
+      instrumento_principal_id: doc.instrumento_principal_id ? Number(doc.instrumento_principal_id) : null,
+      instrumentos: instRows.map(i => ({ id: Number(i.id), nombre: i.nombre })),
+      cursos: cursosRows.map(c => ({ id: Number(c.id), nombre: c.nombre })),
+    });
   } catch(e) {
     res.status(500).json({ error: 'Error al obtener ficha docente' });
   }
@@ -186,16 +196,16 @@ router.put('/:usuarioId', verifyToken, async (req, res) => {
   if (!puedeEditar && !esPropio)
     return res.status(403).json({ error: 'Sin permiso para editar esta ficha' });
 
-  const { dni, fecha_nacimiento, telefono, formacion, instrumento_ids } = req.body;
+  const { dni, fecha_nacimiento, telefono, formacion, instrumento_ids, instrumento_principal_id } = req.body;
+  const principalId = instrumento_principal_id ? Number(instrumento_principal_id) : null;
+
   try {
-    // Verificar que el usuario existe en la institución
     const { rows: uRows } = await db.execute({
       sql: 'SELECT id FROM usuarios WHERE id=? AND institucion_id=? AND activo=1',
       args: [uid, req.user.institucion_id],
     });
     if (!uRows[0]) return res.status(404).json({ error: 'Usuario no encontrado' });
 
-    // Upsert docente ficha
     const { rows: dRows } = await db.execute({
       sql: 'SELECT id FROM docentes WHERE usuario_id=?',
       args: [uid],
@@ -204,14 +214,14 @@ router.put('/:usuarioId', verifyToken, async (req, res) => {
     if (dRows[0]) {
       docenteId = Number(dRows[0].id);
       await db.execute({
-        sql: `UPDATE docentes SET dni=?,fecha_nacimiento=?,telefono=?,formacion=?,updated_at=datetime('now') WHERE id=?`,
-        args: [dni||null, fecha_nacimiento||null, telefono||null, formacion||null, docenteId],
+        sql: `UPDATE docentes SET dni=?,fecha_nacimiento=?,telefono=?,formacion=?,instrumento_principal_id=?,updated_at=datetime('now') WHERE id=?`,
+        args: [dni||null, fecha_nacimiento||null, telefono||null, formacion||null, principalId, docenteId],
       });
     } else {
       const r = await db.execute({
-        sql: `INSERT INTO docentes (usuario_id, institucion_id, dni, fecha_nacimiento, telefono, formacion)
-              VALUES (?,?,?,?,?,?)`,
-        args: [uid, req.user.institucion_id, dni||null, fecha_nacimiento||null, telefono||null, formacion||null],
+        sql: `INSERT INTO docentes (usuario_id, institucion_id, dni, fecha_nacimiento, telefono, formacion, instrumento_principal_id)
+              VALUES (?,?,?,?,?,?,?)`,
+        args: [uid, req.user.institucion_id, dni||null, fecha_nacimiento||null, telefono||null, formacion||null, principalId],
       });
       docenteId = Number(r.lastInsertRowid);
     }
