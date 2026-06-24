@@ -40,6 +40,7 @@ app.use('/api/cumpleanios',     require('./routes/cumpleanios'));
 app.use('/api/inventario',      require('./routes/inventario'));
 app.use('/api/proyectos',       require('./routes/proyectos'));
 app.use('/api/finanzas',        require('./routes/finanzas'));
+app.use('/api/invitaciones',    require('./routes/invitaciones'));
 app.use('/uploads/proyectos',   require('express').static(require('path').join(__dirname, 'uploads', 'proyectos')));
 app.use('/uploads/docentes',    require('express').static(require('path').join(__dirname, 'uploads', 'docentes')));
 

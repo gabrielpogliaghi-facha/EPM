@@ -48,10 +48,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 | 15 | **Proyectos institucionales** | 2026-06-24 | Gestión de proyectos con estados (borrador/en curso/presentado/aprobado/rechazado/finalizado), timeline de historial de estados, adjuntos (PDF/Word/imagen hasta 20MB). Filtro por estado. Permisos `ver_proyectos` + `editar_proyectos`. Tablas `proyectos`, `proyecto_historial`, `proyecto_adjuntos`. |
 | 16 | **Finanzas (estructura)** | 2026-06-24 | Módulo pendiente de CUIT. Pantalla "en construcción" con explicación. Tablas `movimientos_financieros` + `categorias_financieras` ya creadas. Permisos `ver_finanzas` + `editar_finanzas` + `administrar_finanzas`. Listo para activar cuando la EPM tenga CUIT. |
 | +  | **Reorganización del menú** | 2026-06-24 | Sidebar con grupos: Alumnos / Educación / Institución / Administración. `NAV_GROUPS` reemplaza el array plano; `NAV` sigue existiendo como flat map para lookups. |
+| 17 | **Sistema de invitaciones por email** | 2026-06-24 | Gmail SMTP (Nodemailer) desde escuelapopular.ar@gmail.com. Token hasheado (SHA-256), expira 7 días, uso único. Envío individual o masivo (pegar lista de emails). Estados: pendiente/aceptada/expirada/cancelada. Reenvío y cancelación. Página de registro para el invitado (`?invite=TOKEN`). Tab "Invitaciones" en Usuarios y Roles. |
 
 ### Estado general
 
-**Todos los módulos completos. Menú reorganizado por grupos. Equipo docente, inventario, proyectos, finanzas (estructura), cumpleaños en calendario y dashboard.**
+**Sistema completo. Menú reorganizado. Equipo docente, inventario, proyectos, finanzas (estructura), cumpleaños, invitaciones por email.**
 
 ### Decisiones tomadas
 
@@ -73,6 +74,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **Proyectos**: `GET /api/proyectos`, `GET /api/proyectos/:id` (incluye historial + adjuntos), `POST/PUT/DELETE`. Al cambiar estado en PUT, se crea entrada en `proyecto_historial` automáticamente. Adjuntos con multer en `/uploads/proyectos/`.
 - **Finanzas**: solo esqueleto. Las tablas `movimientos_financieros` y `categorias_financieras` existen en DB. El endpoint GET retorna `{estado:'en_construccion'}`. Activar cuando la EPM obtenga CUIT.
 - **Menú**: `NAV_GROUPS` es el array de grupos para el sidebar. `NAV` es el flat map derivado de `NAV_GROUPS.flatMap(g=>g.items)` — todos los lookups por `id` siguen funcionando igual.
+- **Invitaciones**: tabla `invitaciones` (email, rol_id, token_hash SHA-256, estado, expires_at, cursos_ids JSON, created_by, accepted_by). `utils/mailer.js` = Nodemailer con Gmail SMTP. El raw token va en el link `?invite=TOKEN`; el hash se guarda en DB. `POST /api/invitaciones` acepta array de emails para envío masivo. Rutas públicas (sin auth): `GET /api/invitaciones/verificar/:token` y `POST /api/invitaciones/aceptar`. Al aceptar se crea el usuario + asigna cursos + marca la invitación como aceptada. `InvitacionPage` componente detectado vía `?invite=` en URL (igual que `?token=` para reset de contraseña).
+- **Gmail SMTP**: `GMAIL_USER` + `GMAIL_APP_PASSWORD` en .env. `utils/mailer.js` verifica que estén configuradas; si no, loggea warning y no falla.
 
 ### Pendientes / por decidir
 

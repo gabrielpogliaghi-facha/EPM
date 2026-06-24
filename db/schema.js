@@ -552,6 +552,25 @@ async function runSchema(db) {
   `);
   await db.execute(`CREATE INDEX IF NOT EXISTS idx_mov_fin ON movimientos_financieros(institucion_id, fecha)`);
 
+  // ── INVITACIONES ──────────────────────────────────────────────────────────
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS invitaciones (
+      id             INTEGER PRIMARY KEY AUTOINCREMENT,
+      institucion_id INTEGER NOT NULL REFERENCES instituciones(id),
+      email          TEXT NOT NULL,
+      rol_id         INTEGER NOT NULL REFERENCES roles(id),
+      token_hash     TEXT NOT NULL UNIQUE,
+      estado         TEXT NOT NULL DEFAULT 'pendiente' CHECK(estado IN ('pendiente','aceptada','expirada','cancelada')),
+      expires_at     TEXT NOT NULL,
+      cursos_ids     TEXT DEFAULT '[]',
+      created_by     INTEGER NOT NULL REFERENCES usuarios(id),
+      accepted_by    INTEGER REFERENCES usuarios(id),
+      created_at     TEXT DEFAULT (datetime('now')),
+      updated_at     TEXT DEFAULT (datetime('now'))
+    )
+  `);
+  await db.execute(`CREATE INDEX IF NOT EXISTS idx_invit ON invitaciones(institucion_id, estado)`);
+
   // ── MIGRACIÓN PERMISOS módulos nuevos (idempotente) ───────────────────────
   const permsNuevos = [
     { codigo:'ver_equipo_docente',   descripcion:'Ver equipo docente',               grupo:'equipo_docente' },

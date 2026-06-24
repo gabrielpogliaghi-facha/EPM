@@ -875,6 +875,22 @@
     .cumple-nombre { font-size:13px; font-weight:700; }
     .cumple-tipo   { font-size:11px; color:var(--text2); }
 
+    /* ── INVITACIONES ───────────────────────────────────────────────────────── */
+    .inv-row {
+      display:flex; align-items:center; gap:10px; padding:12px 14px;
+      border:1.5px solid var(--border); border-radius:var(--radius);
+      background:var(--card); margin-bottom:6px;
+    }
+    .inv-email   { font-size:14px; font-weight:700; }
+    .inv-meta    { font-size:12px; color:var(--text2); margin-top:2px; }
+    .inv-pendiente  { background:#fef9c3; color:#854d0e; }
+    .inv-aceptada   { background:#dcfce7; color:#166534; }
+    .inv-expirada   { background:#fee2e2; color:#991b1b; }
+    .inv-cancelada  { background:var(--bg3); color:var(--text2); }
+    .inv-badge {
+      font-size:11px; font-weight:700; border-radius:12px; padding:3px 9px; white-space:nowrap;
+    }
+
     /* ── FINANZAS PLACEHOLDER ───────────────────────────────────────────────── */
     .construccion-wrap {
       display:flex; flex-direction:column; align-items:center; justify-content:center;
@@ -3872,12 +3888,15 @@ function UsuariosYRoles({ user }) {
   return (
     <div>
       <div className="curso-tabs" style={{marginBottom:16}}>
-        <div className={`curso-tab ${tab==='usuarios'?'active':''}`} onClick={()=>setTab('usuarios')}>👤 Usuarios</div>
-        <div className={`curso-tab ${tab==='roles'?'active':''}`}   onClick={()=>setTab('roles')}>🔑 Roles y Permisos</div>
+        <div className={`curso-tab ${tab==='usuarios'?'active':''}`}     onClick={()=>setTab('usuarios')}>👤 Usuarios</div>
+        <div className={`curso-tab ${tab==='roles'?'active':''}`}         onClick={()=>setTab('roles')}>🔑 Roles y Permisos</div>
+        <div className={`curso-tab ${tab==='invitaciones'?'active':''}`}  onClick={()=>setTab('invitaciones')}>📩 Invitaciones</div>
       </div>
       {tab==='usuarios'
         ? <GestionUsuarios self={user} />
-        : <GestionRoles />}
+        : tab==='roles'
+        ? <GestionRoles />
+        : <GestionInvitaciones />}
     </div>
   );
 }
@@ -4881,6 +4900,323 @@ function Instrumentos({ user }) {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// ── PÁGINA DE ACEPTAR INVITACIÓN ─────────────────────────────────────────────────
+function InvitacionPage({ token, onDone }) {
+  const [info,    setInfo]   = useState(null); // {email, rol_nombre}
+  const [cargando,setCargando]= useState(true);
+  const [form,    setForm]   = useState({ nombre:'', password:'', confirm:'' });
+  const [saving,  setSaving] = useState(false);
+  const [error,   setError]  = useState('');
+  const [exito,   setExito]  = useState(false);
+
+  useEffect(() => {
+    apiFetch(`/api/invitaciones/verificar/${token}`)
+      .then(d => setInfo(d))
+      .catch(e => setError(e.message || 'Invitación inválida o expirada'))
+      .finally(() => setCargando(false));
+  }, [token]);
+
+  const set = (k, v) => setForm(f => ({...f, [k]:v}));
+
+  const submit = async (e) => {
+    e.preventDefault();
+    if (form.password !== form.confirm) { setError('Las contraseñas no coinciden'); return; }
+    if (form.password.length < 6)       { setError('La contraseña debe tener al menos 6 caracteres'); return; }
+    setSaving(true); setError('');
+    try {
+      await apiFetch('/api/invitaciones/aceptar', {
+        method: 'POST',
+        body:   { token, nombre: form.nombre, password: form.password },
+      });
+      setExito(true);
+    } catch(err) { setError(err.message); }
+    finally { setSaving(false); }
+  };
+
+  return (
+    <div className="login-page">
+      <div className="login-card" style={{maxWidth:420}}>
+        <div className="login-logo">
+          <img src="/logo-epm.jpg" alt="EPM" style={{borderRadius:10}} />
+          <h1>EPM</h1>
+          <p>Escuela Popular de Música</p>
+        </div>
+
+        {cargando ? <div className="spinner"><div className="spin" /></div>
+        : exito ? (
+          <div style={{textAlign:'center'}}>
+            <div style={{fontSize:48,marginBottom:12}}>🎉</div>
+            <div className="alert alert-success" style={{marginBottom:20}}>
+              ¡Cuenta creada exitosamente! Ya podés iniciar sesión con tu email y contraseña.
+            </div>
+            <button className="btn btn-primary" onClick={onDone}>Ir al inicio de sesión</button>
+          </div>
+        ) : error && !info ? (
+          <div>
+            <div className="login-error">{error}</div>
+            <p style={{fontSize:13,color:'var(--text2)',textAlign:'center',marginTop:8}}>
+              Si el link expiró, pedile a quien te invitó que reenvíe la invitación.
+            </p>
+            <button className="btn btn-primary" style={{marginTop:16}} onClick={onDone}>Volver al inicio</button>
+          </div>
+        ) : info ? (
+          <>
+            <div style={{background:'var(--bg3)',borderRadius:10,padding:14,marginBottom:20,textAlign:'center'}}>
+              <div style={{fontSize:13,color:'var(--text2)',marginBottom:4}}>Fuiste invitado/a como</div>
+              <div style={{fontWeight:800,fontSize:17,color:'var(--primary)'}}>{info.rol_nombre}</div>
+              <div style={{fontSize:12,color:'var(--text2)',marginTop:4}}>{info.email}</div>
+            </div>
+            {error && <div className="login-error">{error}</div>}
+            <form onSubmit={submit}>
+              <div className="form-group">
+                <label className="form-label">Tu nombre completo *</label>
+                <input className="form-control" value={form.nombre} required autoFocus
+                  onChange={e => set('nombre', e.target.value)} placeholder="Nombre y Apellido" />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Email</label>
+                <input className="form-control" value={info.email} disabled
+                  style={{opacity:.7,cursor:'not-allowed'}} />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Contraseña *</label>
+                <input className="form-control" type="password" value={form.password} required
+                  onChange={e => set('password', e.target.value)} placeholder="Mínimo 6 caracteres" />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Confirmar contraseña *</label>
+                <input className="form-control" type="password" value={form.confirm} required
+                  onChange={e => set('confirm', e.target.value)} placeholder="Repetí la contraseña" />
+              </div>
+              <button className="btn btn-primary" type="submit" disabled={saving}>
+                {saving ? 'Creando cuenta...' : 'Crear mi cuenta →'}
+              </button>
+            </form>
+          </>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+// ── GESTIÓN DE INVITACIONES ───────────────────────────────────────────────────────
+const ESTADO_INVITE = {
+  pendiente:  { label:'Pendiente',  cls:'inv-pendiente'  },
+  aceptada:   { label:'Aceptada',   cls:'inv-aceptada'   },
+  expirada:   { label:'Expirada',   cls:'inv-expirada'   },
+  cancelada:  { label:'Cancelada',  cls:'inv-cancelada'  },
+};
+
+function GestionInvitaciones() {
+  const [lista,     setLista]    = useState([]);
+  const [roles,     setRoles]    = useState([]);
+  const [cursos,    setCursos]   = useState([]);
+  const [cargando,  setCargando] = useState(true);
+  const [modal,     setModal]    = useState(false);
+  const [error,     setError]    = useState('');
+  const [toast,     setToast]    = useState('');
+
+  const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(''), 4000); };
+
+  const cargar = useCallback(async () => {
+    setCargando(true);
+    try {
+      const [inv, rs, cs] = await Promise.all([
+        apiFetch('/api/invitaciones'),
+        apiFetch('/api/roles'),
+        apiFetch('/api/cursos'),
+      ]);
+      setLista(inv); setRoles(rs); setCursos(cs);
+    } catch(e) { setError(e.message); }
+    finally { setCargando(false); }
+  }, []);
+  useEffect(() => { cargar(); }, [cargar]);
+
+  const cancelar = async (id) => {
+    if (!confirm('¿Cancelar esta invitación?')) return;
+    try { await apiFetch(`/api/invitaciones/${id}`, { method:'DELETE' }); showToast('Invitación cancelada'); cargar(); }
+    catch(e) { alert(e.message); }
+  };
+
+  const reenviar = async (id) => {
+    try { await apiFetch(`/api/invitaciones/${id}/reenviar`, { method:'POST' }); showToast('Invitación reenviada'); cargar(); }
+    catch(e) { alert(e.message); }
+  };
+
+  const pendientes = lista.filter(i => i.estado === 'pendiente');
+  const resto      = lista.filter(i => i.estado !== 'pendiente');
+
+  return (
+    <div>
+      <div className="section-header">
+        <h2 style={{fontSize:16,fontWeight:800}}>📩 Invitaciones</h2>
+        <button className="btn btn-primary btn-auto" onClick={() => setModal(true)}>
+          + Invitar usuario
+        </button>
+      </div>
+
+      {toast && <div className="alert alert-success" style={{marginBottom:12}}>{toast}</div>}
+      {error && <div className="alert alert-error">{error}</div>}
+
+      {cargando ? <div className="spinner"><div className="spin"/></div> : (
+        lista.length === 0
+          ? <div className="empty-state"><div className="empty-state-icon">📩</div><div>No hay invitaciones enviadas</div></div>
+          : <>
+              {pendientes.length > 0 && (
+                <div style={{marginBottom:16}}>
+                  <div style={{fontSize:12,fontWeight:700,color:'var(--text2)',marginBottom:8,textTransform:'uppercase',letterSpacing:'.05em'}}>
+                    Pendientes ({pendientes.length})
+                  </div>
+                  {pendientes.map(inv => <InvRow key={inv.id} inv={inv} onCancelar={cancelar} onReenviar={reenviar} />)}
+                </div>
+              )}
+              {resto.length > 0 && (
+                <div>
+                  <div style={{fontSize:12,fontWeight:700,color:'var(--text2)',marginBottom:8,textTransform:'uppercase',letterSpacing:'.05em'}}>
+                    Historial
+                  </div>
+                  {resto.map(inv => <InvRow key={inv.id} inv={inv} onCancelar={cancelar} onReenviar={reenviar} />)}
+                </div>
+              )}
+            </>
+      )}
+
+      {modal && (
+        <ModalInvitar roles={roles} cursos={cursos}
+          onClose={() => setModal(false)}
+          onEnviado={(res) => { setModal(false); showToast(`✅ ${res.enviadas} invitación/es enviada/s`); cargar(); }}
+        />
+      )}
+    </div>
+  );
+}
+
+function InvRow({ inv, onCancelar, onReenviar }) {
+  const est = ESTADO_INVITE[inv.estado] || { label: inv.estado, cls: 'inv-pendiente' };
+  const dias = Math.ceil((new Date(inv.expires_at) - Date.now()) / 86400000);
+  return (
+    <div className="inv-row">
+      <div style={{flex:1,minWidth:0}}>
+        <div className="inv-email">{inv.email}</div>
+        <div className="inv-meta">
+          {inv.rol_nombre}
+          {inv.estado === 'pendiente' && dias > 0 && ` · expira en ${dias}d`}
+          {inv.estado === 'pendiente' && dias <= 0 && ' · expira hoy'}
+          {' · '}{inv.creado_por_nombre}
+        </div>
+      </div>
+      <span className={`inv-badge ${est.cls}`}>{est.label}</span>
+      {inv.estado === 'pendiente' && (
+        <button className="btn-icon" title="Cancelar" onClick={() => onCancelar(inv.id)}>✕</button>
+      )}
+      {(inv.estado === 'expirada' || inv.estado === 'cancelada') && (
+        <button className="btn-icon" title="Reenviar" onClick={() => onReenviar(inv.id)}>↩</button>
+      )}
+    </div>
+  );
+}
+
+function ModalInvitar({ roles, cursos, onClose, onEnviado }) {
+  const [emailsRaw, setEmailsRaw] = useState('');
+  const [rolId,     setRolId]     = useState(String(roles[0]?.id || ''));
+  const [cursosIds, setCursosIds] = useState([]);
+  const [saving,    setSaving]    = useState(false);
+  const [error,     setError]     = useState('');
+  const [preview,   setPreview]   = useState(false);
+
+  const emails = emailsRaw.split(/[\n,;]+/).map(e => e.trim()).filter(e => e.includes('@'));
+
+  const toggleCurso = (id) => setCursosIds(c => c.includes(id) ? c.filter(x=>x!==id) : [...c, id]);
+
+  const submit = async (e) => {
+    e.preventDefault();
+    if (!emails.length) { setError('Ingresá al menos un email válido'); return; }
+    if (!rolId)          { setError('Seleccioná un rol'); return; }
+    setSaving(true); setError('');
+    try {
+      const data = await apiFetch('/api/invitaciones', {
+        method: 'POST',
+        body:   { emails, rol_id: rolId, cursos_ids: cursosIds },
+      });
+      const enviadas = data.resultados.filter(r => r.estado === 'enviada').length;
+      const omitidas = data.resultados.filter(r => r.estado !== 'enviada');
+      let msg = `✅ ${enviadas} invitación/es enviada/s`;
+      if (omitidas.length) {
+        msg += `. Omitidos: ${omitidas.map(r=>`${r.email} (${r.estado})`).join(', ')}`;
+      }
+      onEnviado({ enviadas, mensaje: msg });
+    } catch(err) { setError(err.message); }
+    finally { setSaving(false); }
+  };
+
+  const rolNombre = roles.find(r => String(r.id) === String(rolId))?.nombre || '';
+
+  return (
+    <div className="modal-overlay" onClick={e => e.target===e.currentTarget && onClose()}>
+      <div className="modal modal-lg">
+        <div className="modal-header">
+          <span className="modal-title">📩 Invitar usuario/s</span>
+          <button className="modal-close" onClick={onClose}>×</button>
+        </div>
+        {error && <div className="alert alert-error">{error}</div>}
+        <form onSubmit={submit}>
+          <div className="form-group">
+            <label className="form-label">
+              Email/s *
+              <span style={{fontWeight:400,color:'var(--text2)',fontSize:11,marginLeft:6}}>
+                (uno por línea o separados por coma para envío masivo)
+              </span>
+            </label>
+            <textarea className="form-control" rows={4} value={emailsRaw}
+              onChange={e => setEmailsRaw(e.target.value)}
+              placeholder="usuario@ejemplo.com&#10;otro@ejemplo.com&#10;tercero@ejemplo.com" />
+            {emails.length > 0 && (
+              <div style={{fontSize:12,color:'var(--text2)',marginTop:4}}>
+                {emails.length} email/s detectado/s
+              </div>
+            )}
+          </div>
+          <div className="form-group">
+            <label className="form-label">Rol asignado *</label>
+            <select className="form-control" value={rolId} onChange={e => setRolId(e.target.value)} required>
+              {roles.map(r => <option key={r.id} value={r.id}>{r.nombre}</option>)}
+            </select>
+          </div>
+          {cursos.length > 0 && (
+            <div className="form-group">
+              <label className="form-label">Cursos asignados (opcional)</label>
+              <div className="curso-checks">
+                {cursos.map(c => (
+                  <button key={c.id} type="button"
+                    className={`curso-check-btn ${cursosIds.includes(c.id)?'selected':''}`}
+                    onClick={() => toggleCurso(c.id)}>
+                    {c.nombre}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Preview antes de enviar masivo */}
+          {emails.length > 1 && (
+            <div className="alert alert-warning" style={{fontSize:13,marginBottom:0}}>
+              Se van a enviar <strong>{emails.length} invitaciones</strong> con rol <strong>{rolNombre}</strong>
+              {cursosIds.length > 0 && ` y ${cursosIds.length} curso/s`}.
+            </div>
+          )}
+
+          <div className="modal-footer">
+            <button type="button" className="btn btn-secondary btn-auto" onClick={onClose}>Cancelar</button>
+            <button type="submit" className="btn btn-primary btn-auto" disabled={saving || !emails.length}>
+              {saving ? 'Enviando...' : `📩 Enviar${emails.length > 1 ? ` ${emails.length} invitaciones` : ' invitación'}`}
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   );
 }
@@ -6473,16 +6809,19 @@ function Layout({ user }) {
 
 // ── APP ─────────────────────────────────────────────────────────────────────────
 function App() {
-  const [user,       setUser]       = useState(null);
-  const [loading,    setLoading]    = useState(true);
-  const [resetToken, setResetToken] = useState(() => {
+  const [user,        setUser]       = useState(null);
+  const [loading,     setLoading]    = useState(true);
+  const [resetToken,  setResetToken] = useState(() => {
     const p = new URLSearchParams(window.location.search);
     return p.get('token') || null;
   });
+  const [inviteToken, setInviteToken] = useState(() => {
+    const p = new URLSearchParams(window.location.search);
+    return p.get('invite') || null;
+  });
 
   useEffect(() => {
-    // Si hay un token de reseteo en la URL no intentamos autenticar
-    if (resetToken) { setLoading(false); return; }
+    if (resetToken || inviteToken) { setLoading(false); return; }
     if (!getUser()) { setLoading(false); return; }
     apiFetch('/api/auth/me')
       .then(d => {
@@ -6508,7 +6847,8 @@ function App() {
     </div>
   );
 
-  if (resetToken) return <ResetPasswordPage token={resetToken} onBack={() => { setResetToken(null); window.history.replaceState({}, '', '/'); }} />;
+  if (inviteToken) return <InvitacionPage token={inviteToken} onDone={() => { setInviteToken(null); window.history.replaceState({}, '', '/'); }} />;
+  if (resetToken)  return <ResetPasswordPage token={resetToken} onBack={() => { setResetToken(null); window.history.replaceState({}, '', '/'); }} />;
 
   return user ? <Layout user={user} /> : <LoginPage onLogin={setUser} />;
 }
