@@ -672,44 +672,76 @@
     }
     .cal-view-btn.active { background:var(--primary); color:#fff; border-color:var(--primary); }
 
-    .cal-grid       { background:var(--card); border-radius:var(--radius); border:1.5px solid var(--border); overflow:hidden; }
-    .cal-weekdays   { display:grid; grid-template-columns:repeat(7,1fr); border-bottom:1.5px solid var(--border); }
-    .cal-weekday    { padding:8px 4px; text-align:center; font-size:11px; font-weight:700;
-                      color:var(--text2); text-transform:uppercase; letter-spacing:.04em; }
-    .cal-days       { display:grid; grid-template-columns:repeat(7,1fr); }
-    .cal-day {
-      min-height:72px; padding:4px; border-right:1px solid var(--border);
-      border-bottom:1px solid var(--border); position:relative; vertical-align:top;
+    /* ── CALENDARIO DE EVENTOS — grid flat, prefijo evtcal para no colisionar ── */
+    /* Un único grid de 7 cols: primero 7 headers, luego N celdas de días */
+    .evtcal-grid {
+      display:grid;
+      grid-template-columns:repeat(7,minmax(0,1fr));
+      background:var(--card);
+      border-radius:var(--radius);
+      border:1.5px solid var(--border);
+      overflow:hidden;
     }
-    .cal-day:nth-child(7n) { border-right:none; }
-    .cal-day-num {
-      font-size:12px; font-weight:700; width:22px; height:22px; border-radius:50%;
-      display:flex; align-items:center; justify-content:center; margin-bottom:2px;
-      color:var(--text2);
+    .evtcal-header {
+      padding:8px 2px; text-align:center; font-size:10px; font-weight:700;
+      color:var(--text2); text-transform:uppercase; letter-spacing:.03em;
+      background:var(--bg); border-bottom:1.5px solid var(--border);
     }
-    .cal-day.today .cal-day-num {
-      background:var(--primary); color:#fff;
+    .evtcal-header.wknd { color:var(--primary); }
+
+    .evtcal-cell {
+      min-height:60px; padding:4px 3px;
+      border-right:1px solid var(--border);
+      border-bottom:1px solid var(--border);
+      overflow:hidden;
     }
-    .cal-day.other-month .cal-day-num { color:var(--border); }
-    .cal-day.other-month { background:var(--bg); }
-    .cal-event {
+    .evtcal-cell:nth-child(7n) { border-right:none; }
+    .evtcal-cell.other-month   { background:var(--bg); }
+    .evtcal-cell.weekend:not(.other-month) { background:rgba(99,102,241,.04); }
+    .evtcal-cell.today         { background:rgba(99,102,241,.06); }
+
+    .evtcal-num {
+      font-size:11px; font-weight:700;
+      width:22px; height:22px; border-radius:50%;
+      display:flex; align-items:center; justify-content:center;
+      margin-bottom:3px; color:var(--text2);
+    }
+    .evtcal-cell.other-month .evtcal-num  { color:var(--border); font-weight:400; }
+    .evtcal-cell.weekend:not(.other-month) .evtcal-num { color:var(--primary); }
+    .evtcal-cell.today .evtcal-num        { background:var(--primary); color:#fff; font-weight:800; }
+
+    /* Puntitos — visibles en mobile */
+    .evtcal-dots { display:flex; flex-wrap:wrap; gap:3px; padding:1px 0; }
+    .evtcal-dot  {
+      width:7px; height:7px; border-radius:50%; cursor:pointer; flex-shrink:0;
+      transition:transform .15s;
+    }
+    .evtcal-dot:hover    { transform:scale(1.5); }
+    .evtcal-dot.inactive { opacity:.35; }
+
+    /* Chips de texto — ocultos en mobile, visibles en desktop */
+    .evtcal-chips { display:none; }
+    .evtcal-chip  {
       display:block; font-size:10px; font-weight:600; border-radius:4px;
       padding:2px 5px; margin-bottom:2px; cursor:pointer; line-height:1.4;
       white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
       color:#fff; transition:opacity .15s;
     }
-    .cal-event:hover { opacity:.82; }
-    .cal-event-cancelado { opacity:.45; text-decoration:line-through; }
-    .cal-event-reprogramado { opacity:.7; }
-    .cal-more { font-size:10px; color:var(--text2); font-weight:600; cursor:pointer; padding-left:5px; }
+    .evtcal-chip:hover    { opacity:.82; }
+    .evtcal-chip.inactive { opacity:.4; text-decoration:line-through; }
+    .evtcal-more {
+      font-size:10px; color:var(--text2); font-weight:600;
+      cursor:pointer; padding:1px 4px; display:block;
+    }
 
-    /* Colores por tipo */
-    .evt-muestra  { background:#f59e0b; }
-    .evt-feriado  { background:#ef4444; }
-    .evt-reunion  { background:#3b82f6; }
-    .evt-ensayo   { background:#8b5cf6; }
-    .evt-salida   { background:#22c55e; }
-    .evt-otro     { background:#6b7280; }
+    @media (min-width:600px) {
+      .evtcal-dots          { display:none; }
+      .evtcal-chips         { display:block; }
+      .evtcal-cell          { min-height:90px; padding:6px 5px; }
+      .evtcal-num           { font-size:13px; width:24px; height:24px; }
+      .evtcal-chip          { font-size:11px; }
+      .evtcal-header        { font-size:11px; padding:9px 4px; }
+    }
 
     /* ── AGENDA (vista lista) ─────────────────────────────────────────────── */
     .agenda-group-date {
@@ -776,8 +808,6 @@
     .prox-evento-fecha  { font-size:11px; color:var(--text2); }
 
     @media (max-width:768px) {
-      .cal-day { min-height:48px; }
-      .cal-event { font-size:9px; }
       .notif-panel { right:-40px; }
     }
   </style>
@@ -5175,36 +5205,63 @@ function Calendario({ user }) {
         )}
       </div>
 
-      {/* Vista calendario */}
+      {/* Vista calendario — grid flat: 7 headers + N celdas como hijos directos */}
       {vista === 'calendario' && (
-        <div className="cal-grid">
-          <div className="cal-weekdays">
-            {DIAS_ES.map(d => <div key={d} className="cal-weekday">{d}</div>)}
-          </div>
-          <div className="cal-days">
-            {grid.map(({ fecha, actual }) => {
-              const evsDia = eventosPorFecha[fecha] || [];
-              const visible = evsDia.slice(0, 3);
-              const mas     = evsDia.length - visible.length;
-              const isToday = fecha === todayStr;
-              return (
-                <div key={fecha} className={`cal-day ${!actual ? 'other-month' : ''} ${isToday ? 'today' : ''}`}>
-                  <div className="cal-day-num">{fecha.slice(8)}</div>
-                  {visible.map(ev => (
-                    <span key={ev.id}
-                      className={`cal-event ${tipoCls(ev.tipo)} ${ev.estado !== 'activo' ? `cal-event-${ev.estado}` : ''}`}
-                      title={ev.titulo}
-                      onClick={() => setModalDetalle(ev)}>
-                      {ev.titulo}
-                    </span>
-                  ))}
-                  {mas > 0 && (
-                    <span className="cal-more" onClick={() => setVista('agenda')}>+{mas} más</span>
-                  )}
-                </div>
-              );
-            })}
-          </div>
+        <div className="evtcal-grid">
+          {DIAS_ES.map((d, i) => (
+            <div key={d} className={`evtcal-header${i >= 5 ? ' wknd' : ''}`}>{d}</div>
+          ))}
+          {grid.map(({ fecha, actual }) => {
+            const evsDia   = eventosPorFecha[fecha] || [];
+            const isToday  = fecha === todayStr;
+            const dow      = new Date(fecha + 'T12:00:00').getDay(); // 0=Dom,6=Sáb
+            const isWeekend = dow === 0 || dow === 6;
+            const cls = [
+              'evtcal-cell',
+              !actual    ? 'other-month' : '',
+              isToday    ? 'today'       : '',
+              isWeekend  ? 'weekend'     : '',
+            ].filter(Boolean).join(' ');
+            return (
+              <div key={fecha} className={cls}>
+                <div className="evtcal-num">{parseInt(fecha.slice(8), 10)}</div>
+
+                {/* Puntitos (mobile) */}
+                {evsDia.length > 0 && (
+                  <div className="evtcal-dots">
+                    {evsDia.slice(0, 6).map(ev => (
+                      <span key={ev.id}
+                        className={`evtcal-dot${ev.estado !== 'activo' ? ' inactive' : ''}`}
+                        style={{background: tipoColor(ev.tipo)}}
+                        title={ev.titulo}
+                        onClick={() => setModalDetalle(ev)}
+                      />
+                    ))}
+                  </div>
+                )}
+
+                {/* Chips de texto (desktop) */}
+                {evsDia.length > 0 && (
+                  <div className="evtcal-chips">
+                    {evsDia.slice(0, 2).map(ev => (
+                      <span key={ev.id}
+                        className={`evtcal-chip${ev.estado !== 'activo' ? ' inactive' : ''}`}
+                        style={{background: tipoColor(ev.tipo)}}
+                        title={ev.titulo}
+                        onClick={() => setModalDetalle(ev)}>
+                        {ev.titulo}
+                      </span>
+                    ))}
+                    {evsDia.length > 2 && (
+                      <span className="evtcal-more" onClick={() => setVista('agenda')}>
+                        +{evsDia.length - 2} más
+                      </span>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
 
