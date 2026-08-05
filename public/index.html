@@ -2181,9 +2181,18 @@ function InscripcionesPanel({ estudianteId, user }) {
     } catch(e) {}
   };
 
-  // Instrumentos ya inscriptos (para ocultar al agregar)
-  const instrIdUsados = inscripciones.map(i => Number(i.instrumento_id));
-  const instrDisponibles = instrumentos.filter(i => !instrIdUsados.includes(Number(i.id)));
+  // El mismo instrumento puede repetirse en niveles distintos (ej: Mojarrita de Guitarra
+  // Y Delfín de Guitarra a la vez), así que ya no se ocultan del selector — se muestran
+  // todos y, si corresponde, se avisa con una advertencia no bloqueante.
+  const instrDisponibles = instrumentos;
+
+  // Otras inscripciones activas del mismo instrumento (para la advertencia no bloqueante)
+  const otrasConMismoInstrumento = form.instrumento_id
+    ? inscripciones.filter(i =>
+        Number(i.instrumento_id) === Number(form.instrumento_id) &&
+        (!editando || i.id !== editando.id) &&
+        String(i.curso_id) !== String(form.curso_id))
+    : [];
 
   const NIVEL_ORDER = { Mojarritas:1, Delfines:2, Tiburones:3, Pulpos:4 };
   const nivelBadge  = (nombre) => {
@@ -2212,7 +2221,7 @@ function InscripcionesPanel({ estudianteId, user }) {
           </div>
         ))
       }
-      {puede('editar_estudiantes') && instrDisponibles.length > 0 && (
+      {puede('editar_estudiantes') && instrumentos.length > 0 && (
         <button className="btn btn-secondary btn-auto" style={{marginTop:4}} onClick={abrirAgregar}>
           ＋ Agregar instrumento
         </button>
@@ -2247,6 +2256,13 @@ function InscripcionesPanel({ estudianteId, user }) {
                   .map(c=><option key={c.id} value={String(c.id)}>{nivelBadge(c.nombre)}</option>)}
               </select>
             </div>
+
+            {otrasConMismoInstrumento.length > 0 && (
+              <div className="alert alert-warning" style={{fontSize:13}}>
+                ⚠️ Este estudiante ya tiene otra inscripción en {otrasConMismoInstrumento[0].instrumento_nombre}
+                {' '}({otrasConMismoInstrumento.map(i=>nivelBadge(i.curso_nombre)).join(', ')}). Podés continuar igual.
+              </div>
+            )}
 
             <div className="modal-footer">
               <button className="btn btn-secondary btn-auto" onClick={cerrar}>Cancelar</button>

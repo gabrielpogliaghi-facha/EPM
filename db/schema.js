@@ -226,7 +226,9 @@ async function runSchema(db) {
   `);
 
   // ── INSCRIPCIONES (estudiante ↔ curso ↔ instrumento) ─────────────────────
-  // Un estudiante puede estar en varios cursos pero solo uno por instrumento.
+  // Un estudiante puede estar en varios cursos, y puede repetir el mismo instrumento
+  // en niveles distintos (ej: Mojarrita de Guitarra Y Delfín de Guitarra a la vez).
+  // Lo único que no puede repetirse es la MISMA inscripción activa (estudiante+instrumento+curso).
   await db.execute(`
     CREATE TABLE IF NOT EXISTS inscripciones (
       id             INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -235,9 +237,43 @@ async function runSchema(db) {
       instrumento_id INTEGER NOT NULL REFERENCES instrumentos(id),
       activo         INTEGER DEFAULT 1,
       created_at     TEXT DEFAULT (datetime('now')),
-      updated_at     TEXT DEFAULT (datetime('now')),
-      UNIQUE(estudiante_id, instrumento_id)
+      updated_at     TEXT DEFAULT (datetime('now'))
     )
+  `);
+
+  // ── MIGRACIÓN: reemplazar UNIQUE(estudiante_id, instrumento_id) por un índice
+  // único parcial (solo entre inscripciones ACTIVAS) que además incluye curso_id.
+  // Esto permite: (a) re-agregar un instrumento después de borrar (soft delete) la
+  // inscripción anterior, y (b) tener el mismo instrumento en dos niveles a la vez.
+  // SQLite no soporta ALTER TABLE para quitar un UNIQUE inline, hay que recrear la tabla.
+  try {
+    const { rows: schRows } = await db.execute({
+      sql: "SELECT sql FROM sqlite_master WHERE type='table' AND name='inscripciones'",
+      args: [],
+    });
+    if (schRows.length > 0 && schRows[0].sql && /UNIQUE\s*\(\s*estudiante_id\s*,\s*instrumento_id\s*\)/i.test(schRows[0].sql)) {
+      console.log('🔄 Migrando inscripciones: UNIQUE(estudiante,instrumento) → índice único parcial por (estudiante,instrumento,curso) activo...');
+      await db.execute(`ALTER TABLE inscripciones RENAME TO inscripciones_pre_multinivel`);
+      await db.execute(`
+        CREATE TABLE inscripciones (
+          id             INTEGER PRIMARY KEY AUTOINCREMENT,
+          estudiante_id  INTEGER NOT NULL REFERENCES estudiantes(id) ON DELETE CASCADE,
+          curso_id       INTEGER NOT NULL REFERENCES cursos(id),
+          instrumento_id INTEGER NOT NULL REFERENCES instrumentos(id),
+          activo         INTEGER DEFAULT 1,
+          created_at     TEXT DEFAULT (datetime('now')),
+          updated_at     TEXT DEFAULT (datetime('now'))
+        )
+      `);
+      await db.execute(`INSERT INTO inscripciones SELECT * FROM inscripciones_pre_multinivel`);
+      await db.execute(`DROP TABLE inscripciones_pre_multinivel`);
+      console.log('✅ Migración inscripciones completada.');
+    }
+  } catch(e) { console.error('❌ Error en migración inscripciones:', e.message); }
+
+  await db.execute(`
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_inscripciones_activa
+      ON inscripciones(estudiante_id, instrumento_id, curso_id) WHERE activo = 1
   `);
 
   // ── HISTORIAL DE PROGRESIÓN (preparado para futuro, sin UI aún) ──────────

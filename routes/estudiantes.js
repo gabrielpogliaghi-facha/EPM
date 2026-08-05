@@ -321,7 +321,7 @@ router.post('/:id/inscripciones', verifyToken, requirePermiso('editar_estudiante
     });
     res.status(201).json({ id: Number(r.lastInsertRowid) });
   } catch (e) {
-    if (e.message?.includes('UNIQUE')) return res.status(409).json({ error: 'Este estudiante ya tiene una inscripción en ese instrumento' });
+    if (e.message?.includes('UNIQUE')) return res.status(409).json({ error: 'Este estudiante ya tiene una inscripción activa en ese instrumento y ese nivel' });
     res.status(500).json({ error: 'Error al crear inscripción' });
   }
 });
@@ -357,6 +357,7 @@ router.put('/:id/inscripciones/:inscId', verifyToken, requirePermiso('editar_est
     }
     res.json({ success: true });
   } catch (e) {
+    if (e.message?.includes('UNIQUE')) return res.status(409).json({ error: 'Este estudiante ya tiene una inscripción activa en ese instrumento y ese nivel' });
     res.status(500).json({ error: 'Error al actualizar inscripción' });
   }
 });
