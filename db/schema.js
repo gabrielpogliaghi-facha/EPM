@@ -445,24 +445,77 @@ async function runSchema(db) {
         AND p.codigo = 'ver_calendario'`);
   } catch(e) {}
 
-  // ── EQUIPO DOCENTE ─────────────────────────────────────────────────────────
+  // ── PERFIL EXTENDIDO EN USUARIOS (unificado con el antiguo Equipo Docente) ──
+  // Agrega columnas de perfil directamente a usuarios (idempotente, ignora "column exists")
+  for (const [col, type] of [
+    ['apellido',                 'TEXT'],
+    ['dni',                      'TEXT'],
+    ['fecha_nacimiento',         'TEXT'],
+    ['telefono',                 'TEXT'],
+    ['foto_path',                'TEXT'],
+    ['instrumento_principal_id', 'INTEGER'],
+    ['formacion',                'TEXT'],
+  ]) {
+    try { await db.execute(`ALTER TABLE usuarios ADD COLUMN ${col} ${type}`); } catch(e) {}
+  }
+
+  // Tabla de instrumentos de usuario (reemplaza docente_instrumentos)
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS usuario_instrumentos (
+      usuario_id     INTEGER NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+      instrumento_id INTEGER NOT NULL REFERENCES instrumentos(id),
+      PRIMARY KEY (usuario_id, instrumento_id)
+    )
+  `);
+
+  // Migración: mover datos de docentes/docente_instrumentos a usuarios/usuario_instrumentos
+  try {
+    const { rows: docCheck } = await db.execute({
+      sql: "SELECT name FROM sqlite_master WHERE type='table' AND name='docentes'", args: []
+    });
+    if (docCheck.length > 0) {
+      // La tabla docentes puede venir de una versión anterior sin esta columna (idempotente)
+      try { await db.execute(`ALTER TABLE docentes ADD COLUMN instrumento_principal_id INTEGER`); } catch(e) {}
+
+      // Copiar campos de perfil de docentes → usuarios
+      await db.execute(`
+        UPDATE usuarios SET
+          dni                      = COALESCE(dni,      (SELECT d.dni      FROM docentes d WHERE d.usuario_id=usuarios.id)),
+          fecha_nacimiento         = COALESCE(fecha_nacimiento, (SELECT d.fecha_nacimiento FROM docentes d WHERE d.usuario_id=usuarios.id)),
+          telefono                 = COALESCE(telefono, (SELECT d.telefono FROM docentes d WHERE d.usuario_id=usuarios.id)),
+          foto_path                = COALESCE(foto_path,(SELECT d.foto_path FROM docentes d WHERE d.usuario_id=usuarios.id)),
+          instrumento_principal_id = COALESCE(instrumento_principal_id,(SELECT d.instrumento_principal_id FROM docentes d WHERE d.usuario_id=usuarios.id)),
+          formacion                = COALESCE(formacion,(SELECT d.formacion FROM docentes d WHERE d.usuario_id=usuarios.id))
+        WHERE EXISTS (SELECT 1 FROM docentes d WHERE d.usuario_id=usuarios.id)
+      `);
+      // Copiar instrumentos docente_instrumentos → usuario_instrumentos
+      try {
+        await db.execute(`
+          INSERT OR IGNORE INTO usuario_instrumentos (usuario_id, instrumento_id)
+          SELECT d.usuario_id, di.instrumento_id
+          FROM docente_instrumentos di JOIN docentes d ON d.id=di.docente_id
+        `);
+        await db.execute(`DROP TABLE IF EXISTS docente_instrumentos`);
+      } catch(e) {}
+      await db.execute(`DROP TABLE IF EXISTS docentes`);
+      console.log('✅ Migración: docentes → usuarios (perfil unificado).');
+    }
+  } catch(e) { console.error('❌ Migración docentes→usuarios:', e.message); }
+
+  // ── LEGACY (tablas antiguas en caso de que no se hayan podido eliminar) ──────
   await db.execute(`
     CREATE TABLE IF NOT EXISTS docentes (
       id               INTEGER PRIMARY KEY AUTOINCREMENT,
       usuario_id       INTEGER UNIQUE NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
       institucion_id   INTEGER NOT NULL REFERENCES instituciones(id),
-      dni              TEXT,
-      fecha_nacimiento TEXT,
-      telefono         TEXT,
-      formacion        TEXT,
-      foto_path        TEXT,
-      created_at       TEXT DEFAULT (datetime('now')),
-      updated_at       TEXT DEFAULT (datetime('now'))
+      dni              TEXT, fecha_nacimiento TEXT, telefono TEXT,
+      formacion TEXT, foto_path TEXT,
+      created_at TEXT DEFAULT (datetime('now')), updated_at TEXT DEFAULT (datetime('now'))
     )
   `);
   await db.execute(`
     CREATE TABLE IF NOT EXISTS docente_instrumentos (
-      docente_id     INTEGER NOT NULL REFERENCES docentes(id) ON DELETE CASCADE,
+      docente_id INTEGER NOT NULL REFERENCES docentes(id) ON DELETE CASCADE,
       instrumento_id INTEGER NOT NULL REFERENCES instrumentos(id),
       PRIMARY KEY (docente_id, instrumento_id)
     )
@@ -606,11 +659,7 @@ async function runSchema(db) {
     }
   } catch(e) { console.error('❌ Migración invitaciones:', e.message); }
 
-  // Migración: agregar instrumento_principal_id a docentes
-  try {
-    await db.execute(`ALTER TABLE docentes ADD COLUMN instrumento_principal_id INTEGER REFERENCES instrumentos(id)`);
-    console.log('✅ Migración docentes: campo instrumento_principal_id.');
-  } catch(e) { /* columna ya existe — ignorar */ }
+  // (instrumento_principal_id ya se agrega en el bloque de perfil extendido arriba)
 
   // ── MIGRACIÓN PERMISOS módulos nuevos (idempotente) ───────────────────────
   const permsNuevos = [
@@ -644,6 +693,51 @@ async function runSchema(db) {
       SELECT r.id, p.id FROM roles r, permisos p
       WHERE r.nombre='Docente'
         AND p.codigo IN ('ver_equipo_docente','ver_proyectos','ver_finanzas')`);
+  } catch(e) {}
+
+  // ── REUNIONES ─────────────────────────────────────────────────────────────
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS reuniones (
+      id             INTEGER PRIMARY KEY AUTOINCREMENT,
+      institucion_id INTEGER NOT NULL REFERENCES instituciones(id),
+      fecha          TEXT NOT NULL,
+      hora           TEXT,
+      motivo         TEXT NOT NULL,
+      resumen        TEXT,
+      created_by     INTEGER NOT NULL REFERENCES usuarios(id),
+      created_at     TEXT DEFAULT (datetime('now')),
+      updated_at     TEXT DEFAULT (datetime('now'))
+    )
+  `);
+  await db.execute(`CREATE INDEX IF NOT EXISTS idx_reuniones_fecha ON reuniones(institucion_id, fecha)`);
+
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS reunion_participantes (
+      reunion_id INTEGER NOT NULL REFERENCES reuniones(id) ON DELETE CASCADE,
+      usuario_id INTEGER NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+      PRIMARY KEY (reunion_id, usuario_id)
+    )
+  `);
+
+  // ── MIGRACIÓN PERMISOS reuniones (idempotente) ────────────────────────────
+  for (const p of [
+    { codigo:'ver_reuniones',    descripcion:'Ver registro de reuniones',        grupo:'reuniones' },
+    { codigo:'crear_reuniones',  descripcion:'Crear reuniones',                  grupo:'reuniones' },
+    { codigo:'editar_reuniones', descripcion:'Editar cualquier reunión',         grupo:'reuniones' },
+  ]) {
+    try { await db.execute({ sql:'INSERT OR IGNORE INTO permisos (codigo, descripcion, grupo) VALUES (?,?,?)', args:[p.codigo, p.descripcion, p.grupo] }); } catch(e) {}
+  }
+  try {
+    await db.execute(`INSERT OR IGNORE INTO roles_permisos (rol_id, permiso_id)
+      SELECT r.id, p.id FROM roles r, permisos p
+      WHERE r.nombre IN ('Gestión','Operador')
+        AND p.codigo IN ('ver_reuniones','crear_reuniones','editar_reuniones')`);
+  } catch(e) {}
+  try {
+    await db.execute(`INSERT OR IGNORE INTO roles_permisos (rol_id, permiso_id)
+      SELECT r.id, p.id FROM roles r, permisos p
+      WHERE r.nombre='Docente'
+        AND p.codigo IN ('ver_reuniones','crear_reuniones')`);
   } catch(e) {}
 }
 

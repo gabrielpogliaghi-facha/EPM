@@ -38,14 +38,16 @@ app.use('/api/reportes',        require('./routes/reportes'));
 app.use('/api/backup',          require('./routes/backup'));
 app.use('/api/eventos',         require('./routes/eventos'));
 app.use('/api/notificaciones',  require('./routes/notificaciones'));
-app.use('/api/docentes',        require('./routes/docentes'));
+// routes/docentes mantenido solo para backward compat (redirige a /api/usuarios?rol=Docente)
 app.use('/api/cumpleanios',     require('./routes/cumpleanios'));
 app.use('/api/inventario',      require('./routes/inventario'));
 app.use('/api/proyectos',       require('./routes/proyectos'));
 app.use('/api/finanzas',        require('./routes/finanzas'));
 app.use('/api/invitaciones',    require('./routes/invitaciones'));
+app.use('/api/reuniones',       require('./routes/reuniones'));
 app.use('/uploads/proyectos',   require('express').static(require('path').join(__dirname, 'uploads', 'proyectos')));
 app.use('/uploads/docentes',    require('express').static(require('path').join(__dirname, 'uploads', 'docentes')));
+app.use('/uploads/usuarios',    require('express').static(require('path').join(__dirname, 'uploads', 'usuarios')));
 
 // ── SPA FALLBACK ───────────────────────────────────────────────────────────────
 app.get('*', (req, res) => {

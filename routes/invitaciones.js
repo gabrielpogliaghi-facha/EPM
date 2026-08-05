@@ -125,15 +125,28 @@ router.get('/verificar/:token', async (req, res) => {
       args: [tHash],
     });
     const inv = rows[0];
-    if (!inv)                                   return res.status(404).json({ error: 'Invitación no encontrada' });
-    if (inv.estado === 'aceptada')              return res.status(400).json({ error: 'Esta invitación ya fue utilizada' });
-    if (inv.estado === 'cancelada')             return res.status(400).json({ error: 'Esta invitación fue cancelada' });
-    if (new Date(inv.expires_at) < new Date())  return res.status(400).json({ error: 'Esta invitación expiró. Pedí un nuevo link.' });
+    if (!inv)                                  return res.status(404).json({ error: 'Invitación no encontrada' });
+    if (inv.estado === 'aceptada')             return res.status(400).json({ error: 'Esta invitación ya fue utilizada' });
+    if (inv.estado === 'cancelada')            return res.status(400).json({ error: 'Esta invitación fue cancelada' });
+    if (new Date(inv.expires_at) < new Date()) return res.status(400).json({ error: 'Esta invitación expiró. Pedí un nuevo link.' });
+
+    // Cursos e instrumentos disponibles para el formulario de registro
+    const { rows: cursos } = await db.execute({
+      sql: 'SELECT id, nombre FROM cursos WHERE institucion_id=? AND activo=1 ORDER BY nombre',
+      args: [inv.institucion_id],
+    });
+    const { rows: instrumentos } = await db.execute({
+      sql: 'SELECT id, nombre FROM instrumentos WHERE institucion_id=? AND activo=1 ORDER BY nombre',
+      args: [inv.institucion_id],
+    });
 
     res.json({
-      rol_nombre: inv.rol_nombre,
-      rol_id:     inv.rol_id,
-      nota:       inv.nota || null,
+      rol_nombre:   inv.rol_nombre,
+      rol_id:       inv.rol_id,
+      nota:         inv.nota || null,
+      cursos_asignados: JSON.parse(inv.cursos_ids || '[]'),
+      cursos,
+      instrumentos,
     });
   } catch(e) {
     res.status(500).json({ error: 'Error al verificar invitación' });
@@ -142,45 +155,66 @@ router.get('/verificar/:token', async (req, res) => {
 
 // ── POST /api/invitaciones/aceptar — público ─────────────────────────────────
 router.post('/aceptar', async (req, res) => {
-  const { token, nombre, email, password } = req.body;
+  const {
+    token, nombre, apellido, email, password,
+    dni, fecha_nacimiento,
+    instrumento_principal_id, instrumento_ids, formacion,
+    cursos_elegidos,
+  } = req.body;
+
   if (!token || !nombre?.trim() || !email?.trim() || !password || password.length < 6)
     return res.status(400).json({ error: 'Token, nombre, email y contraseña (mín. 6 caracteres) requeridos' });
 
   try {
     const tHash = hashToken(token);
-    const { rows } = await db.execute({ sql: 'SELECT * FROM invitaciones WHERE token_hash=?', args: [tHash] });
+    const { rows } = await db.execute({ sql:'SELECT * FROM invitaciones WHERE token_hash=?', args:[tHash] });
     const inv = rows[0];
-    if (!inv)                                  return res.status(404).json({ error: 'Invitación no encontrada' });
-    if (inv.estado !== 'pendiente')            return res.status(400).json({ error: 'Esta invitación ya fue utilizada o cancelada' });
-    if (new Date(inv.expires_at) < new Date()) return res.status(400).json({ error: 'Esta invitación expiró. Pedí un nuevo link.' });
+    if (!inv)                                  return res.status(404).json({ error:'Invitación no encontrada' });
+    if (inv.estado !== 'pendiente')            return res.status(400).json({ error:'Esta invitación ya fue utilizada o cancelada' });
+    if (new Date(inv.expires_at) < new Date()) return res.status(400).json({ error:'Esta invitación expiró. Pedí un nuevo link.' });
 
     const emailNorm = email.toLowerCase().trim();
-    const { rows: dup } = await db.execute({ sql: 'SELECT id FROM usuarios WHERE email=?', args: [emailNorm] });
-    if (dup[0]) return res.status(400).json({ error: 'Ya existe una cuenta con ese email. Iniciá sesión.' });
+    const { rows: dup } = await db.execute({ sql:'SELECT id FROM usuarios WHERE email=?', args:[emailNorm] });
+    if (dup[0]) return res.status(400).json({ error:'Ya existe una cuenta con ese email. Iniciá sesión.' });
 
     const r = await db.execute({
-      sql: 'INSERT INTO usuarios (institucion_id, nombre, email, password_hash, rol_id) VALUES (?,?,?,?,?)',
-      args: [inv.institucion_id, nombre.trim(), emailNorm, bcrypt.hashSync(password, 10), inv.rol_id],
+      sql: `INSERT INTO usuarios
+              (institucion_id, nombre, apellido, email, password_hash, rol_id,
+               dni, fecha_nacimiento, instrumento_principal_id, formacion)
+            VALUES (?,?,?,?,?,?,?,?,?,?)`,
+      args: [
+        inv.institucion_id, nombre.trim(), apellido?.trim()||null, emailNorm,
+        bcrypt.hashSync(password, 10), inv.rol_id,
+        dni?.trim()||null, fecha_nacimiento||null,
+        instrumento_principal_id||null, formacion?.trim()||null,
+      ],
     });
     const usuarioId = Number(r.lastInsertRowid);
 
-    const cursosIds = JSON.parse(inv.cursos_ids || '[]');
-    for (const cid of cursosIds) {
-      await db.execute({
-        sql: 'INSERT OR IGNORE INTO usuarios_cursos (usuario_id, curso_id) VALUES (?,?)',
-        args: [usuarioId, cid],
-      });
+    // Cursos: los que venían preseleccionados en la invitación + los que eligió el usuario
+    const cursosBase = JSON.parse(inv.cursos_ids || '[]');
+    const cursosExtra = Array.isArray(cursos_elegidos) ? cursos_elegidos : [];
+    const todosLosCursos = [...new Set([...cursosBase, ...cursosExtra].map(Number))];
+    for (const cid of todosLosCursos) {
+      await db.execute({ sql:'INSERT OR IGNORE INTO usuarios_cursos (usuario_id,curso_id) VALUES (?,?)', args:[usuarioId,cid] });
+    }
+
+    // Instrumentos adicionales
+    if (Array.isArray(instrumento_ids)) {
+      for (const iid of instrumento_ids) {
+        await db.execute({ sql:'INSERT OR IGNORE INTO usuario_instrumentos (usuario_id,instrumento_id) VALUES (?,?)', args:[usuarioId,Number(iid)] });
+      }
     }
 
     await db.execute({
-      sql: "UPDATE invitaciones SET estado='aceptada', email=?, accepted_by=?, updated_at=datetime('now') WHERE id=?",
-      args: [emailNorm, usuarioId, inv.id],
+      sql:"UPDATE invitaciones SET estado='aceptada',email=?,accepted_by=?,updated_at=datetime('now') WHERE id=?",
+      args:[emailNorm, usuarioId, inv.id],
     });
 
-    res.json({ ok: true, mensaje: '¡Cuenta creada! Ya podés iniciar sesión.' });
+    res.json({ ok:true, mensaje:'¡Cuenta creada! Ya podés iniciar sesión.' });
   } catch(e) {
     console.error(e);
-    res.status(500).json({ error: 'Error al crear la cuenta' });
+    res.status(500).json({ error:'Error al crear la cuenta' });
   }
 });
 

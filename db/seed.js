@@ -28,6 +28,9 @@ const PERMISOS = [
   { codigo: 'ver_finanzas',               descripcion: 'Ver movimientos financieros',             grupo: 'finanzas'       },
   { codigo: 'editar_finanzas',            descripcion: 'Cargar movimientos financieros',          grupo: 'finanzas'       },
   { codigo: 'administrar_finanzas',       descripcion: 'Administrar finanzas y categorías',       grupo: 'finanzas'       },
+  { codigo: 'ver_reuniones',              descripcion: 'Ver registro de reuniones',               grupo: 'reuniones'      },
+  { codigo: 'crear_reuniones',            descripcion: 'Crear reuniones',                         grupo: 'reuniones'      },
+  { codigo: 'editar_reuniones',           descripcion: 'Editar cualquier reunión',                grupo: 'reuniones'      },
 ];
 
 const ROL_OPERADOR = ['ver_estudiantes','crear_estudiantes','editar_estudiantes',
@@ -35,11 +38,13 @@ const ROL_OPERADOR = ['ver_estudiantes','crear_estudiantes','editar_estudiantes'
                       'ver_reportes','editar_reportes','administrar_cursos',
                       'ver_calendario','crear_eventos','editar_eventos',
                       'ver_equipo_docente','ver_inventario','editar_inventario',
-                      'ver_proyectos','editar_proyectos','ver_finanzas','editar_finanzas'];
+                      'ver_proyectos','editar_proyectos','ver_finanzas','editar_finanzas',
+                      'ver_reuniones','crear_reuniones','editar_reuniones'];
 const ROL_DOCENTE  = ['ver_estudiantes','ver_asistencias','cargar_asistencias',
                       'ver_reportes','ver_planificaciones','editar_planificaciones',
                       'ver_legajo_personal','editar_legajo_personal',
-                      'ver_calendario','ver_equipo_docente','ver_proyectos','ver_finanzas'];
+                      'ver_calendario','ver_equipo_docente','ver_proyectos','ver_finanzas',
+                      'ver_reuniones','crear_reuniones'];
 
 async function runSeed(db) {
   const check = await db.execute('SELECT COUNT(*) AS c FROM instituciones');
