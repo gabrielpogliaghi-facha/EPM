@@ -15,7 +15,7 @@ router.get('/', verifyToken, async (req, res) => {
   try {
     // Estudiantes con cumpleaños en ese mes
     const { rows: ests } = await db.execute({
-      sql: `SELECT nombre, apellido, fecha_nacimiento, 'estudiante' AS tipo, NULL AS rol_nombre
+      sql: `SELECT id, nombre, apellido, fecha_nacimiento, 'estudiante' AS tipo, NULL AS rol_nombre
             FROM estudiantes
             WHERE institucion_id=? AND activo=1
               AND fecha_nacimiento IS NOT NULL
@@ -36,11 +36,33 @@ router.get('/', verifyToken, async (req, res) => {
       args: [req.user.institucion_id, mm],
     });
 
+    // Cursos (niveles) de cada estudiante con cumpleaños en el mes, para mostrar el/los
+    // ícono(s) de nivel en vez de una torta genérica. Un estudiante puede estar en más
+    // de un curso (varios instrumentos), en cuyo caso se listan todos.
+    const cursosPorEst = {};
+    if (ests.length > 0) {
+      const estIds = ests.map(e => Number(e.id));
+      const ph = estIds.map(() => '?').join(',');
+      const { rows: inscs } = await db.execute({
+        sql: `SELECT DISTINCT ins.estudiante_id, c.nombre AS curso_nombre
+              FROM inscripciones ins JOIN cursos c ON c.id = ins.curso_id
+              WHERE ins.estudiante_id IN (${ph}) AND ins.activo = 1
+              ORDER BY c.nombre`,
+        args: estIds,
+      });
+      inscs.forEach(i => {
+        const k = Number(i.estudiante_id);
+        if (!cursosPorEst[k]) cursosPorEst[k] = [];
+        cursosPorEst[k].push(i.curso_nombre);
+      });
+    }
+
     const todos = [...ests, ...usrs]
       .map(r => ({
         nombre:     `${r.nombre} ${r.apellido}`.trim(),
         tipo:       r.tipo,          // 'estudiante' | 'usuario'
         rol_nombre: r.rol_nombre,    // solo para tipo 'usuario': Docente/Operador/Gestión
+        cursos:     r.tipo === 'estudiante' ? (cursosPorEst[Number(r.id)] || []) : [],
         dia:        parseInt(r.fecha_nacimiento.slice(8, 10)),
         fecha_nacimiento: r.fecha_nacimiento,
       }))

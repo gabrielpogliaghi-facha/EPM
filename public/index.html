@@ -991,20 +991,39 @@
     }
 
     /* ── CUMPLEAÑOS ─────────────────────────────────────────────────────────── */
-    .cumple-dot {
-      width:8px; height:8px; border-radius:50%; background:#ec4899;
-      flex-shrink:0; display:inline-block;
-    }
     .evtcal-cumple {
       width:6px; height:6px; border-radius:50%; background:#ec4899;
       display:inline-block; cursor:pointer; flex-shrink:0;
     }
     .evtcal-cumple.staff { background:#f59e0b; }
-    .cumple-dot.staff { background:#f59e0b; }
-    .cumple-card { padding:10px 12px; border-radius:10px; display:flex; gap:10px; align-items:flex-start; }
-    .cumple-card:hover { background:var(--bg3); }
-    .cumple-nombre { font-size:13px; font-weight:700; }
-    .cumple-tipo   { font-size:11px; color:var(--text2); }
+
+    /* Card compacta del Dashboard: 1 columna en mobile, 2 en pantallas más grandes */
+    .cumple-mes-grid {
+      display:grid; grid-template-columns:1fr; gap:8px;
+    }
+    @media (min-width:600px) {
+      .cumple-mes-grid { grid-template-columns:1fr 1fr; }
+    }
+    .cumple-mes-card {
+      display:flex; align-items:center; gap:10px; padding:10px 12px;
+      border-radius:10px; background:var(--bg3); min-width:0;
+    }
+    .cumple-mes-card.hoy {
+      background:linear-gradient(135deg,#fce7f3,#fef3c7);
+      border:1.5px solid #ec4899;
+    }
+    .cumple-mes-iconos { font-size:20px; flex-shrink:0; line-height:1; }
+    .cumple-mes-info   { min-width:0; }
+    .cumple-mes-nombre {
+      font-size:13px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+    }
+    .cumple-mes-fecha  { font-size:11.5px; color:var(--text2); }
+    .cumple-mes-card.hoy .cumple-mes-fecha { color:#be185d; font-weight:700; }
+    .cumple-mes-toggle {
+      width:100%; background:none; border:none; color:var(--primary);
+      font-size:12.5px; font-weight:700; cursor:pointer; padding:10px 0 2px; text-align:center;
+    }
+    .cumple-mes-toggle:hover { text-decoration:underline; }
 
     /* ── INVITACIONES ───────────────────────────────────────────────────────── */
     .inv-row {
@@ -1709,53 +1728,79 @@ function useCumpleaniosProximos() {
   return { cumples: conFecha, cumpleHoy, cumpleProx, cargando, mesActual: hoy.getMonth() + 1 };
 }
 
-// Sub-lista de un grupo de cumpleaños (hoy / próximos 7 días / resto del mes), separando
-// estudiantes del equipo (docentes/operadores/gestión) como pide la funcionalidad.
-function CumpleGrupo({ lista, destacar }) {
-  const ests  = lista.filter(c => c.tipo === 'estudiante');
-  const staff = lista.filter(c => c.tipo === 'usuario');
-  const render = (arr) => arr.map((c, i) => (
-    <div key={i} className="cumple-card" style={destacar ? {background:'#fce7f3',borderRadius:10,marginBottom:4} : undefined}>
-      {destacar
-        ? <span style={{fontSize:20}}>🎂</span>
-        : <span className={`cumple-dot${c.tipo==='usuario'?' staff':''}`} style={{marginTop:4}} />}
-      <div>
-        <div className="cumple-nombre">{c.nombre}{destacar ? ' — ¡HOY!' : ''}</div>
-        <div className="cumple-tipo">{cumpleEtiqueta(c)}{!destacar && ` · ${c.dia}/${c.mes}`}</div>
+// Ícono(s) de nivel/curso para una tarjeta de cumpleaños. Un estudiante puede estar en
+// más de un curso (varios instrumentos) — en ese caso se muestran todos juntos (ej: 🐟🐬).
+// El equipo (docentes/operadores/gestión) no tiene curso: ícono fijo de "equipo".
+const NIVEL_EMOJI = { Mojarritas:'🐟', Delfines:'🐬', Tiburones:'🦈', Pulpos:'🐙' };
+const NIVEL_ORDEN = { Mojarritas:1, Delfines:2, Tiburones:3, Pulpos:4 };
+function cumpleIconos(c) {
+  if (c.tipo === 'usuario') return '👩‍🏫';
+  if (!c.cursos?.length) return '🎵'; // estudiante sin inscripción activa todavía
+  return [...c.cursos]
+    .sort((a, b) => (NIVEL_ORDEN[a]||99) - (NIVEL_ORDEN[b]||99))
+    .map(n => NIVEL_EMOJI[n] || '📚').join('');
+}
+
+// Card compacta de un cumpleaños: nombre, ícono(s) de curso y fecha. El de hoy se
+// resalta con fondo especial + 🎂 extra.
+function CumpleMesCard({ c }) {
+  return (
+    <div className={`cumple-mes-card ${c.esHoy ? 'hoy' : ''}`}>
+      <span className="cumple-mes-iconos">{cumpleIconos(c)}</span>
+      <div className="cumple-mes-info">
+        <div className="cumple-mes-nombre">{c.nombre}{c.esHoy ? ' 🎂' : ''}</div>
+        <div className="cumple-mes-fecha">{c.esHoy ? '¡Hoy!' : `${c.dia}/${c.mes}`}</div>
       </div>
     </div>
-  ));
-  return <>{render(ests)}{render(staff)}</>;
+  );
 }
 
 function CumpleaniosMes({ user }) {
   const MESES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
   const hoy = new Date();
-  const { cumples, cumpleHoy, cumpleProx, cargando } = useCumpleaniosProximos();
+  const [cumples,    setCumples]    = useState([]);
+  const [cargando,   setCargando]   = useState(true);
+  const [expandido,  setExpandido]  = useState(false);
+
+  useEffect(() => {
+    const mes = hoy.getMonth() + 1;
+    apiFetch(`/api/cumpleanios?mes=${mes}&anio=${hoy.getFullYear()}`)
+      .then(d => setCumples(d.map(c => ({...c, mes})))) // la API no devuelve el mes consultado
+      .catch(() => {})
+      .finally(() => setCargando(false));
+  }, []);
 
   if (cargando || cumples.length === 0) return null;
 
-  const cumpleResto = cumples.filter(c => c.mes === hoy.getMonth()+1 && !cumpleHoy.includes(c) && !cumpleProx.includes(c));
+  const hoyDia = hoy.getDate();
+  // Orden por cercanía: hoy primero (distancia 0), después los que faltan este mes
+  // (ascendente), y al final los que ya pasaron este mes.
+  const ordenados = cumples
+    .map(c => ({
+      ...c,
+      esHoy: c.dia === hoyDia,
+      distancia: c.dia === hoyDia ? 0 : c.dia > hoyDia ? c.dia - hoyDia : 1000 + c.dia,
+    }))
+    .sort((a, b) => a.distancia - b.distancia);
+
+  const visibles = expandido ? ordenados : ordenados.slice(0, 2);
+  const hayMas   = ordenados.length > 2;
 
   return (
     <div className="card" style={{marginBottom:16,borderColor:'#ec489920',background:'linear-gradient(135deg,#fff,#fdf2f8)'}}>
-      <div className="card-title" style={{marginBottom:8}}>
+      <div className="card-title" style={{marginBottom:10}}>
         🎂 Cumpleaños del mes ({MESES[hoy.getMonth()]})
         <span style={{marginLeft:'auto',fontSize:12,color:'var(--text2)'}}>
           {cumples.length} {cumples.length === 1 ? 'cumpleaños' : 'cumpleaños'}
         </span>
       </div>
-      <CumpleGrupo lista={cumpleHoy} destacar />
-      {cumpleProx.length > 0 && (
-        <div style={{fontSize:11,fontWeight:700,color:'var(--text2)',textTransform:'uppercase',letterSpacing:.5,padding:'6px 12px 2px'}}>
-          🎉 Próximos 7 días
-        </div>
-      )}
-      <CumpleGrupo lista={cumpleProx} />
-      {cumpleResto.length > 0 && (
-        <div style={{fontSize:12,color:'var(--text2)',padding:'4px 12px'}}>
-          + {cumpleResto.length} más este mes
-        </div>
+      <div className="cumple-mes-grid">
+        {visibles.map((c, i) => <CumpleMesCard key={i} c={c} />)}
+      </div>
+      {hayMas && (
+        <button className="cumple-mes-toggle" onClick={() => setExpandido(v => !v)}>
+          {expandido ? '▲ Ver menos' : `▼ Ver todos los de este mes (${ordenados.length})`}
+        </button>
       )}
     </div>
   );
