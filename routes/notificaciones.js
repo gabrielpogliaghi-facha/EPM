@@ -3,11 +3,15 @@ const router  = express.Router();
 const db      = require('../db');
 const { verifyToken } = require('../middleware/auth');
 
+// Los cumpleaños tienen su propio ícono en el header (🎂) desde que se separó de la
+// campanita — nunca deben aparecer acá, ni los que ya existan de antes en la DB.
+const SIN_CUMPLEANIOS = `(entidad_tipo IS NULL OR entidad_tipo NOT IN ('cumpleanios_est','cumpleanios_usuario'))`;
+
 // GET /api/notificaciones
 router.get('/', verifyToken, async (req, res) => {
   try {
     const { rows } = await db.execute({
-      sql: 'SELECT * FROM notificaciones WHERE usuario_id=? ORDER BY created_at DESC LIMIT 50',
+      sql: `SELECT * FROM notificaciones WHERE usuario_id=? AND ${SIN_CUMPLEANIOS} ORDER BY created_at DESC LIMIT 50`,
       args: [req.user.id],
     });
     res.json(rows);
@@ -20,7 +24,7 @@ router.get('/', verifyToken, async (req, res) => {
 router.get('/no-leidas', verifyToken, async (req, res) => {
   try {
     const { rows } = await db.execute({
-      sql: 'SELECT COUNT(*) AS total FROM notificaciones WHERE usuario_id=? AND leida=0',
+      sql: `SELECT COUNT(*) AS total FROM notificaciones WHERE usuario_id=? AND leida=0 AND ${SIN_CUMPLEANIOS}`,
       args: [req.user.id],
     });
     res.json({ total: Number(rows[0].total) });

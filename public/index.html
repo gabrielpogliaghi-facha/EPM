@@ -616,8 +616,11 @@
     .tl-empty { color:var(--text2); font-size:13px; font-style:italic; padding:4px 0; }
     .legajo-save-bar { display:flex; justify-content:flex-end; padding:16px 0 0; }
 
+    /* ── ÍCONOS DEL HEADER (🎂 cumpleaños + 🔔 notificaciones) ─────────────────── */
+    .header-icons-wrap { display:flex; align-items:center; gap:2px; margin-left:auto; }
+
     /* ── NOTIFICACIONES BELL ────────────────────────────────────────────────── */
-    .notif-bell-wrap  { position:relative; margin-left:auto; }
+    .notif-bell-wrap  { position:relative; }
     .notif-bell-btn   {
       background:none; border:none; cursor:pointer; font-size:20px; padding:4px 8px;
       border-radius:8px; color:var(--text); display:flex; align-items:center; position:relative;
@@ -630,6 +633,32 @@
       display:flex; align-items:center; justify-content:center; padding:0 4px;
       border:2px solid var(--bg2); line-height:1;
     }
+
+    /* ── CUMPLEAÑOS BELL (🎂) ───────────────────────────────────────────────── */
+    .cumple-bell-wrap { position:relative; }
+    .cumple-bell-btn  {
+      background:none; border:none; cursor:pointer; font-size:20px; padding:4px 8px;
+      border-radius:8px; color:var(--text); display:flex; align-items:center; position:relative;
+      transition:background .18s;
+    }
+    .cumple-bell-btn:hover { background:linear-gradient(135deg,#fef3c7,#fce7f3); }
+    .cumple-badge {
+      position:absolute; top:-2px; right:-2px; color:#fff;
+      background:linear-gradient(135deg,#f59e0b,#ec4899);
+      border-radius:12px; font-size:10px; font-weight:800; min-width:16px; height:16px;
+      display:flex; align-items:center; justify-content:center; padding:0 4px;
+      border:2px solid var(--bg2); line-height:1;
+    }
+    .cumple-panel-section {
+      font-size:11px; font-weight:800; color:var(--text2); text-transform:uppercase;
+      letter-spacing:.5px; padding:10px 16px 4px;
+    }
+    .cumple-panel-item {
+      display:flex; align-items:center; gap:10px; padding:9px 16px;
+    }
+    .cumple-panel-item.hoy { background:linear-gradient(90deg,rgba(236,73,153,.10),transparent); }
+    .cumple-panel-nombre { font-size:13px; font-weight:700; }
+    .cumple-panel-meta   { font-size:11.5px; color:var(--text2); }
     .notif-panel {
       position:absolute; right:0; top:calc(100% + 8px); width:340px; max-width:90vw;
       background:var(--card); border:1.5px solid var(--border); border-radius:var(--radius);
@@ -821,7 +850,12 @@
     .prox-evento-fecha  { font-size:11px; color:var(--text2); }
 
     @media (max-width:768px) {
-      .notif-panel { right:-40px; }
+      .notif-panel, .cumple-panel { right:-40px; }
+    }
+    @media (max-width:400px) {
+      .header-icons-wrap { gap:0; }
+      .notif-bell-btn, .cumple-bell-btn { padding:4px 6px; font-size:18px; }
+      .notif-panel, .cumple-panel { right:-56px; width:300px; }
     }
 
     /* ── SIDEBAR CON GRUPOS ─────────────────────────────────────────────────── */
@@ -1583,6 +1617,49 @@ function cumpleEtiqueta(c) {
   return c.tipo === 'usuario' ? `👩‍🏫 ${c.rol_nombre || 'Equipo'}` : '👦 Estudiante';
 }
 
+// Hook compartido: trae los cumpleaños del mes actual (+ el mes siguiente si la ventana de
+// "próximos 7 días" cruza el límite de mes) y devuelve los grupos ya calculados. Usado tanto
+// por la card del Dashboard como por el ícono 🎂 del header, para no duplicar esta lógica.
+function useCumpleaniosProximos() {
+  const [cumples,  setCumples]  = useState([]);
+  const [cargando, setCargando] = useState(true);
+
+  useEffect(() => {
+    const hoy = new Date();
+    const mesActual  = hoy.getMonth() + 1, anioActual = hoy.getFullYear();
+    // La ventana de "próximos 7 días" puede cruzar a mes siguiente (ej: hoy 28, +7 = mes que viene)
+    const finVentana  = new Date(hoy); finVentana.setDate(hoy.getDate() + 7);
+    const cruzaMes    = finVentana.getMonth() !== hoy.getMonth();
+
+    const reqs = [apiFetch(`/api/cumpleanios?mes=${mesActual}&anio=${anioActual}`)
+      .then(d => d.map(c => ({...c, mes: mesActual, anio: anioActual})))];
+    if (cruzaMes) {
+      const mesSig = finVentana.getMonth() + 1, anioSig = finVentana.getFullYear();
+      reqs.push(apiFetch(`/api/cumpleanios?mes=${mesSig}&anio=${anioSig}`)
+        .then(d => d.map(c => ({...c, mes: mesSig, anio: anioSig}))));
+    }
+    Promise.all(reqs)
+      .then(results => setCumples(results.flat()))
+      .catch(() => {})
+      .finally(() => setCargando(false));
+  }, []);
+
+  const hoy = new Date();
+  const hoySinHora = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate());
+  const finVentana  = new Date(hoySinHora); finVentana.setDate(finVentana.getDate() + 7);
+  // Próxima ocurrencia real de cada cumpleaños + edad que cumple ese día
+  const conFecha = cumples.map(c => ({
+    ...c,
+    fechaOcurrencia: new Date(c.anio, c.mes - 1, c.dia),
+    edad: c.anio - parseInt(c.fecha_nacimiento.slice(0, 4)),
+  }));
+
+  const cumpleHoy  = conFecha.filter(c => c.fechaOcurrencia.getTime() === hoySinHora.getTime());
+  const cumpleProx = conFecha.filter(c => c.fechaOcurrencia > hoySinHora && c.fechaOcurrencia <= finVentana);
+
+  return { cumples: conFecha, cumpleHoy, cumpleProx, cargando, mesActual: hoy.getMonth() + 1 };
+}
+
 // Sub-lista de un grupo de cumpleaños (hoy / próximos 7 días / resto del mes), separando
 // estudiantes del equipo (docentes/operadores/gestión) como pide la funcionalidad.
 function CumpleGrupo({ lista, destacar }) {
@@ -1604,48 +1681,12 @@ function CumpleGrupo({ lista, destacar }) {
 
 function CumpleaniosMes({ user }) {
   const MESES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
-  const hoy   = new Date();
-  const [cumples,   setCumples]  = useState([]);
-  const [cargando,  setCargando] = useState(true);
-
-  useEffect(() => {
-    const mesActual  = hoy.getMonth() + 1, anioActual = hoy.getFullYear();
-    // La ventana de "próximos 7 días" puede cruzar a mes siguiente (ej: hoy 28, +7 = mes que viene)
-    const finVentana  = new Date(hoy); finVentana.setDate(hoy.getDate() + 7);
-    const cruzaMes    = finVentana.getMonth() !== hoy.getMonth();
-
-    const reqs = [apiFetch(`/api/cumpleanios?mes=${mesActual}&anio=${anioActual}`)
-      .then(d => d.map(c => ({...c, mes: mesActual, anio: anioActual})))];
-    if (cruzaMes) {
-      const mesSig = finVentana.getMonth() + 1, anioSig = finVentana.getFullYear();
-      reqs.push(apiFetch(`/api/cumpleanios?mes=${mesSig}&anio=${anioSig}`)
-        .then(d => d.map(c => ({...c, mes: mesSig, anio: anioSig}))));
-    }
-    Promise.all(reqs)
-      .then(results => setCumples(results.flat()))
-      .catch(() => {})
-      .finally(() => setCargando(false));
-  }, []);
-
-  // Notificar cumpleaños cercanos una vez al día
-  useEffect(() => {
-    const key  = `epm_cumple_notif_${new Date().toISOString().slice(0,10)}`;
-    if (localStorage.getItem(key)) return;
-    apiFetch('/api/cumpleanios/notificar', { method:'POST' })
-      .then(() => localStorage.setItem(key, '1'))
-      .catch(() => {});
-  }, []);
+  const hoy = new Date();
+  const { cumples, cumpleHoy, cumpleProx, cargando } = useCumpleaniosProximos();
 
   if (cargando || cumples.length === 0) return null;
 
-  const hoySinHora = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate());
-  const finVentana  = new Date(hoySinHora); finVentana.setDate(finVentana.getDate() + 7);
-  // Próxima ocurrencia real de cada cumpleaños (con día/mes tal como vino del backend)
-  const conFecha = cumples.map(c => ({...c, fechaOcurrencia: new Date(c.anio, c.mes - 1, c.dia)}));
-
-  const cumpleHoy   = conFecha.filter(c => c.fechaOcurrencia.getTime() === hoySinHora.getTime());
-  const cumpleProx  = conFecha.filter(c => c.fechaOcurrencia > hoySinHora && c.fechaOcurrencia <= finVentana);
-  const cumpleResto = conFecha.filter(c => c.mes === hoy.getMonth()+1 && !cumpleHoy.includes(c) && !cumpleProx.includes(c));
+  const cumpleResto = cumples.filter(c => c.mes === hoy.getMonth()+1 && !cumpleHoy.includes(c) && !cumpleProx.includes(c));
 
   return (
     <div className="card" style={{marginBottom:16,borderColor:'#ec489920',background:'linear-gradient(135deg,#fff,#fdf2f8)'}}>
@@ -5891,6 +5932,83 @@ function NotificacionesBell({ user, onNavigate }) {
   );
 }
 
+// ── CUMPLEAÑOS BELL (🎂) ────────────────────────────────────────────────────────
+// Separado de la campanita de notificaciones: lee en vivo de /api/cumpleanios
+// (vía el hook compartido) en vez de depender de registros en la tabla `notificaciones`.
+function CumpleanosBell() {
+  const [open, setOpen] = useState(false);
+  const { cumpleHoy, cumpleProx, cargando } = useCumpleaniosProximos();
+  const total = cumpleHoy.length + cumpleProx.length;
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e) => {
+      if (!e.target.closest('.cumple-bell-wrap')) setOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [open]);
+
+  const Fila = ({ c, hoy }) => (
+    <div className={`cumple-panel-item ${hoy ? 'hoy' : ''}`}>
+      <span style={{fontSize:18}}>{hoy ? '🎂' : (c.tipo === 'usuario' ? '👩‍🏫' : '👦')}</span>
+      <div>
+        <div className="cumple-panel-nombre">{c.nombre}</div>
+        <div className="cumple-panel-meta">
+          {cumpleEtiqueta(c)} · {hoy ? `cumple ${c.edad} hoy` : `${c.dia}/${c.mes} · cumple ${c.edad}`}
+        </div>
+      </div>
+    </div>
+  );
+
+  const Grupo = ({ lista, hoy }) => {
+    const ests  = lista.filter(c => c.tipo === 'estudiante');
+    const staff = lista.filter(c => c.tipo === 'usuario');
+    return <>
+      {ests.map((c,i) => <Fila key={'e'+i} c={c} hoy={hoy} />)}
+      {staff.map((c,i) => <Fila key={'s'+i} c={c} hoy={hoy} />)}
+    </>;
+  };
+
+  return (
+    <div className="cumple-bell-wrap">
+      <button className="cumple-bell-btn" onClick={() => setOpen(o => !o)} title="Cumpleaños">
+        🎂
+        {total > 0 && <span className="cumple-badge">{total > 9 ? '9+' : total}</span>}
+      </button>
+      {open && (
+        <div className="notif-panel cumple-panel">
+          <div className="notif-panel-header">
+            <span>🎂 Cumpleaños</span>
+          </div>
+          <div className="notif-panel-list">
+            {cargando ? (
+              <div className="notif-empty">Cargando...</div>
+            ) : total === 0 ? (
+              <div className="notif-empty">No hay cumpleaños esta semana</div>
+            ) : (
+              <>
+                {cumpleHoy.length > 0 && (
+                  <>
+                    <div className="cumple-panel-section">🎂 Hoy cumple</div>
+                    <Grupo lista={cumpleHoy} hoy />
+                  </>
+                )}
+                {cumpleProx.length > 0 && (
+                  <>
+                    <div className="cumple-panel-section">📅 Esta semana</div>
+                    <Grupo lista={cumpleProx} />
+                  </>
+                )}
+              </>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── MODAL EVENTO ─────────────────────────────────────────────────────────────────
 function ModalEvento({ evento, cursos, onClose, onGuardado }) {
   const inicial = evento ? {
@@ -8075,7 +8193,10 @@ function Layout({ user, onUserUpdate }) {
         <div className="topbar">
           <button className="topbar-menu" onClick={() => setMenuOpen(o => !o)}>☰</button>
           <span className="topbar-title">{title}</span>
-          <NotificacionesBell user={user} onNavigate={irANotificacion} />
+          <div className="header-icons-wrap">
+            <CumpleanosBell />
+            <NotificacionesBell user={user} onNavigate={irANotificacion} />
+          </div>
         </div>
         <AyudaSeccion section={section} />
         <div className="page">
