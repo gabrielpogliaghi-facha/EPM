@@ -61,16 +61,20 @@ router.get('/asistencia', verifyToken, requirePermiso('ver_reportes'), async (re
 // GET /api/reportes/nivel?curso_id= — resumen completo de estudiantes de un nivel/curso
 // (o de todos si no se pasa curso_id), con asistencia resumida y completitud de datos.
 router.get('/nivel', verifyToken, requirePermiso('ver_reportes'), async (req, res) => {
-  const { curso_id } = req.query;
+  const { curso_id, instrumento_id } = req.query;
   try {
     let sql = `SELECT DISTINCT e.id, e.nombre, e.apellido, e.dni, e.telefono, e.direccion,
                e.tutor_nombre, e.tutor_dni, e.tutor_telefono, e.foto_path, e.fecha_nacimiento
                FROM estudiantes e`;
     const args = [];
-    if (curso_id) sql += ' JOIN inscripciones ins ON ins.estudiante_id = e.id AND ins.activo = 1';
+    // El join a inscripciones hace falta si se filtra por curso o por instrumento — al usar
+    // el mismo alias para ambas condiciones, el AND exige que sea la MISMA inscripción
+    // (ese curso Y ese instrumento juntos), no cualquier curso + cualquier instrumento sueltos.
+    if (curso_id || instrumento_id) sql += ' JOIN inscripciones ins ON ins.estudiante_id = e.id AND ins.activo = 1';
     sql += ' WHERE e.institucion_id = ? AND e.activo = 1';
     args.push(req.user.institucion_id);
-    if (curso_id) { sql += ' AND ins.curso_id = ?'; args.push(Number(curso_id)); }
+    if (curso_id)       { sql += ' AND ins.curso_id = ?';       args.push(Number(curso_id)); }
+    if (instrumento_id) { sql += ' AND ins.instrumento_id = ?'; args.push(Number(instrumento_id)); }
     sql += ' ORDER BY e.apellido, e.nombre';
 
     const { rows: estudiantes } = await db.execute({ sql, args });

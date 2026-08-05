@@ -356,6 +356,13 @@
       font-size:11px; font-weight:600; background:var(--bg3); color:var(--primary);
       border-radius:12px; padding:2px 9px; white-space:nowrap; flex-shrink:0;
     }
+    .est-tag-link {
+      cursor:pointer; text-decoration:underline; text-decoration-color:transparent;
+      transition:background .15s, text-decoration-color .15s, color .15s;
+    }
+    .est-tag-link:hover {
+      background:var(--primary); color:#fff; text-decoration-color:currentColor;
+    }
 
     /* ── FOTO ───────────────────────────────────────────────────────────────── */
     .foto-avatar-wrap {
@@ -2193,7 +2200,7 @@ function CalendarioAsistencia({ estudianteId }) {
 }
 
 // ── LISTA DE ESTUDIANTES ────────────────────────────────────────────────────────
-function ListaEstudiantes({ user, onNuevo, onEditar }) {
+function ListaEstudiantes({ user, onNuevo, onEditar, onVerReporteNivel }) {
   const [cursos,        setCursos]        = useState([]);
   const [instrumentos,  setInstrumentos]  = useState([]);
   const [cursoId,       setCursoId]       = useState('');
@@ -2367,15 +2374,14 @@ function ListaEstudiantes({ user, onNuevo, onEditar }) {
             </div>
             <div style={{flex:1,minWidth:0,cursor:'pointer'}} onClick={() => onEditar(e.id)}>
               <div className="est-nombre">{e.apellido}, {e.nombre}</div>
-              <div className="est-sub">
-                DNI {e.dni}
-                {(e.inscripciones||[]).length > 0 && (
-                  <span> · {(e.inscripciones||[]).map(i=>`${i.curso_nombre} (${i.instrumento_nombre})`).join(' · ')}</span>
-                )}
-              </div>
+              <div className="est-sub">DNI {e.dni}</div>
             </div>
             {(e.inscripciones||[]).map(i=>(
-              <span key={i.id} className="est-tag" style={{fontSize:11}}>{i.curso_nombre} · {i.instrumento_nombre}</span>
+              <span key={i.id} className="est-tag est-tag-link" style={{fontSize:11}}
+                title={`Ver reporte de ${i.curso_nombre} · ${i.instrumento_nombre}`}
+                onClick={(ev) => { ev.stopPropagation(); onVerReporteNivel?.(i.curso_id, i.instrumento_id); }}>
+                {i.curso_nombre} · {i.instrumento_nombre}
+              </span>
             ))}
             <div className="row-actions">
               <button className="btn-icon" onClick={() => onEditar(e.id)} title="Editar ficha">✏️</button>
@@ -3139,7 +3145,7 @@ function Ficha({ user, estudianteId, initialTab, onClose, onGuardarYCargarOtro, 
 }
 
 // ── ESTUDIANTES (contenedor) ──────────────────────────────────────────────────────
-function Estudiantes({ user, deepLink }) {
+function Estudiantes({ user, deepLink, onVerReporteNivel }) {
   const [view,        setView]       = useState('list');
   const [fichaId,     setFichaId]    = useState(null);
   const [fichaKey,    setFichaKey]   = useState(0);
@@ -3171,7 +3177,7 @@ function Estudiantes({ user, deepLink }) {
       />
     );
   }
-  return <ListaEstudiantes user={user} onNuevo={abrirNuevo} onEditar={abrirEditar} />;
+  return <ListaEstudiantes user={user} onNuevo={abrirNuevo} onEditar={abrirEditar} onVerReporteNivel={onVerReporteNivel} />;
 }
 
 // ── HISTORIAL DE ASISTENCIA (sección de Asistencias) ───────────────────────────
@@ -3522,8 +3528,14 @@ function PieChart({ presencias, ausencias, tardes, size = 80 }) {
 }
 
 // ── REPORTES DE ASISTENCIA ───────────────────────────────────────────────────────
-function Reportes({ user, onNavigate }) {
+function Reportes({ user, onNavigate, filtroNivel }) {
   const [tabReporte, setTabReporte] = useState('asistencia'); // 'asistencia' | 'nivel'
+
+  // Llegada desde un badge de inscripción en Estudiantes ("Tiburones · Canto") — salta
+  // directo al tab "Por nivel / curso" con ese curso+instrumento ya filtrados.
+  useEffect(() => {
+    if (filtroNivel) setTabReporte('nivel');
+  }, [filtroNivel]);
   const [ciclos,     setCiclos]     = useState([]);
   const [cursos,     setCursos]     = useState([]);
   const [modo,       setModo]       = useState('semestre');
@@ -3650,7 +3662,7 @@ function Reportes({ user, onNavigate }) {
         <button className={`cal-view-btn ${tabReporte==='nivel'?'active':''}`} onClick={()=>setTabReporte('nivel')}>🏫 Por nivel / curso</button>
       </div>
 
-      {tabReporte === 'nivel' && <ReportePorNivel cursos={cursos} onNavigate={onNavigate} />}
+      {tabReporte === 'nivel' && <ReportePorNivel cursos={cursos} onNavigate={onNavigate} filtroInicial={filtroNivel} />}
 
       {tabReporte === 'asistencia' && <>
       {/* ── Panel de control ── */}
@@ -3873,25 +3885,39 @@ const CAMPOS_COMPLETITUD = [
   { key:'foto',           label:'Foto',       ok: e => !!e.foto_path },
 ];
 
-function ReportePorNivel({ cursos, onNavigate }) {
-  const [cursoId, setCursoId] = useState('');
+function ReportePorNivel({ cursos, onNavigate, filtroInicial }) {
+  const [cursoId,      setCursoId]      = useState(filtroInicial?.curso_id ? String(filtroInicial.curso_id) : '');
+  const [instrumentoId,setInstrumentoId]= useState(filtroInicial?.instrumento_id ? String(filtroInicial.instrumento_id) : '');
+  const [instrumentos, setInstrumentos] = useState([]);
   const [datos,   setDatos]   = useState(null);
   const [loading, setLoading] = useState(false);
   const [error,   setError]   = useState('');
   const [sortCol, setSortCol] = useState('apellido');
   const [sortDir, setSortDir] = useState('asc');
 
+  useEffect(() => { apiFetch('/api/instrumentos').then(setInstrumentos).catch(()=>{}); }, []);
+
+  // Un click en un badge de inscripción ("Tiburones · Canto") puede llegar más de una vez
+  // con curso/instrumento distintos — hay que releer el filtro cada vez que cambia (el `ts`
+  // asegura que se detecte incluso si el usuario clickea el mismo combo de nuevo).
+  useEffect(() => {
+    if (!filtroInicial) return;
+    setCursoId(filtroInicial.curso_id ? String(filtroInicial.curso_id) : '');
+    setInstrumentoId(filtroInicial.instrumento_id ? String(filtroInicial.instrumento_id) : '');
+  }, [filtroInicial?.ts]);
+
   const cargar = async () => {
     setLoading(true); setError('');
     try {
       const p = new URLSearchParams();
-      if (cursoId) p.set('curso_id', cursoId);
+      if (cursoId)       p.set('curso_id', cursoId);
+      if (instrumentoId) p.set('instrumento_id', instrumentoId);
       setDatos(await apiFetch(`/api/reportes/nivel?${p}`));
     } catch(e) { setError(e.message); }
     finally { setLoading(false); }
   };
 
-  useEffect(() => { cargar(); }, [cursoId]);
+  useEffect(() => { cargar(); }, [cursoId, instrumentoId]);
 
   const toggleSort = (col) => {
     if (sortCol === col) setSortDir(d => d==='asc'?'desc':'asc');
@@ -3907,7 +3933,9 @@ function ReportePorNivel({ cursos, onNavigate }) {
     return sortDir==='asc' ? (av??0)-(bv??0) : (bv??0)-(av??0);
   });
 
-  const cursoLabel = cursoId ? (cursos.find(c=>String(c.id)===cursoId)?.nombre||'') : 'Todos los niveles';
+  const cursoLabel      = cursoId ? (cursos.find(c=>String(c.id)===cursoId)?.nombre||'') : 'Todos los niveles';
+  const instrumentoLabel = instrumentoId ? (instrumentos.find(i=>String(i.id)===instrumentoId)?.nombre||'') : '';
+  const filtroLabel      = instrumentoLabel ? `${cursoLabel} · ${instrumentoLabel}` : cursoLabel;
 
   const exportarCSV = () => {
     if (!sorted.length) return;
@@ -3931,7 +3959,7 @@ function ReportePorNivel({ cursos, onNavigate }) {
     const blob = new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8;'});
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = `EPM_reporte_nivel_${cursoLabel.replace(/\s+/g,'_')}.csv`;
+    a.download = `EPM_reporte_nivel_${filtroLabel.replace(/\s+/g,'_')}.csv`;
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
   };
 
@@ -3945,12 +3973,21 @@ function ReportePorNivel({ cursos, onNavigate }) {
     <div>
       <div className="card no-print" style={{marginBottom:14}}>
         <div className="card-title" style={{marginBottom:12}}>🏫 Resumen por nivel / curso</div>
-        <div className="form-group" style={{marginBottom:0}}>
-          <label className="form-label">Nivel / Curso</label>
-          <select className="form-control" value={cursoId} onChange={e=>setCursoId(e.target.value)}>
-            <option value="">Todos los niveles</option>
-            {cursos.map(c=><option key={c.id} value={String(c.id)}>{c.nombre}</option>)}
-          </select>
+        <div className="form-grid">
+          <div className="form-group" style={{marginBottom:0}}>
+            <label className="form-label">Nivel / Curso</label>
+            <select className="form-control" value={cursoId} onChange={e=>setCursoId(e.target.value)}>
+              <option value="">Todos los niveles</option>
+              {cursos.map(c=><option key={c.id} value={String(c.id)}>{c.nombre}</option>)}
+            </select>
+          </div>
+          <div className="form-group" style={{marginBottom:0}}>
+            <label className="form-label">Instrumento</label>
+            <select className="form-control" value={instrumentoId} onChange={e=>setInstrumentoId(e.target.value)}>
+              <option value="">Todos los instrumentos</option>
+              {instrumentos.map(i=><option key={i.id} value={String(i.id)}>{i.nombre}</option>)}
+            </select>
+          </div>
         </div>
       </div>
 
@@ -3962,7 +3999,7 @@ function ReportePorNivel({ cursos, onNavigate }) {
           <div className="no-print" style={{display:'flex',gap:8,marginBottom:14,flexWrap:'wrap',alignItems:'center'}}>
             <button className="btn btn-secondary btn-auto" onClick={exportarCSV}>📤 Exportar CSV</button>
             <button className="btn btn-secondary btn-auto" onClick={()=>window.print()}>🖨️ Imprimir</button>
-            <span style={{fontSize:12,color:'var(--text2)'}}>{sorted.length} est. · {cursoLabel}</span>
+            <span style={{fontSize:12,color:'var(--text2)'}}>{sorted.length} est. · {filtroLabel}</span>
           </div>
 
           {sorted.length === 0 ? (
@@ -8258,6 +8295,7 @@ function Layout({ user, onUserUpdate }) {
   const [section, setSection] = useHashSection('dashboard');
   const [menuOpen, setMenuOpen] = useState(false);
   const [deepLink, setDeepLink] = useState(null); // { tipo, id, ts } — destino de una notificación
+  const [filtroNivel, setFiltroNivel] = useState(null); // { curso_id, instrumento_id, ts } — desde un badge de inscripción
   const [tourActivo, setTourActivo] = useState(false);
   const title = NAV.find(n => n.id === section)?.label || 'Dashboard';
   const puede = (p) => !p || user.permisos?.includes(p);
@@ -8285,6 +8323,13 @@ function Layout({ user, onUserUpdate }) {
     setDeepLink({ tipo, id: Number(id), ts: Date.now() });
   };
 
+  // Click en un badge de inscripción ("Tiburones · Canto") en Estudiantes → Reportes
+  // filtrado por ese curso + ese instrumento.
+  const verReporteNivel = (curso_id, instrumento_id) => {
+    setSection('reportes');
+    setFiltroNivel({ curso_id, instrumento_id, ts: Date.now() });
+  };
+
   return (
     <div className="layout">
       <Sidebar
@@ -8310,11 +8355,11 @@ function Layout({ user, onUserUpdate }) {
                 onVolver={() => setSection('dashboard')} onSelfUpdate={onUserUpdate} titulo="👤 Mi perfil"
                 onIniciarTour={() => setTourActivo(true)} />
             : section === 'estudiantes'
-            ? <Estudiantes user={user} deepLink={deepLink} />
+            ? <Estudiantes user={user} deepLink={deepLink} onVerReporteNivel={verReporteNivel} />
             : section === 'asistencia'
             ? <AsistenciasView user={user} />
             : section === 'reportes'
-            ? <Reportes user={user} onNavigate={irANotificacion} />
+            ? <Reportes user={user} onNavigate={irANotificacion} filtroNivel={filtroNivel} />
             : section === 'usuarios'
             ? <UsuariosYRoles user={user} />
             : section === 'planificaciones'
