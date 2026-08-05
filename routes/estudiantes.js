@@ -97,8 +97,8 @@ router.post('/importar', verifyToken, requirePermiso('crear_estudiantes'), async
 
   const sql = `INSERT INTO estudiantes
     (institucion_id, curso_id, nombre, apellido, dni, cuit, fecha_nacimiento,
-     tutor_nombre, tutor_dni, direccion, auth_imagen, auth_general, auth_boleto)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`;
+     telefono, tutor_nombre, tutor_dni, tutor_telefono, direccion, auth_imagen, auth_general, auth_boleto)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`;
 
   let importados = 0;
   const errores = [];
@@ -110,7 +110,8 @@ router.post('/importar', verifyToken, requirePermiso('crear_estudiantes'), async
           req.user.institucion_id, null,
           e.nombre.trim(), e.apellido.trim(), e.dni.trim(),
           e.cuit?.trim() || null, e.fecha_nacimiento || null,
-          e.tutor_nombre?.trim() || null, e.tutor_dni?.trim() || null,
+          e.telefono?.trim() || null,
+          e.tutor_nombre?.trim() || null, e.tutor_dni?.trim() || null, e.tutor_telefono?.trim() || null,
           e.direccion?.trim() || null,
           e.auth_imagen ? 1 : 0, e.auth_general ? 1 : 0, e.auth_boleto ? 1 : 0,
         ],
@@ -138,8 +139,8 @@ router.get('/', verifyToken, requirePermiso('ver_estudiantes'), async (req, res)
   try {
     const { curso_id, instrumento_id, buscar } = req.query;
 
-    let sql = `SELECT DISTINCT e.id, e.nombre, e.apellido, e.dni, e.cuit, e.fecha_nacimiento,
-               e.tutor_nombre, e.tutor_dni, e.direccion, e.foto_path,
+    let sql = `SELECT DISTINCT e.id, e.nombre, e.apellido, e.dni, e.cuit, e.fecha_nacimiento, e.telefono,
+               e.tutor_nombre, e.tutor_dni, e.tutor_telefono, e.direccion, e.foto_path,
                e.auth_imagen, e.auth_general, e.auth_boleto, e.created_at
                FROM estudiantes e`;
     const args = [];
@@ -216,22 +217,22 @@ router.get('/:id', verifyToken, requirePermiso('ver_estudiantes'), async (req, r
 
 // POST /api/estudiantes
 router.post('/', verifyToken, requirePermiso('crear_estudiantes'), async (req, res) => {
-  const { nombre, apellido, dni, cuit, fecha_nacimiento,
-          tutor_nombre, tutor_dni, direccion, curso_id,
+  const { nombre, apellido, dni, cuit, fecha_nacimiento, telefono,
+          tutor_nombre, tutor_dni, tutor_telefono, direccion, curso_id,
           auth_imagen, auth_general, auth_boleto } = req.body;
   if (!nombre?.trim() || !apellido?.trim() || !dni?.trim())
     return res.status(400).json({ error: 'Nombre, apellido y DNI son obligatorios' });
   try {
     const r = await db.execute({
       sql: `INSERT INTO estudiantes
-              (institucion_id, curso_id, nombre, apellido, dni, cuit, fecha_nacimiento,
-               tutor_nombre, tutor_dni, direccion, auth_imagen, auth_general, auth_boleto)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+              (institucion_id, curso_id, nombre, apellido, dni, cuit, fecha_nacimiento, telefono,
+               tutor_nombre, tutor_dni, tutor_telefono, direccion, auth_imagen, auth_general, auth_boleto)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
       args: [
         req.user.institucion_id, curso_id || null,
         nombre.trim(), apellido.trim(), dni.trim(),
-        cuit?.trim() || null, fecha_nacimiento || null,
-        tutor_nombre?.trim() || null, tutor_dni?.trim() || null,
+        cuit?.trim() || null, fecha_nacimiento || null, telefono?.trim() || null,
+        tutor_nombre?.trim() || null, tutor_dni?.trim() || null, tutor_telefono?.trim() || null,
         direccion?.trim() || null,
         auth_imagen ? 1 : 0, auth_general ? 1 : 0, auth_boleto ? 1 : 0,
       ],
@@ -245,8 +246,8 @@ router.post('/', verifyToken, requirePermiso('crear_estudiantes'), async (req, r
 
 // PUT /api/estudiantes/:id
 router.put('/:id', verifyToken, requirePermiso('editar_estudiantes'), async (req, res) => {
-  const { nombre, apellido, dni, cuit, fecha_nacimiento,
-          tutor_nombre, tutor_dni, direccion, curso_id,
+  const { nombre, apellido, dni, cuit, fecha_nacimiento, telefono,
+          tutor_nombre, tutor_dni, tutor_telefono, direccion, curso_id,
           auth_imagen, auth_general, auth_boleto } = req.body;
   if (!nombre?.trim() || !apellido?.trim() || !dni?.trim())
     return res.status(400).json({ error: 'Nombre, apellido y DNI son obligatorios' });
@@ -259,15 +260,15 @@ router.put('/:id', verifyToken, requirePermiso('editar_estudiantes'), async (req
 
     await db.execute({
       sql: `UPDATE estudiantes SET
-              curso_id=?, nombre=?, apellido=?, dni=?, cuit=?, fecha_nacimiento=?,
-              tutor_nombre=?, tutor_dni=?, direccion=?,
+              curso_id=?, nombre=?, apellido=?, dni=?, cuit=?, fecha_nacimiento=?, telefono=?,
+              tutor_nombre=?, tutor_dni=?, tutor_telefono=?, direccion=?,
               auth_imagen=?, auth_general=?, auth_boleto=?, updated_at=datetime('now')
             WHERE id=?`,
       args: [
         curso_id || null,
         nombre.trim(), apellido.trim(), dni.trim(),
-        cuit?.trim() || null, fecha_nacimiento || null,
-        tutor_nombre?.trim() || null, tutor_dni?.trim() || null,
+        cuit?.trim() || null, fecha_nacimiento || null, telefono?.trim() || null,
+        tutor_nombre?.trim() || null, tutor_dni?.trim() || null, tutor_telefono?.trim() || null,
         direccion?.trim() || null,
         auth_imagen ? 1 : 0, auth_general ? 1 : 0, auth_boleto ? 1 : 0,
         Number(req.params.id),

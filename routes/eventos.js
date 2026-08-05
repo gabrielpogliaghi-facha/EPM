@@ -95,19 +95,21 @@ router.get('/proximos', verifyToken, requirePermiso('ver_calendario'), async (re
 
 // POST /api/eventos
 router.post('/', verifyToken, requirePermiso('crear_eventos'), async (req, res) => {
-  const { titulo, descripcion, fecha, hora_inicio, hora_fin, lugar, tipo, alcance, cursos_ids } = req.body;
+  const { titulo, descripcion, fecha, fecha_fin, hora_inicio, hora_fin, lugar, tipo, alcance, cursos_ids } = req.body;
   if (!titulo?.trim())          return res.status(400).json({ error: 'El título es requerido' });
-  if (!fecha)                    return res.status(400).json({ error: 'La fecha es requerida' });
+  if (!fecha)                    return res.status(400).json({ error: 'La fecha de inicio es requerida' });
   if (!TIPOS.includes(tipo))    return res.status(400).json({ error: 'Tipo inválido' });
   if (!ALCANCE.includes(alcance)) return res.status(400).json({ error: 'Alcance inválido' });
   if (alcance === 'cursos' && !cursos_ids?.length)
     return res.status(400).json({ error: 'Seleccioná al menos un curso' });
+  const fechaFin = fecha_fin || fecha;
+  if (fechaFin < fecha) return res.status(400).json({ error: 'La fecha fin no puede ser anterior a la fecha inicio' });
 
   try {
     const r = await db.execute({
-      sql: `INSERT INTO eventos (institucion_id, titulo, descripcion, fecha, hora_inicio, hora_fin, lugar, tipo, alcance, created_by)
-            VALUES (?,?,?,?,?,?,?,?,?,?)`,
-      args: [req.user.institucion_id, titulo.trim(), descripcion||null, fecha,
+      sql: `INSERT INTO eventos (institucion_id, titulo, descripcion, fecha, fecha_fin, hora_inicio, hora_fin, lugar, tipo, alcance, created_by)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
+      args: [req.user.institucion_id, titulo.trim(), descripcion||null, fecha, fechaFin,
              hora_inicio||null, hora_fin||null, lugar||null, tipo, alcance, req.user.id],
     });
     const eventoId = Number(r.lastInsertRowid);
@@ -132,9 +134,11 @@ router.post('/', verifyToken, requirePermiso('crear_eventos'), async (req, res) 
 // PUT /api/eventos/:id
 router.put('/:id', verifyToken, requirePermiso('editar_eventos'), async (req, res) => {
   const { id } = req.params;
-  const { titulo, descripcion, fecha, hora_inicio, hora_fin, lugar, tipo, alcance, cursos_ids } = req.body;
+  const { titulo, descripcion, fecha, fecha_fin, hora_inicio, hora_fin, lugar, tipo, alcance, cursos_ids } = req.body;
   if (!titulo?.trim()) return res.status(400).json({ error: 'El título es requerido' });
-  if (!fecha)           return res.status(400).json({ error: 'La fecha es requerida' });
+  if (!fecha)           return res.status(400).json({ error: 'La fecha de inicio es requerida' });
+  const fechaFin = fecha_fin || fecha;
+  if (fechaFin < fecha) return res.status(400).json({ error: 'La fecha fin no puede ser anterior a la fecha inicio' });
 
   try {
     const { rows: ex } = await db.execute({
@@ -144,9 +148,9 @@ router.put('/:id', verifyToken, requirePermiso('editar_eventos'), async (req, re
     if (!ex[0]) return res.status(404).json({ error: 'Evento no encontrado' });
 
     await db.execute({
-      sql: `UPDATE eventos SET titulo=?,descripcion=?,fecha=?,hora_inicio=?,hora_fin=?,
+      sql: `UPDATE eventos SET titulo=?,descripcion=?,fecha=?,fecha_fin=?,hora_inicio=?,hora_fin=?,
                                lugar=?,tipo=?,alcance=?,updated_at=datetime('now') WHERE id=?`,
-      args: [titulo.trim(), descripcion||null, fecha, hora_inicio||null, hora_fin||null,
+      args: [titulo.trim(), descripcion||null, fecha, fechaFin, hora_inicio||null, hora_fin||null,
              lugar||null, tipo, alcance, id],
     });
 
@@ -230,14 +234,18 @@ router.post('/:id/reprogramar', verifyToken, requirePermiso('editar_eventos'), a
     if (!evento) return res.status(404).json({ error: 'Evento no encontrado' });
     if (evento.estado !== 'activo') return res.status(400).json({ error: 'El evento ya fue cancelado o reprogramado' });
 
+    // Preserva la duración del evento (multi-día) al desplazar la fecha de inicio
+    const duracionMs = new Date(evento.fecha_fin || evento.fecha) - new Date(evento.fecha);
+    const nuevaFechaFin = new Date(new Date(nueva_fecha).getTime() + duracionMs).toISOString().slice(0, 10);
+
     await db.execute({
       sql: `UPDATE eventos SET
               estado='reprogramado', motivo_cambio=?,
               fecha_original=fecha, hora_inicio_original=hora_inicio,
-              fecha=?, hora_inicio=?, hora_fin=?,
+              fecha=?, fecha_fin=?, hora_inicio=?, hora_fin=?,
               updated_at=datetime('now')
             WHERE id=?`,
-      args: [motivo.trim(), nueva_fecha, nueva_hora_inicio||null, nueva_hora_fin||null, id],
+      args: [motivo.trim(), nueva_fecha, nuevaFechaFin, nueva_hora_inicio||null, nueva_hora_fin||null, id],
     });
 
     notificarCambioEvento(db, evento, 'reprogramado', motivo.trim(), nueva_fecha, nueva_hora_inicio||null)

@@ -719,6 +719,29 @@ async function runSchema(db) {
     )
   `);
 
+  // ── MIGRACIÓN ESTUDIANTES: teléfono propio y teléfono del tutor ───────────
+  for (const col of ['telefono', 'tutor_telefono']) {
+    try { await db.execute(`ALTER TABLE estudiantes ADD COLUMN ${col} TEXT`); } catch(e) {}
+  }
+
+  // ── MIGRACIÓN EVENTOS: fecha_fin para eventos multi-día ───────────────────
+  try { await db.execute(`ALTER TABLE eventos ADD COLUMN fecha_fin TEXT`); } catch(e) {}
+  // Backfill: eventos existentes sin fecha_fin duran 1 solo día
+  try { await db.execute(`UPDATE eventos SET fecha_fin = fecha WHERE fecha_fin IS NULL`); } catch(e) {}
+
+  // ── MIGRACIÓN INSTRUMENTOS: agregar Teclado y Chancha si faltan ───────────
+  try {
+    const { rows: instituciones } = await db.execute('SELECT id FROM instituciones');
+    for (const inst of instituciones) {
+      for (const nombre of ['Teclado', 'Chancha']) {
+        await db.execute({
+          sql: 'INSERT OR IGNORE INTO instrumentos (institucion_id, nombre) VALUES (?,?)',
+          args: [inst.id, nombre],
+        });
+      }
+    }
+  } catch(e) { console.error('❌ Migración instrumentos Teclado/Chancha:', e.message); }
+
   // ── MIGRACIÓN PERMISOS reuniones (idempotente) ────────────────────────────
   for (const p of [
     { codigo:'ver_reuniones',    descripcion:'Ver registro de reuniones',        grupo:'reuniones' },

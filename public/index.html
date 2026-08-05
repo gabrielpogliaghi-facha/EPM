@@ -584,12 +584,18 @@
     .restore-warning strong { color:var(--danger); }
 
     /* ── FICHA TABS ─────────────────────────────────────────────────────────── */
-    .ficha-tab-bar { display:flex; gap:0; border-bottom:2px solid var(--border); margin-bottom:12px; }
-    .ficha-tab-btn { flex:1; padding:11px 4px; text-align:center; font-size:13px; font-weight:600;
+    .ficha-tab-bar { display:flex; gap:0; border-bottom:2px solid var(--border); margin-bottom:12px;
+                     width:100%; max-width:100%; overflow-x:auto; -webkit-overflow-scrolling:touch; }
+    .ficha-tab-btn { flex:1 1 0; min-width:0; min-height:44px; padding:11px 4px; text-align:center;
+                     font-size:13px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
                      color:var(--text2); border:none; background:none; cursor:pointer;
+                     touch-action:manipulation; -webkit-tap-highlight-color:transparent;
                      border-bottom:3px solid transparent; margin-bottom:-2px; transition:color .15s; }
     .ficha-tab-btn.active { color:var(--primary); border-bottom-color:var(--primary); }
     .ficha-tab-btn:hover:not(.active) { color:var(--text); background:rgba(0,0,0,.03); }
+    @media (max-width:400px) {
+      .ficha-tab-btn { font-size:12px; padding:11px 2px; }
+    }
 
     /* ── LEGAJO TIMELINE ─────────────────────────────────────────────────────── */
     .legajo-subtitle { font-size:12px; font-weight:700; color:var(--text2); text-transform:uppercase;
@@ -718,6 +724,9 @@
     }
     .evtcal-dot:hover    { transform:scale(1.5); }
     .evtcal-dot.inactive { opacity:.35; }
+    /* Días intermedios de un evento multi-día: puntito alargado, como una barrita */
+    .evtcal-dot.multi-start,.evtcal-dot.multi-mid,.evtcal-dot.multi-end { border-radius:3px; width:14px; }
+    .evtcal-dot.multi-mid { opacity:.75; }
 
     /* Chips de texto — ocultos en mobile, visibles en desktop */
     .evtcal-chips { display:none; }
@@ -729,6 +738,10 @@
     }
     .evtcal-chip:hover    { opacity:.82; }
     .evtcal-chip.inactive { opacity:.4; text-decoration:line-through; }
+    /* Eventos multi-día: chips conectados visualmente entre celdas contiguas */
+    .evtcal-chip.multi-start { border-radius:4px 0 0 4px; margin-right:-6px; padding-right:10px; position:relative; z-index:1; }
+    .evtcal-chip.multi-mid   { border-radius:0; margin-left:-6px; margin-right:-6px; padding-left:10px; padding-right:10px; position:relative; z-index:1; }
+    .evtcal-chip.multi-end   { border-radius:0 4px 4px 0; margin-left:-6px; padding-left:10px; }
     .evtcal-more {
       font-size:10px; color:var(--text2); font-weight:600;
       cursor:pointer; padding:1px 4px; display:block;
@@ -1063,14 +1076,14 @@ async function apiFetch(url, opts = {}) {
 }
 
 // ── CSV IMPORT UTILITIES ────────────────────────────────────────────────────────
-const COLS_CSV = ['Nombre','Apellido','DNI','CUIT','Fecha de nacimiento','Dirección',
-                  'Tutor','DNI del tutor','Autorización de Imagen','Autorización General',
+const COLS_CSV = ['Nombre','Apellido','DNI','CUIT','Fecha de nacimiento','Teléfono','Dirección',
+                  'Tutor','DNI del tutor','Teléfono del tutor','Autorización de Imagen','Autorización General',
                   'Autorización Boleto Estudiantil','Curso','Instrumento'];
 
 function descargarPlantilla() {
   // Curso e Instrumento soportan múltiples valores separados por | (uno por inscripción)
-  const ej1 = ['Juan','García','45123456','20-45123456-7','15/03/2015','Av. Siempreviva 742','María García','23456789','sí','sí','no','Delfines|Mojarritas','Guitarra|Canto'];
-  const ej2 = ['Sofía','López','45678901','','22/07/2016','','','','no','no','sí','Tiburones','Batería'];
+  const ej1 = ['Juan','García','45123456','20-45123456-7','15/03/2015','1122334455','Av. Siempreviva 742','María García','23456789','1155667788','sí','sí','no','Delfines|Mojarritas','Guitarra|Canto'];
+  const ej2 = ['Sofía','López','45678901','','22/07/2016','','','','','','no','no','sí','Tiburones','Batería'];
   const csv = [COLS_CSV,ej1,ej2].map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
   const a = document.createElement('a');
   a.href = URL.createObjectURL(new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8;'}));
@@ -1155,7 +1168,7 @@ function validarFilaCSV(row, cursos, instrumentos, allDnis, idx) {
                              curso_nombre: curso.nombre, instrumento_nombre: instr.nombre });
       }
     });
-    inscripcionesLabel = inscripciones.map(i=>`${i.instrumento_nombre}→${i.curso_nombre}`).join(' | ');
+    inscripcionesLabel = inscripciones.map(i=>`${i.curso_nombre} · ${i.instrumento_nombre}`).join(' | ');
   }
 
   return {
@@ -1163,9 +1176,11 @@ function validarFilaCSV(row, cursos, instrumentos, allDnis, idx) {
     nombre, apellido, dni,
     cuit:         row['CUIT']?.trim()||'',
     fecha_nacimiento,
-    direccion:    row['Dirección']?.trim()||'',
-    tutor_nombre: row['Tutor']?.trim()||'',
-    tutor_dni:    row['DNI del tutor']?.trim()||'',
+    telefono:       row['Teléfono']?.trim()||'',
+    direccion:      row['Dirección']?.trim()||'',
+    tutor_nombre:   row['Tutor']?.trim()||'',
+    tutor_dni:      row['DNI del tutor']?.trim()||'',
+    tutor_telefono: row['Teléfono del tutor']?.trim()||'',
     auth_imagen:  parseBool(row['Autorización de Imagen']),
     auth_general: parseBool(row['Autorización General']),
     auth_boleto:  parseBool(row['Autorización Boleto Estudiantil']),
@@ -1184,6 +1199,38 @@ async function apiFotoUpload(id, file) {
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || 'Error al subir foto');
   return data;
+}
+
+// ── INPUT DE CONTRASEÑA CON BOTÓN MOSTRAR/OCULTAR ─────────────────────────────────
+function PasswordInput({ value, onChange, placeholder, required, className, id, autoComplete }) {
+  const [visible, setVisible] = React.useState(false);
+  return (
+    <div style={{position:'relative'}}>
+      <input
+        id={id}
+        className={className || 'form-control'}
+        style={{paddingRight:40}}
+        type={visible ? 'text' : 'password'}
+        placeholder={placeholder}
+        value={value}
+        onChange={onChange}
+        required={required}
+        autoComplete={autoComplete}
+      />
+      <button
+        type="button"
+        onClick={() => setVisible(v => !v)}
+        aria-label={visible ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+        title={visible ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+        style={{
+          position:'absolute', right:0, top:0, bottom:0, width:40,
+          display:'flex', alignItems:'center', justifyContent:'center',
+          background:'none', border:'none', cursor:'pointer', fontSize:18,
+          color:'var(--text2)', padding:0,
+        }}
+      >{visible ? '🙈' : '👁'}</button>
+    </div>
+  );
 }
 
 // ── LOGIN ────────────────────────────────────────────────────────────────────────
@@ -1222,7 +1269,7 @@ function LoginPage({ onLogin }) {
           </div>
           <div className="form-group">
             <label className="form-label">Contraseña</label>
-            <input className="form-control" type="password" placeholder="••••••••"
+            <PasswordInput placeholder="••••••••"
               value={form.password} onChange={e => setForm({...form, password:e.target.value})} required />
           </div>
           <button className="btn btn-primary" type="submit" disabled={loading}>
@@ -1332,6 +1379,7 @@ function ProximosEventos({ user, onSection }) {
               <div className="prox-evento-titulo">{ev.titulo}</div>
               <div className="prox-evento-fecha">
                 {formatFechaCalendario(ev.fecha)}
+                {ev.fecha_fin && ev.fecha_fin !== ev.fecha ? ` al ${formatFechaCalendario(ev.fecha_fin)}` : ''}
                 {ev.hora_inicio ? ` · ${formatHora(ev.hora_inicio)}` : ''}
                 {ev.lugar ? ` · ${ev.lugar}` : ''}
                 <span style={{marginLeft:6,background:tipoColor(ev.tipo)+'22',color:tipoColor(ev.tipo),
@@ -1529,9 +1577,9 @@ function ModalImport({ cursos, instrumentos, onImportado, onClose }) {
         method:'POST',
         body:{ estudiantes: validas.map(f=>({
           nombre:f.nombre, apellido:f.apellido, dni:f.dni,
-          cuit:f.cuit||null, fecha_nacimiento:f.fecha_nacimiento||null,
+          cuit:f.cuit||null, fecha_nacimiento:f.fecha_nacimiento||null, telefono:f.telefono||null,
           direccion:f.direccion||null, tutor_nombre:f.tutor_nombre||null,
-          tutor_dni:f.tutor_dni||null,
+          tutor_dni:f.tutor_dni||null, tutor_telefono:f.tutor_telefono||null,
           auth_imagen:f.auth_imagen, auth_general:f.auth_general, auth_boleto:f.auth_boleto,
           inscripciones: f.inscripciones||[],
         })) }
@@ -1848,7 +1896,7 @@ function ListaEstudiantes({ user, onNuevo, onEditar }) {
     const rows = target.map(e => [
       e.nombre, e.apellido, e.dni, e.cuit||'',
       e.fecha_nacimiento ? e.fecha_nacimiento.split('-').reverse().join('/') : '',
-      e.direccion||'', e.tutor_nombre||'', e.tutor_dni||'',
+      e.telefono||'', e.direccion||'', e.tutor_nombre||'', e.tutor_dni||'', e.tutor_telefono||'',
       e.auth_imagen?'sí':'no', e.auth_general?'sí':'no', e.auth_boleto?'sí':'no',
       (e.inscripciones||[]).map(i=>i.curso_nombre).join('|'),
       (e.inscripciones||[]).map(i=>i.instrumento_nombre).join('|'),
@@ -1968,12 +2016,12 @@ function ListaEstudiantes({ user, onNuevo, onEditar }) {
               <div className="est-sub">
                 DNI {e.dni}
                 {(e.inscripciones||[]).length > 0 && (
-                  <span> · {(e.inscripciones||[]).map(i=>`${i.instrumento_nombre} (${i.curso_nombre})`).join(' · ')}</span>
+                  <span> · {(e.inscripciones||[]).map(i=>`${i.curso_nombre} (${i.instrumento_nombre})`).join(' · ')}</span>
                 )}
               </div>
             </div>
             {(e.inscripciones||[]).map(i=>(
-              <span key={i.id} className="est-tag" style={{fontSize:11}}>{i.instrumento_nombre}</span>
+              <span key={i.id} className="est-tag" style={{fontSize:11}}>{i.curso_nombre} · {i.instrumento_nombre}</span>
             ))}
             <div className="row-actions">
               <button className="btn-icon" onClick={() => onEditar(e.id)} title="Editar ficha">✏️</button>
@@ -2153,9 +2201,9 @@ function InscripcionesPanel({ estudianteId, user }) {
           <div key={ins.id} style={{display:'flex',alignItems:'center',gap:8,marginBottom:6,padding:'8px 10px',
                                     background:'var(--bg3)',borderRadius:8}}>
             <span style={{flex:1,fontSize:14}}>
-              <strong>{ins.instrumento_nombre}</strong>
-              <span style={{color:'var(--text2)',marginLeft:6}}>→</span>
-              <span style={{marginLeft:6}}>{nivelBadge(ins.curso_nombre)}</span>
+              <strong>{nivelBadge(ins.curso_nombre)}</strong>
+              <span style={{color:'var(--text2)',marginLeft:6}}>·</span>
+              <span style={{marginLeft:6}}>{ins.instrumento_nombre}</span>
             </span>
             {puede('editar_estudiantes') && (<>
               <button className="btn-icon" onClick={() => abrirEditar(ins)} title="Cambiar nivel">✏️</button>
@@ -2457,8 +2505,8 @@ function LegajoTab({ estudianteId, user }) {
 
 // ── FICHA DE ESTUDIANTE ──────────────────────────────────────────────────────────
 const FORM_VACIO = {
-  nombre:'', apellido:'', dni:'', cuit:'', fecha_nacimiento:'',
-  tutor_nombre:'', tutor_dni:'', direccion:'',
+  nombre:'', apellido:'', dni:'', cuit:'', fecha_nacimiento:'', telefono:'',
+  tutor_nombre:'', tutor_dni:'', tutor_telefono:'', direccion:'',
   auth_imagen:false, auth_general:false, auth_boleto:false,
 };
 
@@ -2496,9 +2544,11 @@ function Ficha({ user, estudianteId, initialTab, onClose, onGuardarYCargarOtro, 
             dni:              data.dni || '',
             cuit:             data.cuit || '',
             fecha_nacimiento: data.fecha_nacimiento || '',
+            telefono:         data.telefono || '',
             direccion:        data.direccion || '',
             tutor_nombre:     data.tutor_nombre || '',
             tutor_dni:        data.tutor_dni || '',
+            tutor_telefono:   data.tutor_telefono || '',
             auth_imagen:      !!data.auth_imagen,
             auth_general:     !!data.auth_general,
             auth_boleto:      !!data.auth_boleto,
@@ -2626,6 +2676,11 @@ function Ficha({ user, estudianteId, initialTab, onClose, onGuardarYCargarOtro, 
             <input className="form-control" value={form.direccion}
               onChange={e => set('direccion', e.target.value)} placeholder="Av. Ejemplo 1234, Ciudad" />
           </div>
+          <div className="form-group" style={{marginBottom:0}}>
+            <label className="form-label">Teléfono</label>
+            <input className="form-control" type="tel" value={form.telefono}
+              onChange={e => set('telefono', e.target.value)} placeholder="11 2233-4455" />
+          </div>
         </div>
       </div>
 
@@ -2643,12 +2698,17 @@ function Ficha({ user, estudianteId, initialTab, onClose, onGuardarYCargarOtro, 
             <input className="form-control" value={form.tutor_dni} inputMode="numeric"
               onChange={e => set('tutor_dni', e.target.value)} placeholder="23456789" />
           </div>
+          <div className="form-group" style={{marginBottom:0}}>
+            <label className="form-label">Teléfono del tutor</label>
+            <input className="form-control" type="tel" value={form.tutor_telefono}
+              onChange={e => set('tutor_telefono', e.target.value)} placeholder="11 5566-7788" />
+          </div>
         </div>
       </div>
 
       {/* ── Inscripciones ── */}
       <div className="ficha-section">
-        <div className="ficha-section-title">🎵 Inscripciones (instrumento → nivel)</div>
+        <div className="ficha-section-title">🎵 Inscripciones (nivel · instrumento)</div>
         {isNew
           ? <p style={{color:'var(--text2)',fontSize:13,margin:0}}>Guardá la ficha primero para agregar inscripciones.</p>
           : <InscripcionesPanel estudianteId={estudianteId} user={user} />
@@ -3092,7 +3152,8 @@ function PieChart({ presencias, ausencias, tardes, size = 80 }) {
 }
 
 // ── REPORTES DE ASISTENCIA ───────────────────────────────────────────────────────
-function Reportes({ user }) {
+function Reportes({ user, onNavigate }) {
+  const [tabReporte, setTabReporte] = useState('asistencia'); // 'asistencia' | 'nivel'
   const [ciclos,     setCiclos]     = useState([]);
   const [cursos,     setCursos]     = useState([]);
   const [modo,       setModo]       = useState('semestre');
@@ -3213,6 +3274,15 @@ function Reportes({ user }) {
     <div>
       {toast.text && <div className={`alert alert-${toast.type} no-print`} style={{cursor:'pointer'}} onClick={()=>setToast({type:'',text:''})}>{toast.text}</div>}
 
+      {/* ── Selector de tipo de reporte ── */}
+      <div className="cal-view-toggle no-print" style={{marginBottom:14}}>
+        <button className={`cal-view-btn ${tabReporte==='asistencia'?'active':''}`} onClick={()=>setTabReporte('asistencia')}>📊 Asistencia</button>
+        <button className={`cal-view-btn ${tabReporte==='nivel'?'active':''}`} onClick={()=>setTabReporte('nivel')}>🏫 Por nivel / curso</button>
+      </div>
+
+      {tabReporte === 'nivel' && <ReportePorNivel cursos={cursos} onNavigate={onNavigate} />}
+
+      {tabReporte === 'asistencia' && <>
       {/* ── Panel de control ── */}
       <div className="card no-print" style={{marginBottom:14}}>
         <div className="card-title" style={{marginBottom:12}}>📊 Reporte de Asistencia</div>
@@ -3387,6 +3457,7 @@ function Reportes({ user }) {
           )}
         </>
       )}
+      </>}
 
       {/* Modal editar semestre */}
       {editSem && (
@@ -3416,6 +3487,185 @@ function Reportes({ user }) {
             </div>
           </div>
         </div>
+      )}
+    </div>
+  );
+}
+
+// ── REPORTE POR NIVEL / CURSO ─────────────────────────────────────────────────────
+const CAMPOS_COMPLETITUD = [
+  { key:'dni',            label:'DNI',        ok: e => !!e.dni },
+  { key:'fecha_nac',      label:'F. nac.',    ok: e => !!e.fecha_nacimiento },
+  { key:'telefono',       label:'Teléfono',   ok: e => !!e.telefono },
+  { key:'tutor',          label:'Tutor',      ok: e => !!e.tutor_nombre && !!e.tutor_dni },
+  { key:'tutor_telefono', label:'Tel. tutor', ok: e => !!e.tutor_telefono },
+  { key:'direccion',      label:'Dirección',  ok: e => !!e.direccion },
+  { key:'foto',           label:'Foto',       ok: e => !!e.foto_path },
+];
+
+function ReportePorNivel({ cursos, onNavigate }) {
+  const [cursoId, setCursoId] = useState('');
+  const [datos,   setDatos]   = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error,   setError]   = useState('');
+  const [sortCol, setSortCol] = useState('apellido');
+  const [sortDir, setSortDir] = useState('asc');
+
+  const cargar = async () => {
+    setLoading(true); setError('');
+    try {
+      const p = new URLSearchParams();
+      if (cursoId) p.set('curso_id', cursoId);
+      setDatos(await apiFetch(`/api/reportes/nivel?${p}`));
+    } catch(e) { setError(e.message); }
+    finally { setLoading(false); }
+  };
+
+  useEffect(() => { cargar(); }, [cursoId]);
+
+  const toggleSort = (col) => {
+    if (sortCol === col) setSortDir(d => d==='asc'?'desc':'asc');
+    else { setSortCol(col); setSortDir('asc'); }
+  };
+
+  const est = datos || [];
+  const sorted = [...est].sort((a, b) => {
+    let av = sortCol==='apellido' ? `${a.apellido} ${a.nombre}` : a[sortCol];
+    let bv = sortCol==='apellido' ? `${b.apellido} ${b.nombre}` : b[sortCol];
+    if (sortCol==='completitud' || sortCol==='porcentaje') { av = av??-1; bv = bv??-1; }
+    if (typeof av==='string') return sortDir==='asc' ? av.localeCompare(bv,'es') : bv.localeCompare(av,'es');
+    return sortDir==='asc' ? (av??0)-(bv??0) : (bv??0)-(av??0);
+  });
+
+  const cursoLabel = cursoId ? (cursos.find(c=>String(c.id)===cursoId)?.nombre||'') : 'Todos los niveles';
+
+  const exportarCSV = () => {
+    if (!sorted.length) return;
+    const heads = ['Apellido','Nombre','Curso/Nivel','Instrumento(s)','Teléfono','Tutor','Tel. tutor','Dirección',
+                   'Presencias','Ausencias','Tardes','Días','% Asistencia',
+                   ...CAMPOS_COMPLETITUD.map(c=>c.label), 'Completitud %'];
+    const rows = sorted.map(e => {
+      const niveles = (e.inscripciones||[]).map(i=>i.curso_nombre).join(' | ');
+      const instrs  = (e.inscripciones||[]).map(i=>i.instrumento_nombre).join(' | ');
+      const okCount = CAMPOS_COMPLETITUD.filter(c=>c.ok(e)).length;
+      return [
+        e.apellido, e.nombre, niveles, instrs,
+        e.telefono||'', e.tutor_nombre||'', e.tutor_telefono||'', e.direccion||'',
+        e.presencias, e.ausencias, e.tardes, e.total_registros,
+        e.porcentaje!==null ? e.porcentaje+'%' : 'Sin datos',
+        ...CAMPOS_COMPLETITUD.map(c=>c.ok(e)?'sí':'no'),
+        Math.round(okCount/CAMPOS_COMPLETITUD.length*100)+'%',
+      ];
+    });
+    const csv  = [heads,...rows].map(r=>r.map(v=>`"${String(v||'').replace(/"/g,'""')}"`).join(',')).join('\n');
+    const blob = new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8;'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `EPM_reporte_nivel_${cursoLabel.replace(/\s+/g,'_')}.csv`;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  };
+
+  const SortTh = ({col, label}) => (
+    <th className="rpt-th" onClick={()=>toggleSort(col)}>
+      {label}{sortCol===col && <span style={{marginLeft:4,fontSize:10}}>{sortDir==='asc'?'▲':'▼'}</span>}
+    </th>
+  );
+
+  return (
+    <div>
+      <div className="card no-print" style={{marginBottom:14}}>
+        <div className="card-title" style={{marginBottom:12}}>🏫 Resumen por nivel / curso</div>
+        <div className="form-group" style={{marginBottom:0}}>
+          <label className="form-label">Nivel / Curso</label>
+          <select className="form-control" value={cursoId} onChange={e=>setCursoId(e.target.value)}>
+            <option value="">Todos los niveles</option>
+            {cursos.map(c=><option key={c.id} value={String(c.id)}>{c.nombre}</option>)}
+          </select>
+        </div>
+      </div>
+
+      {error && <div className="alert alert-error">{error}</div>}
+      {loading && <div className="spinner"><div className="spin" /></div>}
+
+      {!loading && datos && (
+        <>
+          <div className="no-print" style={{display:'flex',gap:8,marginBottom:14,flexWrap:'wrap',alignItems:'center'}}>
+            <button className="btn btn-secondary btn-auto" onClick={exportarCSV}>📤 Exportar CSV</button>
+            <button className="btn btn-secondary btn-auto" onClick={()=>window.print()}>🖨️ Imprimir</button>
+            <span style={{fontSize:12,color:'var(--text2)'}}>{sorted.length} est. · {cursoLabel}</span>
+          </div>
+
+          {sorted.length === 0 ? (
+            <div className="empty-state">
+              <div className="empty-state-icon">🏫</div>
+              <p>No hay estudiantes para mostrar con esos filtros.</p>
+            </div>
+          ) : (
+            <div className="card" style={{padding:0,overflow:'hidden'}}>
+              <div style={{overflowX:'auto'}}>
+                <table className="rpt-table">
+                  <thead>
+                    <tr>
+                      <SortTh col="apellido" label="Estudiante" />
+                      <th className="rpt-th">Nivel · Instrumento</th>
+                      <th className="rpt-th">Contacto</th>
+                      <SortTh col="porcentaje" label="% Asist." />
+                      <th className="rpt-th">Completitud de datos</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {sorted.map(e => {
+                      const okCount = CAMPOS_COMPLETITUD.filter(c=>c.ok(e)).length;
+                      const pctCompletitud = Math.round(okCount/CAMPOS_COMPLETITUD.length*100);
+                      const irAFicha = () => onNavigate && onNavigate('asistencia', e.id);
+                      return (
+                        <tr key={e.id}>
+                          <td className="rpt-nombre" style={{cursor:'pointer'}} onClick={irAFicha}>
+                            {e.apellido}, {e.nombre}
+                          </td>
+                          <td className="rpt-td" style={{fontSize:12}}>
+                            {(e.inscripciones||[]).length
+                              ? (e.inscripciones||[]).map((i,idx)=>(
+                                  <div key={idx}>{i.curso_nombre} · {i.instrumento_nombre}</div>
+                                ))
+                              : <span style={{color:'var(--text2)'}}>—</span>}
+                          </td>
+                          <td className="rpt-td" style={{fontSize:12}}>
+                            {e.telefono && <div>📱 {e.telefono}</div>}
+                            {e.tutor_telefono && <div>👨‍👩‍👧 {e.tutor_telefono}</div>}
+                            {!e.telefono && !e.tutor_telefono && <span style={{color:'var(--text2)'}}>—</span>}
+                          </td>
+                          <td className="rpt-td">
+                            {e.porcentaje===null
+                              ? <span style={{color:'var(--text2)',fontSize:12}}>Sin datos</span>
+                              : <span className={`pct-badge ${e.porcentaje>=90?'pct-alta':e.porcentaje>=75?'pct-media':'pct-baja'}`}>{e.porcentaje}%</span>}
+                          </td>
+                          <td className="rpt-td">
+                            <div style={{display:'flex',gap:4,flexWrap:'wrap',alignItems:'center'}}>
+                              {CAMPOS_COMPLETITUD.map(c => (
+                                <span key={c.key} title={`${c.label}: ${c.ok(e)?'completo':'falta — tocá para completar'}`}
+                                  onClick={c.ok(e) ? undefined : irAFicha}
+                                  style={{cursor:c.ok(e)?'default':'pointer',fontSize:11,whiteSpace:'nowrap',
+                                          padding:'2px 6px',borderRadius:6,
+                                          background: c.ok(e)?'rgba(34,197,94,.12)':'rgba(239,68,68,.12)',
+                                          color: c.ok(e)?'#16a34a':'#dc2626'}}>
+                                  {c.ok(e)?'✅':'❌'} {c.label}
+                                </span>
+                              ))}
+                              <span className={`pct-badge ${pctCompletitud>=90?'pct-alta':pctCompletitud>=60?'pct-media':'pct-baja'}`} style={{marginLeft:4}}>
+                                {pctCompletitud}%
+                              </span>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </>
       )}
     </div>
   );
@@ -3607,7 +3857,7 @@ function GestionUsuarios({ self }) {
             {isNew && (
               <div className="form-group">
                 <label className="form-label">Contraseña * (mín. 6 caracteres)</label>
-                <input className="form-control" type="password" value={form.password} onChange={e=>setForm(f=>({...f,password:e.target.value}))} placeholder="••••••" />
+                <PasswordInput value={form.password} onChange={e=>setForm(f=>({...f,password:e.target.value}))} placeholder="••••••" />
               </div>
             )}
             <div className="form-group">
@@ -3655,11 +3905,11 @@ function GestionUsuarios({ self }) {
             {formErr && <div className="alert alert-error">{formErr}</div>}
             <div className="form-group">
               <label className="form-label">Nueva contraseña (mín. 6 caracteres)</label>
-              <input className="form-control" type="password" value={pwForm.password} onChange={e=>setPwForm(f=>({...f,password:e.target.value}))} placeholder="••••••" />
+              <PasswordInput value={pwForm.password} onChange={e=>setPwForm(f=>({...f,password:e.target.value}))} placeholder="••••••" />
             </div>
             <div className="form-group">
               <label className="form-label">Confirmar contraseña</label>
-              <input className="form-control" type="password" value={pwForm.confirm} onChange={e=>setPwForm(f=>({...f,confirm:e.target.value}))} placeholder="••••••" />
+              <PasswordInput value={pwForm.confirm} onChange={e=>setPwForm(f=>({...f,confirm:e.target.value}))} placeholder="••••••" />
             </div>
             <div className="modal-footer">
               <button className="btn btn-secondary btn-auto" onClick={cerrar}>Cancelar</button>
@@ -5034,12 +5284,12 @@ function InvitacionPage({ token, onDone }) {
               </div>
               <div className="form-group">
                 <label className="form-label">Contraseña *</label>
-                <input className="form-control" type="password" value={form.password} required
+                <PasswordInput value={form.password} required
                   onChange={e => set('password', e.target.value)} placeholder="Mínimo 6 caracteres" />
               </div>
               <div className="form-group">
                 <label className="form-label">Confirmar contraseña *</label>
-                <input className="form-control" type="password" value={form.confirm} required
+                <PasswordInput value={form.confirm} required
                   onChange={e => set('confirm', e.target.value)} placeholder="Repetí la contraseña" />
               </div>
               <button className="btn btn-primary" type="submit" disabled={saving}>
@@ -5421,20 +5671,26 @@ function ModalEvento({ evento, cursos, onClose, onGuardado }) {
     titulo:      evento.titulo || '',
     descripcion: evento.descripcion || '',
     fecha:       evento.fecha || '',
+    fecha_fin:   evento.fecha_fin || evento.fecha || '',
     hora_inicio: evento.hora_inicio || '',
     hora_fin:    evento.hora_fin || '',
     lugar:       evento.lugar || '',
     tipo:        evento.tipo || 'otro',
     alcance:     evento.alcance || 'institucion',
     cursos_ids:  evento.cursos_ids || [],
-  } : { titulo:'', descripcion:'', fecha:'', hora_inicio:'', hora_fin:'', lugar:'',
+  } : { titulo:'', descripcion:'', fecha:'', fecha_fin:'', hora_inicio:'', hora_fin:'', lugar:'',
         tipo:'otro', alcance:'institucion', cursos_ids:[] };
 
   const [form,    setForm]   = useState(inicial);
   const [saving,  setSaving] = useState(false);
   const [error,   setError]  = useState('');
 
-  const set = (k, v) => setForm(f => ({...f, [k]:v}));
+  const set = (k, v) => setForm(f => {
+    const next = {...f, [k]:v};
+    // Si la fecha inicio queda posterior a la fecha fin, la fecha fin se ajusta
+    if (k === 'fecha' && (!f.fecha_fin || v > f.fecha_fin)) next.fecha_fin = v;
+    return next;
+  });
 
   const toggleCurso = (id) => {
     setForm(f => {
@@ -5449,7 +5705,7 @@ function ModalEvento({ evento, cursos, onClose, onGuardado }) {
     try {
       const method = evento?.id ? 'PUT' : 'POST';
       const url    = evento?.id ? `/api/eventos/${evento.id}` : '/api/eventos';
-      const data   = await apiFetch(url, { method, body: form });
+      const data   = await apiFetch(url, { method, body: { ...form, fecha_fin: form.fecha_fin || form.fecha } });
       onGuardado(data);
     } catch(e) { setError(e.message); }
     finally { setSaving(false); }
@@ -5484,9 +5740,14 @@ function ModalEvento({ evento, cursos, onClose, onGuardado }) {
           </div>
           <div className="form-grid">
             <div className="form-group">
-              <label className="form-label">Fecha *</label>
+              <label className="form-label">Fecha inicio *</label>
               <input className="form-control" type="date" value={form.fecha}
                 onChange={e => set('fecha', e.target.value)} required />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Fecha fin *</label>
+              <input className="form-control" type="date" value={form.fecha_fin} min={form.fecha}
+                onChange={e => set('fecha_fin', e.target.value)} required />
             </div>
             <div className="form-group">
               <label className="form-label">Lugar</label>
@@ -5648,6 +5909,7 @@ function ModalDetalleEvento({ evento, cursos, user, onClose, onEditar, onCambio 
         </div>
         <div style={{fontSize:14,display:'flex',flexDirection:'column',gap:8}}>
           <div><strong>📅 Fecha:</strong> {formatFechaCalendario(evento.fecha)}
+            {evento.fecha_fin && evento.fecha_fin !== evento.fecha ? ` al ${formatFechaCalendario(evento.fecha_fin)}` : ''}
             {evento.hora_inicio ? ` · ${formatHora(evento.hora_inicio)}` : ''}
             {evento.hora_fin    ? ` – ${formatHora(evento.hora_fin)}`    : ''}
           </div>
@@ -5757,11 +6019,25 @@ function Calendario({ user }) {
   const todayStr = hoy.toISOString().slice(0,10);
   const grid = buildGrid();
 
-  // Mapa fecha → eventos
+  // Devuelve todas las fechas YYYY-MM-DD entre desde y hasta (inclusive)
+  const fechasEnRango = (desde, hasta) => {
+    const out = []; let d = new Date(desde + 'T12:00:00'); const fin = new Date((hasta||desde) + 'T12:00:00');
+    let guard = 0;
+    while (d <= fin && guard < 60) { out.push(d.toISOString().slice(0,10)); d.setDate(d.getDate()+1); guard++; }
+    return out;
+  };
+
+  // Mapa fecha → eventos (expandido: un evento multi-día aparece en cada día de su rango,
+  // marcado con su posición para dibujar la "barrita" conectada visualmente)
   const eventosPorFecha = {};
   eventos.forEach(ev => {
-    if (!eventosPorFecha[ev.fecha]) eventosPorFecha[ev.fecha] = [];
-    eventosPorFecha[ev.fecha].push(ev);
+    const dias = fechasEnRango(ev.fecha, ev.fecha_fin || ev.fecha);
+    dias.forEach((f, i) => {
+      const multiPos = dias.length <= 1 ? null
+        : i === 0 ? 'multi-start' : i === dias.length - 1 ? 'multi-end' : 'multi-mid';
+      if (!eventosPorFecha[f]) eventosPorFecha[f] = [];
+      eventosPorFecha[f].push({ ...ev, __multiPos: multiPos });
+    });
   });
 
   // Mapa dia → cumpleaños del mes visible
@@ -5771,12 +6047,11 @@ function Calendario({ user }) {
     cumplesPorDia[c.dia].push(c);
   });
 
-  // Vista agenda: eventos del mes actual ordenados
+  // Vista agenda: eventos que tocan el mes actual (incluye multi-día que empiezan antes)
+  const inicioMesStr = new Date(año, mes, 1).toISOString().slice(0,10);
+  const finMesStr    = new Date(año, mes + 1, 0).toISOString().slice(0,10);
   const eventosDelMes = eventos
-    .filter(ev => {
-      const [y,m] = ev.fecha.split('-').map(Number);
-      return y === año && m - 1 === mes;
-    })
+    .filter(ev => ev.fecha <= finMesStr && (ev.fecha_fin || ev.fecha) >= inicioMesStr)
     .sort((a,b) => a.fecha.localeCompare(b.fecha) || (a.hora_inicio||'').localeCompare(b.hora_inicio||''));
 
   const cerrarTodo = () => {
@@ -5844,9 +6119,9 @@ function Calendario({ user }) {
                 <div className="evtcal-dots">
                   {evsDia.slice(0, 5).map(ev => (
                     <span key={ev.id}
-                      className={`evtcal-dot${ev.estado !== 'activo' ? ' inactive' : ''}`}
+                      className={`evtcal-dot${ev.estado !== 'activo' ? ' inactive' : ''}${ev.__multiPos ? ' '+ev.__multiPos : ''}`}
                       style={{background: tipoColor(ev.tipo)}}
-                      title={ev.titulo}
+                      title={ev.fecha_fin && ev.fecha_fin !== ev.fecha ? `${ev.titulo} (${formatFechaCalendario(ev.fecha)} al ${formatFechaCalendario(ev.fecha_fin)})` : ev.titulo}
                       onClick={() => setModalDetalle(ev)}
                     />
                   ))}
@@ -5860,11 +6135,11 @@ function Calendario({ user }) {
                 <div className="evtcal-chips">
                   {evsDia.slice(0, 2).map(ev => (
                     <span key={ev.id}
-                      className={`evtcal-chip${ev.estado !== 'activo' ? ' inactive' : ''}`}
+                      className={`evtcal-chip${ev.estado !== 'activo' ? ' inactive' : ''}${ev.__multiPos ? ' '+ev.__multiPos : ''}`}
                       style={{background: tipoColor(ev.tipo)}}
-                      title={ev.titulo}
+                      title={ev.fecha_fin && ev.fecha_fin !== ev.fecha ? `${ev.titulo} (${formatFechaCalendario(ev.fecha)} al ${formatFechaCalendario(ev.fecha_fin)})` : ev.titulo}
                       onClick={() => setModalDetalle(ev)}>
-                      {ev.titulo}
+                      {ev.__multiPos === 'multi-mid' || ev.__multiPos === 'multi-end' ? '' : ev.titulo}
                     </span>
                   ))}
                   {cumpleDia.length > 0 && (
@@ -5915,6 +6190,7 @@ function Calendario({ user }) {
                           borderRadius:8,padding:'1px 7px',fontSize:11,fontWeight:700}}>
                           {tipoLabel(ev.tipo)}
                         </span>
+                        {ev.fecha_fin && ev.fecha_fin !== ev.fecha && <span>↔ al {formatFechaCalendario(ev.fecha_fin)}</span>}
                         {ev.hora_inicio && <span>⏰ {formatHora(ev.hora_inicio)}{ev.hora_fin ? ` – ${formatHora(ev.hora_fin)}` : ''}</span>}
                         {ev.lugar && <span>📍 {ev.lugar}</span>}
                         {ev.alcance === 'institucion'
@@ -6208,12 +6484,12 @@ function PerfilUsuario({ usuarioId, user, puede, onVolver, titulo }) {
             {pwErr && <div className="alert alert-error">{pwErr}</div>}
             <div className="form-group">
               <label className="form-label">Nueva contraseña</label>
-              <input className="form-control" type="password" value={pwForm.pass}
+              <PasswordInput value={pwForm.pass}
                 onChange={e => setPwForm(f=>({...f,pass:e.target.value}))} placeholder="Mínimo 6 caracteres" />
             </div>
             <div className="form-group">
               <label className="form-label">Confirmar</label>
-              <input className="form-control" type="password" value={pwForm.confirm}
+              <PasswordInput value={pwForm.confirm}
                 onChange={e => setPwForm(f=>({...f,confirm:e.target.value}))} placeholder="Repetí la contraseña" />
             </div>
             <div className="modal-footer">
@@ -7327,8 +7603,30 @@ function Finanzas() {
 }
 
 // ── LAYOUT ──────────────────────────────────────────────────────────────────────
+// Sincroniza la sección activa con el hash de la URL (#/seccion) para que el botón
+// "atrás" del navegador (muy usado en celular) navegue dentro de la app en vez de
+// salir de ella. Cada cambio de sección agrega una entrada al historial del navegador;
+// "atrás" dispara 'hashchange' y volvemos a la sección anterior sin recargar nada.
+function useHashSection(defaultSection) {
+  const leerHash = () => (window.location.hash || '').replace(/^#\/?/, '') || defaultSection;
+  const [section, setSectionState] = useState(leerHash);
+
+  useEffect(() => {
+    const onHashChange = () => setSectionState(leerHash());
+    window.addEventListener('hashchange', onHashChange);
+    return () => window.removeEventListener('hashchange', onHashChange);
+  }, []);
+
+  const setSection = (id) => {
+    if (id === leerHash()) return;
+    window.location.hash = '/' + id;
+  };
+
+  return [section, setSection];
+}
+
 function Layout({ user }) {
-  const [section, setSection] = useState('dashboard');
+  const [section, setSection] = useHashSection('dashboard');
   const [menuOpen, setMenuOpen] = useState(false);
   const [deepLink, setDeepLink] = useState(null); // { tipo, id, ts } — destino de una notificación
   const title = NAV.find(n => n.id === section)?.label || 'Dashboard';
@@ -7362,7 +7660,7 @@ function Layout({ user }) {
             : section === 'asistencia'
             ? <AsistenciasView user={user} />
             : section === 'reportes'
-            ? <Reportes user={user} />
+            ? <Reportes user={user} onNavigate={irANotificacion} />
             : section === 'usuarios'
             ? <UsuariosYRoles user={user} />
             : section === 'planificaciones'
