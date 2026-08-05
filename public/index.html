@@ -947,6 +947,8 @@
       width:6px; height:6px; border-radius:50%; background:#ec4899;
       display:inline-block; cursor:pointer; flex-shrink:0;
     }
+    .evtcal-cumple.staff { background:#f59e0b; }
+    .cumple-dot.staff { background:#f59e0b; }
     .cumple-card { padding:10px 12px; border-radius:10px; display:flex; gap:10px; align-items:flex-start; }
     .cumple-card:hover { background:var(--bg3); }
     .cumple-nombre { font-size:13px; font-weight:700; }
@@ -1403,6 +1405,30 @@ function ProximosEventos({ user, onSection }) {
   );
 }
 
+// Etiqueta de tipo + rol para un cumpleaños ('estudiante' o 'usuario' — Docente/Operador/Gestión)
+function cumpleEtiqueta(c) {
+  return c.tipo === 'usuario' ? `👩‍🏫 ${c.rol_nombre || 'Equipo'}` : '👦 Estudiante';
+}
+
+// Sub-lista de un grupo de cumpleaños (hoy / próximos 7 días / resto del mes), separando
+// estudiantes del equipo (docentes/operadores/gestión) como pide la funcionalidad.
+function CumpleGrupo({ lista, destacar }) {
+  const ests  = lista.filter(c => c.tipo === 'estudiante');
+  const staff = lista.filter(c => c.tipo === 'usuario');
+  const render = (arr) => arr.map((c, i) => (
+    <div key={i} className="cumple-card" style={destacar ? {background:'#fce7f3',borderRadius:10,marginBottom:4} : undefined}>
+      {destacar
+        ? <span style={{fontSize:20}}>🎂</span>
+        : <span className={`cumple-dot${c.tipo==='usuario'?' staff':''}`} style={{marginTop:4}} />}
+      <div>
+        <div className="cumple-nombre">{c.nombre}{destacar ? ' — ¡HOY!' : ''}</div>
+        <div className="cumple-tipo">{cumpleEtiqueta(c)}{!destacar && ` · ${c.dia}/${c.mes}`}</div>
+      </div>
+    </div>
+  ));
+  return <>{render(ests)}{render(staff)}</>;
+}
+
 function CumpleaniosMes({ user }) {
   const MESES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
   const hoy   = new Date();
@@ -1410,10 +1436,20 @@ function CumpleaniosMes({ user }) {
   const [cargando,  setCargando] = useState(true);
 
   useEffect(() => {
-    const mes  = hoy.getMonth() + 1;
-    const anio = hoy.getFullYear();
-    apiFetch(`/api/cumpleanios?mes=${mes}&anio=${anio}`)
-      .then(d => setCumples(d))
+    const mesActual  = hoy.getMonth() + 1, anioActual = hoy.getFullYear();
+    // La ventana de "próximos 7 días" puede cruzar a mes siguiente (ej: hoy 28, +7 = mes que viene)
+    const finVentana  = new Date(hoy); finVentana.setDate(hoy.getDate() + 7);
+    const cruzaMes    = finVentana.getMonth() !== hoy.getMonth();
+
+    const reqs = [apiFetch(`/api/cumpleanios?mes=${mesActual}&anio=${anioActual}`)
+      .then(d => d.map(c => ({...c, mes: mesActual, anio: anioActual})))];
+    if (cruzaMes) {
+      const mesSig = finVentana.getMonth() + 1, anioSig = finVentana.getFullYear();
+      reqs.push(apiFetch(`/api/cumpleanios?mes=${mesSig}&anio=${anioSig}`)
+        .then(d => d.map(c => ({...c, mes: mesSig, anio: anioSig}))));
+    }
+    Promise.all(reqs)
+      .then(results => setCumples(results.flat()))
       .catch(() => {})
       .finally(() => setCargando(false));
   }, []);
@@ -1429,37 +1465,30 @@ function CumpleaniosMes({ user }) {
 
   if (cargando || cumples.length === 0) return null;
 
-  const hoyDia = hoy.getDate();
-  const cumpleHoy   = cumples.filter(c => c.dia === hoyDia);
-  const cumpleProx  = cumples.filter(c => c.dia > hoyDia && c.dia <= hoyDia + 7);
-  const cumpleResto = cumples.filter(c => c.dia < hoyDia || c.dia > hoyDia + 7);
+  const hoySinHora = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate());
+  const finVentana  = new Date(hoySinHora); finVentana.setDate(finVentana.getDate() + 7);
+  // Próxima ocurrencia real de cada cumpleaños (con día/mes tal como vino del backend)
+  const conFecha = cumples.map(c => ({...c, fechaOcurrencia: new Date(c.anio, c.mes - 1, c.dia)}));
+
+  const cumpleHoy   = conFecha.filter(c => c.fechaOcurrencia.getTime() === hoySinHora.getTime());
+  const cumpleProx  = conFecha.filter(c => c.fechaOcurrencia > hoySinHora && c.fechaOcurrencia <= finVentana);
+  const cumpleResto = conFecha.filter(c => c.mes === hoy.getMonth()+1 && !cumpleHoy.includes(c) && !cumpleProx.includes(c));
 
   return (
     <div className="card" style={{marginBottom:16,borderColor:'#ec489920',background:'linear-gradient(135deg,#fff,#fdf2f8)'}}>
       <div className="card-title" style={{marginBottom:8}}>
-        🎂 Cumpleaños de {MESES[hoy.getMonth()]}
+        🎂 Cumpleaños del mes ({MESES[hoy.getMonth()]})
         <span style={{marginLeft:'auto',fontSize:12,color:'var(--text2)'}}>
           {cumples.length} {cumples.length === 1 ? 'cumpleaños' : 'cumpleaños'}
         </span>
       </div>
-      {cumpleHoy.map((c, i) => (
-        <div key={i} className="cumple-card" style={{background:'#fce7f3',borderRadius:10,marginBottom:4}}>
-          <span style={{fontSize:20}}>🎂</span>
-          <div>
-            <div className="cumple-nombre">{c.nombre} — ¡HOY!</div>
-            <div className="cumple-tipo">{c.tipo === 'docente' ? '👩‍🏫 Docente' : '👦 Estudiante'}</div>
-          </div>
+      <CumpleGrupo lista={cumpleHoy} destacar />
+      {cumpleProx.length > 0 && (
+        <div style={{fontSize:11,fontWeight:700,color:'var(--text2)',textTransform:'uppercase',letterSpacing:.5,padding:'6px 12px 2px'}}>
+          🎉 Próximos 7 días
         </div>
-      ))}
-      {cumpleProx.map((c, i) => (
-        <div key={i} className="cumple-card">
-          <span className="cumple-dot" style={{marginTop:4}} />
-          <div>
-            <div className="cumple-nombre">{c.nombre}</div>
-            <div className="cumple-tipo">{c.tipo === 'docente' ? '👩‍🏫 Docente' : '👦 Estudiante'} · {c.dia}/{hoy.getMonth()+1}</div>
-          </div>
-        </div>
-      ))}
+      )}
+      <CumpleGrupo lista={cumpleProx} />
       {cumpleResto.length > 0 && (
         <div style={{fontSize:12,color:'var(--text2)',padding:'4px 12px'}}>
           + {cumpleResto.length} más este mes
@@ -6126,6 +6155,8 @@ function Calendario({ user }) {
             const dia       = parseInt(fecha.slice(8), 10);
             const cumpleDia = (actual && fecha.slice(0,7) === `${año}-${String(mes+1).padStart(2,'0')}`)
                               ? cumplesPorDia[dia] || [] : [];
+            const cumpleEstDia   = cumpleDia.filter(c => c.tipo === 'estudiante');
+            const cumpleStaffDia = cumpleDia.filter(c => c.tipo === 'usuario');
             const isToday   = fecha === todayStr;
             const dow       = new Date(fecha + 'T12:00:00').getDay();
             const isWeekend = dow === 0 || dow === 6;
@@ -6149,8 +6180,12 @@ function Calendario({ user }) {
                       onClick={() => setModalDetalle(ev)}
                     />
                   ))}
-                  {cumpleDia.length > 0 && (
-                    <span className="evtcal-cumple" title={`🎂 ${cumpleDia.map(c=>c.nombre).join(', ')}`}
+                  {cumpleEstDia.length > 0 && (
+                    <span className="evtcal-cumple" title={`🎂 Estudiantes: ${cumpleEstDia.map(c=>c.nombre).join(', ')}`}
+                      onClick={() => setModalCumple({ dia, lista: cumpleDia })} />
+                  )}
+                  {cumpleStaffDia.length > 0 && (
+                    <span className="evtcal-cumple staff" title={`🎂 Equipo: ${cumpleStaffDia.map(c=>c.nombre).join(', ')}`}
                       onClick={() => setModalCumple({ dia, lista: cumpleDia })} />
                   )}
                 </div>
@@ -6166,10 +6201,16 @@ function Calendario({ user }) {
                       {ev.__multiPos === 'multi-mid' || ev.__multiPos === 'multi-end' ? '' : ev.titulo}
                     </span>
                   ))}
-                  {cumpleDia.length > 0 && (
+                  {cumpleEstDia.length > 0 && (
                     <span className="evtcal-chip" style={{background:'#ec4899',cursor:'pointer'}}
                       onClick={() => setModalCumple({ dia, lista: cumpleDia })}>
-                      🎂 {cumpleDia.length === 1 ? cumpleDia[0].nombre.split(' ')[0] : `${cumpleDia.length} cumpleaños`}
+                      🎂 {cumpleEstDia.length === 1 ? cumpleEstDia[0].nombre.split(' ')[0] : `${cumpleEstDia.length} estudiantes`}
+                    </span>
+                  )}
+                  {cumpleStaffDia.length > 0 && (
+                    <span className="evtcal-chip" style={{background:'#f59e0b',cursor:'pointer'}}
+                      onClick={() => setModalCumple({ dia, lista: cumpleDia })}>
+                      🎂 {cumpleStaffDia.length === 1 ? cumpleStaffDia[0].nombre.split(' ')[0] : `${cumpleStaffDia.length} equipo`}
                     </span>
                   )}
                   {evsDia.length > 2 && (
@@ -6265,7 +6306,7 @@ function Calendario({ user }) {
                 <div>
                   <div style={{fontWeight:700,fontSize:14}}>{c.nombre}</div>
                   <div style={{fontSize:12,color:'var(--text2)'}}>
-                    {c.tipo === 'docente' ? '👩‍🏫 Docente' : '👦 Estudiante'}
+                    {c.tipo === 'usuario' ? `👩‍🏫 ${c.rol_nombre}` : '👦 Estudiante'}
                     {c.fecha_nacimiento && ` · ${new Date().getFullYear() - parseInt(c.fecha_nacimiento.slice(0,4))} años`}
                   </div>
                 </div>
