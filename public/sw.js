@@ -7,7 +7,7 @@
 //  - Resto de archivos  → cache-first con actualización en segundo plano (más rápido).
 //
 // Subir CACHE_VERSION en cada release para invalidar el cache viejo automáticamente.
-const CACHE_VERSION = 'v1';
+const CACHE_VERSION = 'v2'; // v2: íconos regenerados con el logo real de la EPM
 const CACHE_NAME = `epm-cache-${CACHE_VERSION}`;
 
 const PRECACHE_URLS = [
