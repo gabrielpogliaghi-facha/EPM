@@ -31,7 +31,7 @@ router.post('/login', async (req, res) => {
       args: [user.rol_id],
     });
     const payload = {
-      id: Number(user.id), nombre: user.nombre, email: user.email,
+      id: Number(user.id), nombre: user.nombre, email: user.email, foto_path: user.foto_path || null,
       rol_id: Number(user.rol_id), rol_nombre: user.rol_nombre,
       institucion_id: Number(user.institucion_id), institucion_nombre: user.institucion_nombre,
       permisos: permRows.map(r => r.codigo),
@@ -46,7 +46,7 @@ router.post('/login', async (req, res) => {
 router.get('/me', verifyToken, async (req, res) => {
   try {
     const { rows } = await db.execute({
-      sql: `SELECT u.id, u.nombre, u.email, u.rol_id, u.institucion_id, u.activo,
+      sql: `SELECT u.id, u.nombre, u.email, u.foto_path, u.rol_id, u.institucion_id, u.activo,
                    r.nombre AS rol_nombre, i.nombre AS institucion_nombre
             FROM   usuarios u
             JOIN   roles r         ON u.rol_id        = r.id
@@ -62,7 +62,7 @@ router.get('/me', verifyToken, async (req, res) => {
       args: [user.rol_id],
     });
     const payload = {
-      id: Number(user.id), nombre: user.nombre, email: user.email,
+      id: Number(user.id), nombre: user.nombre, email: user.email, foto_path: user.foto_path || null,
       rol_id: Number(user.rol_id), rol_nombre: user.rol_nombre,
       institucion_id: Number(user.institucion_id), institucion_nombre: user.institucion_nombre,
       permisos: permRows.map(r => r.codigo),

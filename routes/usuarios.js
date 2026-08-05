@@ -154,14 +154,19 @@ router.put('/:id/perfil', verifyToken, async (req, res) => {
                    req.user.permisos.includes('editar_equipo_docente');
   if (!esPropio && !esAdmin) return res.status(403).json({ error: 'Sin permiso' });
 
-  const { apellido, dni, fecha_nacimiento, telefono, instrumento_principal_id, instrumento_ids, formacion } = req.body;
+  const { nombre, email, apellido, dni, fecha_nacimiento, telefono, instrumento_principal_id, instrumento_ids, formacion } = req.body;
+  if (nombre !== undefined && !nombre?.trim()) return res.status(400).json({ error:'El nombre no puede quedar vacío' });
+  if (email  !== undefined && !email?.trim())  return res.status(400).json({ error:'El email no puede quedar vacío' });
   try {
-    const { rows } = await db.execute({ sql:'SELECT id FROM usuarios WHERE id=? AND institucion_id=? AND activo=1', args:[id, req.user.institucion_id] });
+    const { rows } = await db.execute({ sql:'SELECT id,nombre,email FROM usuarios WHERE id=? AND institucion_id=? AND activo=1', args:[id, req.user.institucion_id] });
     if (!rows[0]) return res.status(404).json({ error:'Usuario no encontrado' });
 
+    const nuevoNombre = nombre !== undefined ? nombre.trim()               : rows[0].nombre;
+    const nuevoEmail  = email  !== undefined ? email.toLowerCase().trim()  : rows[0].email;
+
     await db.execute({
-      sql: `UPDATE usuarios SET apellido=?,dni=?,fecha_nacimiento=?,telefono=?,instrumento_principal_id=?,formacion=?,updated_at=datetime('now') WHERE id=?`,
-      args: [apellido||null, dni||null, fecha_nacimiento||null, telefono||null, instrumento_principal_id||null, formacion||null, id],
+      sql: `UPDATE usuarios SET nombre=?,email=?,apellido=?,dni=?,fecha_nacimiento=?,telefono=?,instrumento_principal_id=?,formacion=?,updated_at=datetime('now') WHERE id=?`,
+      args: [nuevoNombre, nuevoEmail, apellido||null, dni||null, fecha_nacimiento||null, telefono||null, instrumento_principal_id||null, formacion||null, id],
     });
     if (Array.isArray(instrumento_ids)) {
       await db.execute({ sql:'DELETE FROM usuario_instrumentos WHERE usuario_id=?', args:[id] });
@@ -171,6 +176,7 @@ router.put('/:id/perfil', verifyToken, async (req, res) => {
     }
     res.json({ ok:true });
   } catch(e) {
+    if (e.message?.includes('UNIQUE')) return res.status(409).json({ error:'El email ya está registrado' });
     console.error(e);
     res.status(500).json({ error:'Error al actualizar perfil' });
   }
@@ -194,6 +200,25 @@ router.post('/:id/foto', verifyToken, upload.single('foto'), async (req, res) =>
     await db.execute({ sql:"UPDATE usuarios SET foto_path=?,updated_at=datetime('now') WHERE id=?", args:[fotoPath,id] });
     res.json({ foto_path:fotoPath });
   } catch(e) { res.status(500).json({ error:'Error al subir foto' }); }
+});
+
+// ── DELETE /api/usuarios/:id/foto ────────────────────────────────────────────
+router.delete('/:id/foto', verifyToken, async (req, res) => {
+  const id = Number(req.params.id);
+  const esPropio = req.user.id === id;
+  const esAdmin  = req.user.permisos.includes('administrar_usuarios_roles') ||
+                   req.user.permisos.includes('editar_equipo_docente');
+  if (!esPropio && !esAdmin) return res.status(403).json({ error:'Sin permiso' });
+  try {
+    const { rows } = await db.execute({ sql:'SELECT foto_path FROM usuarios WHERE id=? AND institucion_id=?', args:[id, req.user.institucion_id] });
+    if (!rows[0]) return res.status(404).json({ error:'Usuario no encontrado' });
+    if (rows[0].foto_path) {
+      const old = path.join(__dirname, '..', ...rows[0].foto_path.split('/').filter(Boolean));
+      if (fs.existsSync(old)) fs.unlinkSync(old);
+      await db.execute({ sql:"UPDATE usuarios SET foto_path=NULL,updated_at=datetime('now') WHERE id=?", args:[id] });
+    }
+    res.json({ success:true });
+  } catch(e) { res.status(500).json({ error:'Error al quitar foto' }); }
 });
 
 // ── POST /api/usuarios ────────────────────────────────────────────────────────
@@ -252,6 +277,29 @@ router.put('/:id/password', ...admin, async (req, res) => {
   try {
     const { rows } = await db.execute({ sql:'SELECT id FROM usuarios WHERE id=? AND institucion_id=? AND activo=1', args:[id,req.user.institucion_id] });
     if (!rows[0]) return res.status(404).json({ error:'Usuario no encontrado' });
+    await db.execute({ sql:"UPDATE usuarios SET password_hash=?,updated_at=datetime('now') WHERE id=?", args:[bcrypt.hashSync(password,10),id] });
+    res.json({ success:true });
+  } catch(e) { res.status(500).json({ error:'Error al cambiar contraseña' }); }
+});
+
+// ── PUT /api/usuarios/:id/mi-password — cambio de contraseña propio ──────────
+// A diferencia de PUT /:id/password (solo admin, resetea sin pedir la actual),
+// esta ruta es exclusivamente para que un usuario cambie SU PROPIA contraseña
+// y siempre exige la contraseña actual, sin importar el rol (incluso Gestión).
+router.put('/:id/mi-password', verifyToken, async (req, res) => {
+  const id = Number(req.params.id);
+  if (req.user.id !== id) return res.status(403).json({ error:'Solo podés cambiar tu propia contraseña' });
+
+  const { password_actual, password } = req.body;
+  if (!password_actual) return res.status(400).json({ error:'Ingresá tu contraseña actual' });
+  if (!password || password.length < 6) return res.status(400).json({ error:'La nueva contraseña debe tener al menos 6 caracteres' });
+
+  try {
+    const { rows } = await db.execute({ sql:'SELECT id,password_hash FROM usuarios WHERE id=? AND institucion_id=? AND activo=1', args:[id, req.user.institucion_id] });
+    if (!rows[0]) return res.status(404).json({ error:'Usuario no encontrado' });
+    if (!bcrypt.compareSync(password_actual, rows[0].password_hash))
+      return res.status(401).json({ error:'La contraseña actual es incorrecta' });
+
     await db.execute({ sql:"UPDATE usuarios SET password_hash=?,updated_at=datetime('now') WHERE id=?", args:[bcrypt.hashSync(password,10),id] });
     res.json({ success:true });
   } catch(e) { res.status(500).json({ error:'Error al cambiar contraseña' }); }

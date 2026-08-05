@@ -995,6 +995,7 @@ const { useState, useEffect, useCallback } = React;
 const NAV_GROUPS = [
   { label: null, items: [
     { id:'dashboard',       label:'Dashboard',        icon:'🏠', permiso:null },
+    { id:'mi-perfil',       label:'Mi perfil',        icon:'👤', permiso:null },
   ]},
   { label: 'Alumnos', items: [
     { id:'estudiantes',     label:'Estudiantes',       icon:'👥', permiso:'ver_estudiantes' },
@@ -1337,10 +1338,17 @@ function Sidebar({ user, section, onSection, open, onClose }) {
           })}
         </div>
         <div className="sidebar-user">
-          <div className="user-avatar">{initials}</div>
-          <div className="user-info">
-            <div className="user-name">{user.nombre}</div>
-            <div className="user-role">{user.rol_nombre}</div>
+          <div style={{display:'flex',alignItems:'center',gap:10,flex:1,minWidth:0,cursor:'pointer'}}
+            onClick={() => { onSection('mi-perfil'); onClose(); }} title="Ver mi perfil">
+            <div className="user-avatar">
+              {user.foto_path
+                ? <img src={user.foto_path} alt={user.nombre} style={{width:'100%',height:'100%',objectFit:'cover',borderRadius:'inherit'}} />
+                : initials}
+            </div>
+            <div className="user-info">
+              <div className="user-name">{user.nombre}</div>
+              <div className="user-role">{user.rol_nombre}</div>
+            </div>
           </div>
           <button className="btn-logout" onClick={logout} title="Cerrar sesión">⎋</button>
         </div>
@@ -6272,22 +6280,25 @@ function Calendario({ user }) {
 
 // ── PERFIL DE USUARIO UNIFICADO ──────────────────────────────────────────────────
 // Usado tanto desde Equipo Docente como desde Usuarios y Roles
-function PerfilUsuario({ usuarioId, user, puede, onVolver, titulo }) {
+function PerfilUsuario({ usuarioId, user, puede, onVolver, titulo, onSelfUpdate }) {
   const [perfil,     setPerfil]      = useState(null);
   const [instrumentos,setInstrumentos]= useState([]);
   const [todosLosCursos,setTodosCursos]=useState([]);
   const [cargando,   setCargando]    = useState(true);
   const [form,       setForm]        = useState(null);
+  const [savedForm,  setSavedForm]   = useState(null);
   const [saving,     setSaving]      = useState(false);
   const [msg,        setMsg]         = useState('');
   const [pwModal,    setPwModal]     = useState(false);
-  const [pwForm,     setPwForm]      = useState({ pass:'', confirm:'' });
+  const [pwForm,     setPwForm]      = useState({ actual:'', pass:'', confirm:'' });
+  const [pwSaving,   setPwSaving]    = useState(false);
   const [pwErr,      setPwErr]       = useState('');
 
   const esPropio   = user.id === usuarioId;
   const esAdmin    = puede('administrar_usuarios_roles');
   const puedeEd    = esAdmin || esPropio || puede('editar_equipo_docente');
   const esDocente  = perfil?.rol_nombre === 'Docente';
+  const isDirty    = form && savedForm && JSON.stringify(form) !== JSON.stringify(savedForm);
 
   const cargar = useCallback(async () => {
     try {
@@ -6299,7 +6310,9 @@ function PerfilUsuario({ usuarioId, user, puede, onVolver, titulo }) {
       setPerfil(p);
       setInstrumentos(inst);
       setTodosCursos(cursos);
-      setForm({
+      const f = {
+        nombre:                   p.nombre || '',
+        email:                    p.email || '',
         apellido:                 p.apellido || '',
         dni:                      p.dni || '',
         fecha_nacimiento:         p.fecha_nacimiento || '',
@@ -6307,7 +6320,8 @@ function PerfilUsuario({ usuarioId, user, puede, onVolver, titulo }) {
         formacion:                p.formacion || '',
         instrumento_ids:          (p.instrumentos || []).map(i => Number(i.id)),
         instrumento_principal_id: p.instrumento_principal_id ? Number(p.instrumento_principal_id) : null,
-      });
+      };
+      setForm(f); setSavedForm(f);
     } catch(e) { setMsg('Error: ' + e.message); }
     finally { setCargando(false); }
   }, [usuarioId]);
@@ -6322,10 +6336,15 @@ function PerfilUsuario({ usuarioId, user, puede, onVolver, titulo }) {
   });
 
   const guardar = async (e) => {
-    e.preventDefault(); setSaving(true); setMsg('');
+    e.preventDefault();
+    if (!form.nombre.trim()) { setMsg('Error: el nombre no puede quedar vacío.'); return; }
+    if (!form.email.trim())  { setMsg('Error: el email no puede quedar vacío.');  return; }
+    setSaving(true); setMsg('');
     try {
       await apiFetch(`/api/usuarios/${usuarioId}/perfil`, { method:'PUT', body: form });
-      setMsg('Perfil guardado.');
+      setMsg('✅ Perfil guardado.');
+      setSavedForm(form);
+      if (esPropio) onSelfUpdate?.({ nombre: form.nombre, email: form.email });
       cargar();
     } catch(err) { setMsg('Error: ' + err.message); }
     finally { setSaving(false); }
@@ -6338,17 +6357,35 @@ function PerfilUsuario({ usuarioId, user, puede, onVolver, titulo }) {
       method:'POST', headers:{ Authorization:`Bearer ${localStorage.getItem('epm_token')}` }, body:fd,
     });
     const d = await res.json();
-    if (res.ok) setPerfil(p => ({...p, foto_path: d.foto_path}));
+    if (res.ok) { setPerfil(p => ({...p, foto_path: d.foto_path})); if (esPropio) onSelfUpdate?.({ foto_path: d.foto_path }); }
     else alert(d.error);
   };
 
-  const cambiarPassword = async () => {
-    if (pwForm.pass.length < 6) { setPwErr('Mínimo 6 caracteres'); return; }
-    if (pwForm.pass !== pwForm.confirm) { setPwErr('Las contraseñas no coinciden'); return; }
+  const quitarFoto = async () => {
+    if (!window.confirm('¿Quitar la foto de perfil?')) return;
     try {
-      await apiFetch(`/api/usuarios/${usuarioId}/password`, { method:'PUT', body:{ password:pwForm.pass } });
-      setPwModal(false); setPwForm({ pass:'',confirm:'' }); setMsg('Contraseña actualizada.');
+      await apiFetch(`/api/usuarios/${usuarioId}/foto`, { method:'DELETE' });
+      setPerfil(p => ({...p, foto_path: null}));
+      if (esPropio) onSelfUpdate?.({ foto_path: null });
+    } catch(e) { alert(e.message); }
+  };
+
+  const abrirPassword = () => { setPwForm({ actual:'', pass:'', confirm:'' }); setPwErr(''); setPwModal(true); };
+
+  const cambiarPassword = async () => {
+    if (esPropio && !pwForm.actual) { setPwErr('Ingresá tu contraseña actual'); return; }
+    if (pwForm.pass.length < 6) { setPwErr('La nueva contraseña debe tener mínimo 6 caracteres'); return; }
+    if (pwForm.pass !== pwForm.confirm) { setPwErr('Las contraseñas no coinciden'); return; }
+    setPwSaving(true); setPwErr('');
+    try {
+      if (esPropio) {
+        await apiFetch(`/api/usuarios/${usuarioId}/mi-password`, { method:'PUT', body:{ password_actual:pwForm.actual, password:pwForm.pass } });
+      } else {
+        await apiFetch(`/api/usuarios/${usuarioId}/password`, { method:'PUT', body:{ password:pwForm.pass } });
+      }
+      setPwModal(false); setPwForm({ actual:'', pass:'', confirm:'' }); setMsg('✅ Contraseña actualizada.');
     } catch(e) { setPwErr(e.message); }
+    finally { setPwSaving(false); }
   };
 
   if (cargando) return <div className="spinner"><div className="spin"/></div>;
@@ -6356,17 +6393,18 @@ function PerfilUsuario({ usuarioId, user, puede, onVolver, titulo }) {
 
   const nombreCompleto = [perfil.nombre, perfil.apellido].filter(Boolean).join(' ');
   const iniciales = nombreCompleto.split(' ').map(p=>p[0]).join('').slice(0,2).toUpperCase();
+  const fechaRegistro = perfil.created_at ? new Date(perfil.created_at).toLocaleDateString('es-AR') : '—';
 
   return (
     <div style={{maxWidth:660,margin:'0 auto'}}>
-      <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:18}}>
+      <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:18,flexWrap:'wrap'}}>
         <button className="btn btn-secondary btn-auto" onClick={onVolver}>← Volver</button>
         <h2 style={{fontSize:18,fontWeight:800}}>{titulo || 'Perfil'}</h2>
       </div>
 
       {/* Cabecera con foto */}
       <div className="ficha-section">
-        <div style={{display:'flex',alignItems:'center',gap:14}}>
+        <div style={{display:'flex',alignItems:'center',gap:14,flexWrap:'wrap'}}>
           <label style={{cursor:puedeEd?'pointer':'default'}}>
             <div className="docente-avatar" style={{width:64,height:64,fontSize:22,borderRadius:14}}>
               {perfil.foto_path
@@ -6376,7 +6414,7 @@ function PerfilUsuario({ usuarioId, user, puede, onVolver, titulo }) {
             {puedeEd && <input type="file" accept="image/*" style={{display:'none'}}
               onChange={e => e.target.files[0] && subirFoto(e.target.files[0])} />}
           </label>
-          <div style={{flex:1}}>
+          <div style={{flex:1,minWidth:160}}>
             <div style={{fontSize:18,fontWeight:800}}>{nombreCompleto}</div>
             <div style={{fontSize:13,color:'var(--text2)'}}>{perfil.email}</div>
             <div style={{display:'flex',gap:6,flexWrap:'wrap',marginTop:4}}>
@@ -6389,18 +6427,23 @@ function PerfilUsuario({ usuarioId, user, puede, onVolver, titulo }) {
                 </span>
               )}
             </div>
+            {puedeEd && perfil.foto_path && (
+              <button onClick={quitarFoto} style={{background:'none',border:'none',color:'var(--danger)',fontSize:11,cursor:'pointer',padding:0,marginTop:6}}>
+                ✕ Quitar foto
+              </button>
+            )}
           </div>
-          {(esAdmin) && (
-            <button className="btn btn-secondary btn-auto" style={{fontSize:12}} onClick={() => setPwModal(true)}>🔑 Contraseña</button>
+          {(esAdmin || esPropio) && (
+            <button className="btn btn-secondary btn-auto" style={{fontSize:12}} onClick={abrirPassword}>🔑 Contraseña</button>
           )}
         </div>
-        {perfil.cursos?.length > 0 && (
-          <div style={{fontSize:12,color:'var(--text2)',marginTop:10}}>
-            Cursos: {perfil.cursos.map(c=>c.nombre).join(', ')}
-          </div>
-        )}
+        <div style={{fontSize:12,color:'var(--text2)',marginTop:10,display:'flex',flexDirection:'column',gap:2}}>
+          {perfil.cursos?.length > 0 && <div>Cursos asignados: {perfil.cursos.map(c=>c.nombre).join(', ')}</div>}
+          <div>Usuario desde: {fechaRegistro}</div>
+        </div>
       </div>
 
+      {isDirty && <div className="dirty-bar"><span>●</span> Cambios sin guardar</div>}
       {msg && <div className={`alert ${msg.startsWith('Error') ? 'alert-error' : 'alert-success'}`}>{msg}</div>}
 
       <form onSubmit={guardar}>
@@ -6409,9 +6452,19 @@ function PerfilUsuario({ usuarioId, user, puede, onVolver, titulo }) {
           <div className="ficha-section-title">Datos personales</div>
           <div className="form-grid">
             <div className="form-group">
+              <label className="form-label">Nombre</label>
+              <input className="form-control" value={form.nombre} disabled={!puedeEd}
+                onChange={e => set('nombre', e.target.value)} placeholder="Ana" />
+            </div>
+            <div className="form-group">
               <label className="form-label">Apellido</label>
               <input className="form-control" value={form.apellido} disabled={!puedeEd}
                 onChange={e => set('apellido', e.target.value)} placeholder="González" />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Email</label>
+              <input className="form-control" type="email" value={form.email} disabled={!puedeEd}
+                onChange={e => set('email', e.target.value)} placeholder="ana@epm.edu.ar" />
             </div>
             <div className="form-group">
               <label className="form-label">DNI</label>
@@ -6498,6 +6551,13 @@ function PerfilUsuario({ usuarioId, user, puede, onVolver, titulo }) {
               <button className="modal-close" onClick={() => setPwModal(false)}>×</button>
             </div>
             {pwErr && <div className="alert alert-error">{pwErr}</div>}
+            {esPropio && (
+              <div className="form-group">
+                <label className="form-label">Contraseña actual</label>
+                <PasswordInput value={pwForm.actual} autoComplete="current-password"
+                  onChange={e => setPwForm(f=>({...f,actual:e.target.value}))} placeholder="Tu contraseña actual" />
+              </div>
+            )}
             <div className="form-group">
               <label className="form-label">Nueva contraseña</label>
               <PasswordInput value={pwForm.pass}
@@ -6510,7 +6570,9 @@ function PerfilUsuario({ usuarioId, user, puede, onVolver, titulo }) {
             </div>
             <div className="modal-footer">
               <button className="btn btn-secondary btn-auto" onClick={() => setPwModal(false)}>Cancelar</button>
-              <button className="btn btn-primary btn-auto" onClick={cambiarPassword}>Cambiar</button>
+              <button className="btn btn-primary btn-auto" onClick={cambiarPassword} disabled={pwSaving}>
+                {pwSaving ? 'Cambiando…' : 'Cambiar'}
+              </button>
             </div>
           </div>
         </div>
@@ -7641,11 +7703,12 @@ function useHashSection(defaultSection) {
   return [section, setSection];
 }
 
-function Layout({ user }) {
+function Layout({ user, onUserUpdate }) {
   const [section, setSection] = useHashSection('dashboard');
   const [menuOpen, setMenuOpen] = useState(false);
   const [deepLink, setDeepLink] = useState(null); // { tipo, id, ts } — destino de una notificación
   const title = NAV.find(n => n.id === section)?.label || 'Dashboard';
+  const puede = (p) => !p || user.permisos?.includes(p);
 
   // Click en una notificación con entidad asociada → navega a la sección correspondiente.
   const irANotificacion = (tipo, id) => {
@@ -7671,6 +7734,9 @@ function Layout({ user }) {
         <div className="page">
           {section === 'dashboard'
             ? <Dashboard user={user} onSection={setSection} />
+            : section === 'mi-perfil'
+            ? <PerfilUsuario usuarioId={user.id} user={user} puede={puede}
+                onVolver={() => setSection('dashboard')} onSelfUpdate={onUserUpdate} titulo="👤 Mi perfil" />
             : section === 'estudiantes'
             ? <Estudiantes user={user} deepLink={deepLink} />
             : section === 'asistencia'
@@ -7744,7 +7810,17 @@ function App() {
 
   if (inviteToken) return <InvitacionPage token={inviteToken} onDone={() => { setInviteToken(null); window.history.replaceState({}, '', '/'); }} />;
 
-  return user ? <Layout user={user} /> : <LoginPage onLogin={setUser} />;
+  // Actualiza el usuario en memoria + localStorage sin necesitar re-login
+  // (ej: al cambiar nombre o foto desde "Mi perfil").
+  const onUserUpdate = (patch) => {
+    setUser(u => {
+      const nu = { ...u, ...patch };
+      localStorage.setItem('epm_user', JSON.stringify(nu));
+      return nu;
+    });
+  };
+
+  return user ? <Layout user={user} onUserUpdate={onUserUpdate} /> : <LoginPage onLogin={setUser} />;
 }
 
 ReactDOM.createRoot(document.getElementById('root')).render(<App />);
