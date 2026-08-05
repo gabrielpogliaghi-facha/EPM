@@ -8357,17 +8357,17 @@ function Layout({ user, onUserUpdate }) {
 // ── BANNER DE INSTALACIÓN PWA ──────────────────────────────────────────────────
 // Android/Chrome/Edge disparan 'beforeinstallprompt' y permiten disparar el prompt
 // nativo por código. iOS Safari NO tiene ese evento — ahí solo se puede guiar al
-// usuario a hacerlo a mano (Compartir → Agregar a inicio). "Una vez por sesión":
-// sessionStorage (se resetea solo al cerrar la pestaña/navegador, a diferencia de
-// localStorage que sería "para siempre").
+// usuario a hacerlo a mano (Compartir → Agregar a inicio).
+// A pedido: el banner aparece SIEMPRE que se entra a la app (no se guarda ninguna
+// preferencia de "ya lo vi"), pero se puede cerrar y desaparece por el resto de esa
+// visita — sin tocar ningún storage, así que la próxima vez que se entre (nueva
+// pestaña, recarga, o abrir la app instalada/agregada) vuelve a aparecer.
 function InstallBanner() {
   const [prompt,  setPrompt]  = useState(null);
   const [visible, setVisible] = useState(false);
   const [esIOS,   setEsIOS]   = useState(false);
 
   useEffect(() => {
-    if (sessionStorage.getItem('epm_install_banner_visto')) return;
-
     const yaInstalada = window.matchMedia('(display-mode: standalone)').matches
       || window.navigator.standalone === true; // iOS
     if (yaInstalada) return;
@@ -8377,10 +8377,6 @@ function InstallBanner() {
 
     const onBeforeInstall = (e) => {
       e.preventDefault();
-      // El listener queda vivo mientras dure la sesión (el componente nunca se
-      // desmonta) — si el navegador vuelve a disparar el evento después de que
-      // el usuario ya cerró el banner, no debe reaparecer.
-      if (sessionStorage.getItem('epm_install_banner_visto')) return;
       setPrompt(e);
       setVisible(true);
     };
@@ -8388,10 +8384,7 @@ function InstallBanner() {
     return () => window.removeEventListener('beforeinstallprompt', onBeforeInstall);
   }, []);
 
-  const cerrar = () => {
-    setVisible(false);
-    sessionStorage.setItem('epm_install_banner_visto', '1');
-  };
+  const cerrar = () => setVisible(false);
 
   const instalar = async () => {
     if (!prompt) return;
