@@ -5,6 +5,24 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
   <title>EPM – Sistema de Gestión Escolar</title>
   <link rel="icon" type="image/jpeg" href="/logo-epm.jpg" />
+
+  <!-- ── PWA ──────────────────────────────────────────────────────────────── -->
+  <link rel="manifest" href="/manifest.json" />
+  <meta name="theme-color" content="#6366f1" />
+  <meta name="description" content="Sistema de gestión de la Escuela Popular de Música" />
+
+  <!-- iOS: Safari no lee el manifest.json para el modo standalone, necesita estos tags aparte -->
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="EPM" />
+  <link rel="apple-touch-icon" href="/icons/icon-180.png" />
+  <link rel="apple-touch-icon" sizes="152x152" href="/icons/icon-152.png" />
+  <link rel="apple-touch-icon" sizes="180x180" href="/icons/icon-180.png" />
+
+  <!-- Android/Chrome también usan estos íconos como favicon en distintos contextos -->
+  <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png" />
+  <link rel="icon" type="image/png" sizes="512x512" href="/icons/icon-512.png" />
+
   <script src="https://cdn.jsdelivr.net/npm/react@18.3.1/umd/react.production.min.js" crossorigin="anonymous"></script>
   <script src="https://cdn.jsdelivr.net/npm/react-dom@18.3.1/umd/react-dom.production.min.js" crossorigin="anonymous"></script>
   <script src="https://cdn.jsdelivr.net/npm/@babel/standalone@7.24.7/babel.min.js"></script>
@@ -1012,6 +1030,37 @@
     .construccion-icon { font-size:64px; }
     .construccion-titulo { font-size:22px; font-weight:800; }
     .construccion-sub { font-size:14px; color:var(--text2); max-width:400px; line-height:1.7; }
+
+    /* ── BANNER DE INSTALACIÓN PWA ──────────────────────────────────────────── */
+    .install-banner {
+      position:fixed; left:12px; right:12px; bottom:12px; z-index:9997;
+      background:linear-gradient(135deg,#6366f1,#4f46e5); color:#fff;
+      border-radius:14px; padding:12px 12px 12px 14px;
+      display:flex; align-items:center; gap:10px;
+      box-shadow:0 10px 30px rgba(79,70,229,.4);
+      max-width:480px; margin:0 auto;
+      animation:install-banner-in .3s ease;
+    }
+    @keyframes install-banner-in { from { transform:translateY(16px); opacity:0; } to { transform:translateY(0); opacity:1; } }
+    .install-banner-icon { font-size:22px; flex-shrink:0; }
+    .install-banner-text { flex:1; font-size:12.5px; line-height:1.4; }
+    .install-banner-btn {
+      background:#fff; color:#4f46e5; border:none; border-radius:8px;
+      padding:8px 14px; font-size:12.5px; font-weight:800; cursor:pointer; white-space:nowrap;
+    }
+    .install-banner-btn:hover { opacity:.9; }
+    .install-banner-close {
+      background:rgba(255,255,255,.18); border:none; color:#fff; border-radius:50%;
+      width:26px; height:26px; flex-shrink:0; cursor:pointer; font-size:13px;
+      display:flex; align-items:center; justify-content:center;
+    }
+    .install-banner-close:hover { background:rgba(255,255,255,.3); }
+    @media (max-width:480px) {
+      .install-banner { flex-wrap:wrap; }
+      .install-banner-text { flex-basis:100%; order:1; }
+      .install-banner-btn  { order:2; flex:1; }
+      .install-banner-close{ order:3; }
+    }
 
     /* ── TOUR GUIADO DE BIENVENIDA ─────────────────────────────────────────── */
     .tour-overlay {
@@ -8251,6 +8300,69 @@ function Layout({ user, onUserUpdate }) {
 }
 
 // ── APP ─────────────────────────────────────────────────────────────────────────
+// ── BANNER DE INSTALACIÓN PWA ──────────────────────────────────────────────────
+// Android/Chrome/Edge disparan 'beforeinstallprompt' y permiten disparar el prompt
+// nativo por código. iOS Safari NO tiene ese evento — ahí solo se puede guiar al
+// usuario a hacerlo a mano (Compartir → Agregar a inicio). "Una vez por sesión":
+// sessionStorage (se resetea solo al cerrar la pestaña/navegador, a diferencia de
+// localStorage que sería "para siempre").
+function InstallBanner() {
+  const [prompt,  setPrompt]  = useState(null);
+  const [visible, setVisible] = useState(false);
+  const [esIOS,   setEsIOS]   = useState(false);
+
+  useEffect(() => {
+    if (sessionStorage.getItem('epm_install_banner_visto')) return;
+
+    const yaInstalada = window.matchMedia('(display-mode: standalone)').matches
+      || window.navigator.standalone === true; // iOS
+    if (yaInstalada) return;
+
+    const ios = /iphone|ipad|ipod/i.test(navigator.userAgent) && !window.MSStream;
+    if (ios) { setEsIOS(true); setVisible(true); return; }
+
+    const onBeforeInstall = (e) => {
+      e.preventDefault();
+      // El listener queda vivo mientras dure la sesión (el componente nunca se
+      // desmonta) — si el navegador vuelve a disparar el evento después de que
+      // el usuario ya cerró el banner, no debe reaparecer.
+      if (sessionStorage.getItem('epm_install_banner_visto')) return;
+      setPrompt(e);
+      setVisible(true);
+    };
+    window.addEventListener('beforeinstallprompt', onBeforeInstall);
+    return () => window.removeEventListener('beforeinstallprompt', onBeforeInstall);
+  }, []);
+
+  const cerrar = () => {
+    setVisible(false);
+    sessionStorage.setItem('epm_install_banner_visto', '1');
+  };
+
+  const instalar = async () => {
+    if (!prompt) return;
+    prompt.prompt();
+    await prompt.userChoice;
+    setPrompt(null);
+    cerrar();
+  };
+
+  if (!visible) return null;
+
+  return (
+    <div className="install-banner">
+      <span className="install-banner-icon">📲</span>
+      <div className="install-banner-text">
+        {esIOS
+          ? <>Instalá EPM en tu celular: tocá <strong>Compartir</strong> y luego <strong>"Agregar a inicio"</strong>.</>
+          : <>Instalá EPM en tu celular para acceso rápido.</>}
+      </div>
+      {!esIOS && <button className="install-banner-btn" onClick={instalar}>Instalar</button>}
+      <button className="install-banner-close" onClick={cerrar} title="Cerrar">✕</button>
+    </div>
+  );
+}
+
 function App() {
   const [user,        setUser]       = useState(null);
   const [loading,     setLoading]    = useState(true);
@@ -8277,17 +8389,6 @@ function App() {
       .finally(() => setLoading(false));
   }, []);
 
-  if (loading) return (
-    <div style={{minHeight:'100vh',display:'flex',alignItems:'center',justifyContent:'center',
-                 background:'linear-gradient(135deg,#1e1b4b,#312e81)'}}>
-      <div className="spinner">
-        <div className="spin" style={{borderColor:'rgba(255,255,255,.3)',borderTopColor:'#a5b4fc'}} />
-      </div>
-    </div>
-  );
-
-  if (inviteToken) return <InvitacionPage token={inviteToken} onDone={() => { setInviteToken(null); window.history.replaceState({}, '', '/'); }} />;
-
   // Actualiza el usuario en memoria + localStorage sin necesitar re-login
   // (ej: al cambiar nombre o foto desde "Mi perfil").
   const onUserUpdate = (patch) => {
@@ -8298,10 +8399,35 @@ function App() {
     });
   };
 
-  return user ? <Layout user={user} onUserUpdate={onUserUpdate} /> : <LoginPage onLogin={setUser} />;
+  let contenido;
+  if (loading) {
+    contenido = (
+      <div style={{minHeight:'100vh',display:'flex',alignItems:'center',justifyContent:'center',
+                   background:'linear-gradient(135deg,#1e1b4b,#312e81)'}}>
+        <div className="spinner">
+          <div className="spin" style={{borderColor:'rgba(255,255,255,.3)',borderTopColor:'#a5b4fc'}} />
+        </div>
+      </div>
+    );
+  } else if (inviteToken) {
+    contenido = <InvitacionPage token={inviteToken} onDone={() => { setInviteToken(null); window.history.replaceState({}, '', '/'); }} />;
+  } else {
+    contenido = user ? <Layout user={user} onUserUpdate={onUserUpdate} /> : <LoginPage onLogin={setUser} />;
+  }
+
+  return <>{contenido}<InstallBanner /></>;
 }
 
 ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+
+<!-- Registro del Service Worker (fuera del script de Babel: no necesita JSX ni transpilarse) -->
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('/sw.js').catch(err => console.error('Error registrando SW:', err));
+    });
+  }
 </script>
 </body>
 </html>

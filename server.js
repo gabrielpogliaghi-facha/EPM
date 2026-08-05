@@ -11,10 +11,12 @@ const PORT = process.env.PORT || 3001;
 app.set('trust proxy', 1);
 
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '2mb' })); // límite default de Express (100kb) se quedaba corto para imports de CSV grandes
 app.use(express.static(path.join(__dirname, 'public'), {
   setHeaders: (res, filePath) => {
-    if (filePath.endsWith('.html')) {
+    // .html y sw.js siempre frescos: el service worker nuevo tiene que poder
+    // detectarse apenas se despliega, no recién cuando expire un cache viejo.
+    if (filePath.endsWith('.html') || filePath.endsWith('sw.js')) {
       res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
       res.setHeader('Pragma', 'no-cache');
       res.setHeader('Expires', '0');
