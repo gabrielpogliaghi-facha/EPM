@@ -978,6 +978,71 @@
     .construccion-icon { font-size:64px; }
     .construccion-titulo { font-size:22px; font-weight:800; }
     .construccion-sub { font-size:14px; color:var(--text2); max-width:400px; line-height:1.7; }
+
+    /* ── TOUR GUIADO DE BIENVENIDA ─────────────────────────────────────────── */
+    .tour-overlay {
+      position:fixed; inset:0; z-index:9998; pointer-events:auto;
+    }
+    .tour-spotlight {
+      position:fixed; border-radius:14px;
+      box-shadow:0 0 0 9999px rgba(15,23,42,.78), 0 0 0 3px #fff, 0 0 24px 4px rgba(99,102,241,.65);
+      transition:top .3s ease, left .3s ease, width .3s ease, height .3s ease;
+      pointer-events:none;
+    }
+    .tour-tooltip {
+      position:fixed; z-index:9999; background:var(--card); border-radius:14px;
+      padding:16px; box-shadow:0 12px 32px rgba(0,0,0,.35);
+      transition:top .3s ease, left .3s ease, bottom .3s ease;
+      max-width:calc(100vw - 24px);
+    }
+    .tour-tooltip-title { font-size:15px; font-weight:800; margin-bottom:6px; }
+    .tour-tooltip-desc  { font-size:13.5px; color:var(--text2); line-height:1.5; margin-bottom:12px; }
+    .tour-tooltip-foot  { display:flex; align-items:center; flex-wrap:wrap; gap:8px; }
+    .tour-tooltip-progress { font-size:11px; color:var(--text2); font-weight:600; white-space:nowrap; }
+    .tour-btn-skip, .tour-btn-prev {
+      background:none; border:none; color:var(--text2); font-size:12.5px;
+      cursor:pointer; padding:8px 4px; font-weight:600;
+    }
+    .tour-btn-skip:hover, .tour-btn-prev:hover { color:var(--text); text-decoration:underline; }
+    .tour-btn-next {
+      background:var(--primary); color:#fff; border:none; border-radius:8px;
+      padding:8px 16px; font-size:13px; font-weight:700; cursor:pointer; white-space:nowrap;
+    }
+    .tour-btn-next:hover { opacity:.9; }
+    @media (max-width:480px) {
+      .tour-tooltip { padding:14px; }
+      .tour-tooltip-foot { justify-content:space-between; }
+    }
+
+    /* ── PANEL DE AYUDA (❓) POR SECCIÓN ────────────────────────────────────── */
+    .ayuda-fab {
+      position:fixed; top:70px; right:16px; z-index:120;
+      width:34px; height:34px; border-radius:50%; border:1.5px solid var(--border);
+      background:var(--card); color:var(--text2); font-size:15px; font-weight:800;
+      cursor:pointer; display:flex; align-items:center; justify-content:center;
+      box-shadow:0 2px 8px rgba(0,0,0,.12); transition:transform .15s, color .15s;
+    }
+    .ayuda-fab:hover { transform:scale(1.08); color:var(--primary); }
+    .ayuda-panel {
+      position:fixed; top:110px; right:16px; z-index:119;
+      width:min(300px, calc(100vw - 32px)); background:var(--card); border:1.5px solid var(--border);
+      border-radius:14px; padding:14px; box-shadow:0 12px 32px rgba(0,0,0,.25);
+    }
+    .ayuda-panel-header { display:flex; align-items:center; gap:8px; margin-bottom:8px; }
+    .ayuda-panel-header strong { font-size:13.5px; flex:1; }
+    .ayuda-panel-close  { background:none; border:none; color:var(--text2); cursor:pointer; font-size:14px; padding:2px; }
+    .ayuda-panel-desc   { font-size:12.5px; color:var(--text2); line-height:1.5; margin-bottom:10px; }
+    .ayuda-panel-tips   { list-style:none; margin:0 0 10px; padding:0; display:flex; flex-direction:column; gap:7px; }
+    .ayuda-panel-tips li { font-size:12px; line-height:1.5; background:var(--bg3); border-radius:8px; padding:7px 10px; }
+    .ayuda-panel-hide   {
+      background:none; border:none; color:var(--text2); font-size:11px; text-decoration:underline;
+      cursor:pointer; padding:0; width:100%; text-align:center;
+    }
+    .ayuda-panel-hide:hover { color:var(--danger); }
+    @media (max-width:600px) {
+      .ayuda-fab   { top:64px; right:10px; width:30px; height:30px; font-size:13px; }
+      .ayuda-panel { top:102px; right:10px; }
+    }
   </style>
 </head>
 <body>
@@ -1024,6 +1089,114 @@ const NAV_GROUPS = [
 ];
 // NAV flat (para búsquedas de label/icon por id)
 const NAV = NAV_GROUPS.flatMap(g => g.items);
+
+// ── TOUR GUIADO + TIPS DE USO ──────────────────────────────────────────────────
+// Única fuente de verdad para el texto de cada sección: el tour usa `descripcion`
+// (título + descripción), el panel de ayuda (❓) usa `descripcion` + `tips`.
+const SECCION_INFO = {
+  dashboard: {
+    descripcion: 'Tu página de inicio. Acá ves los próximos eventos, cumpleaños y un resumen general.',
+    tips: [
+      '💡 Los cumpleaños de estudiantes y del equipo aparecen automáticamente acá arriba.',
+      '💡 Tocá "Ver todos" en cualquier card para ir directo a esa sección.',
+    ],
+  },
+  'mi-perfil': {
+    descripcion: 'Tus datos personales, foto y cambio de contraseña.',
+    tips: [
+      '💡 Para cambiar tu contraseña siempre te vamos a pedir la actual, por seguridad.',
+      '💡 Si sos Docente, acá cargás tus instrumentos y tu formación.',
+    ],
+  },
+  estudiantes: {
+    descripcion: 'Acá cargás y gestionás la ficha de cada estudiante. Podés buscar por nombre, DNI o curso.',
+    tips: [
+      '💡 Usá "Guardar y cargar otro" para cargar varios estudiantes seguidos.',
+      '💡 Podés importar un plantel completo desde un archivo CSV.',
+      '💡 La pestaña "Legajo personal" guarda salud, trayectoria y observaciones.',
+    ],
+  },
+  asistencia: {
+    descripcion: 'Tomá la asistencia del día seleccionando el curso. Un toque por estudiante, rápido y fácil.',
+    tips: [
+      '💡 Podés usar "Todos presentes" y después corregir solo los ausentes.',
+      '💡 Si ya cargaste la asistencia de hoy, se precarga para editar.',
+    ],
+  },
+  reportes: {
+    descripcion: 'Mirá cómo viene la asistencia por curso y por estudiante, con gráficos y porcentajes.',
+    tips: [
+      '💡 Hacé click en cualquier columna para ordenar.',
+      '💡 Los porcentajes bajos aparecen en rojo.',
+      '💡 El tab "Por nivel / curso" te muestra qué datos le faltan a cada estudiante.',
+    ],
+  },
+  calendario: {
+    descripcion: 'Eventos de la EPM: muestras, festivales, reuniones, feriados. También aparecen los cumpleaños.',
+    tips: [
+      '💡 Los cumpleaños aparecen automáticamente con 🎂.',
+      '💡 Si cancelás o reprogramás un evento, los afectados reciben una notificación.',
+      '💡 Los eventos de varios días se ven conectados en el calendario.',
+    ],
+  },
+  planificaciones: {
+    descripcion: 'Organizá los contenidos por período, curso y docente.',
+    tips: [
+      '💡 Podés reordenar los contenidos con las flechas ↑↓.',
+      '💡 Cada docente ve solo sus propias planificaciones (Gestión las ve todas).',
+    ],
+  },
+  reuniones: {
+    descripcion: 'Registrá las reuniones del equipo con resumen, participantes y menciones.',
+    tips: [
+      '💡 Escribí @ para mencionar a alguien y que le llegue una notificación.',
+      '💡 Podés copiar el resumen como texto plano o exportarlo a PDF.',
+    ],
+  },
+  docentes: {
+    descripcion: 'El equipo de profes de la EPM con su instrumento y formación.',
+    tips: [
+      '💡 Filtrá por instrumento para encontrar rápido a quien buscás.',
+      '💡 Cada docente puede editar su propia ficha desde "Mi perfil".',
+    ],
+  },
+  inventario: {
+    descripcion: 'Los instrumentos físicos de la escuela: qué hay, en qué estado, a quién se prestó.',
+    tips: [
+      '💡 Usá los filtros de tipo y estado para encontrar un instrumento rápido.',
+      '💡 Podés exportar el inventario completo a CSV.',
+    ],
+  },
+  proyectos: {
+    descripcion: 'Documentá proyectos institucionales y a dónde se presentaron.',
+    tips: [
+      '💡 Cada cambio de estado queda registrado en la línea de tiempo del proyecto.',
+      '💡 Podés adjuntar PDFs, Word o imágenes de hasta 20MB.',
+    ],
+  },
+  usuarios: {
+    descripcion: 'Administrá quién accede al sistema y con qué permisos.',
+    tips: [
+      '💡 Podés invitar gente por link, sin necesidad de que tengan email cargado antes.',
+      '💡 La matriz de permisos es editable por rol.',
+    ],
+  },
+  backup: {
+    descripcion: 'Copias de seguridad de toda la información del sistema.',
+    tips: [
+      '💡 Se genera un backup automático cada semana, además del manual.',
+      '💡 Restaurar un backup reinicia el servidor — avisá antes de hacerlo.',
+    ],
+  },
+};
+
+// Orden curado del tour de bienvenida (no necesariamente el orden del sidebar).
+// `permiso: null` en el NAV correspondiente = visible para cualquier usuario logueado.
+const TOUR_ORDEN = [
+  'dashboard', 'estudiantes', 'asistencia', 'reportes', 'calendario',
+  'planificaciones', 'reuniones', 'docentes', 'inventario', 'proyectos',
+  'mi-perfil', 'usuarios', 'backup',
+];
 
 // ── HELPERS EVENTOS ────────────────────────────────────────────────────────────
 const TIPO_EVENTO = {
@@ -1328,7 +1501,7 @@ function Sidebar({ user, section, onSection, open, onClose }) {
               <div key={gi}>
                 {grupo.label && <div className="nav-group-label">{grupo.label}</div>}
                 {visibles.map(item => (
-                  <div key={item.id}
+                  <div key={item.id} data-tour={item.id}
                     className={`nav-item ${section===item.id?'active':''}`}
                     onClick={() => { onSection(item.id); onClose(); }}>
                     <span className="nav-icon">{item.icon}</span>
@@ -6321,7 +6494,7 @@ function Calendario({ user }) {
 
 // ── PERFIL DE USUARIO UNIFICADO ──────────────────────────────────────────────────
 // Usado tanto desde Equipo Docente como desde Usuarios y Roles
-function PerfilUsuario({ usuarioId, user, puede, onVolver, titulo, onSelfUpdate }) {
+function PerfilUsuario({ usuarioId, user, puede, onVolver, titulo, onSelfUpdate, onIniciarTour }) {
   const [perfil,     setPerfil]      = useState(null);
   const [instrumentos,setInstrumentos]= useState([]);
   const [todosLosCursos,setTodosCursos]=useState([]);
@@ -6441,6 +6614,10 @@ function PerfilUsuario({ usuarioId, user, puede, onVolver, titulo, onSelfUpdate 
       <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:18,flexWrap:'wrap'}}>
         <button className="btn btn-secondary btn-auto" onClick={onVolver}>← Volver</button>
         <h2 style={{fontSize:18,fontWeight:800}}>{titulo || 'Perfil'}</h2>
+        {esPropio && onIniciarTour && (
+          <button className="btn btn-secondary btn-auto" style={{marginLeft:'auto',fontSize:12}}
+            onClick={onIniciarTour}>🎓 Repetir tour</button>
+        )}
       </div>
 
       {/* Cabecera con foto */}
@@ -7744,12 +7921,140 @@ function useHashSection(defaultSection) {
   return [section, setSection];
 }
 
+// ── TOUR GUIADO DE BIENVENIDA ──────────────────────────────────────────────────
+// Overlay oscuro con un "agujero" (spotlight) sobre el ítem del menú activo + un
+// tooltip con la descripción de esa sección. Implementado 100% con CSS/JS propio
+// (sin librerías externas). En mobile fuerza la apertura del sidebar para poder
+// medir y resaltar los ítems, y lo vuelve a cerrar al terminar.
+function TourGuiado({ pasos, onAbrirSidebar, onCerrarSidebar, onFinish, onSkip }) {
+  const [i,    setI]    = useState(0);
+  const [rect, setRect] = useState(null);
+  const paso = pasos[i];
+  const esMobile = window.innerWidth < 769;
+
+  useEffect(() => {
+    if (esMobile) onAbrirSidebar();
+    return () => { if (esMobile) onCerrarSidebar(); };
+  }, []);
+
+  const medir = useCallback(() => {
+    const el = document.querySelector(`[data-tour="${paso.id}"]`);
+    if (el) setRect(el.getBoundingClientRect());
+  }, [paso.id]);
+
+  useEffect(() => {
+    // Pequeña espera: en mobile el sidebar recién se está abriendo (transición CSS),
+    // y necesitamos medir su posición final, no la de mitad de camino.
+    const t = setTimeout(medir, esMobile ? 350 : 60);
+    window.addEventListener('resize', medir);
+    return () => { clearTimeout(t); window.removeEventListener('resize', medir); };
+  }, [medir]);
+
+  const siguiente = () => { if (i < pasos.length - 1) setI(i + 1); else onFinish(); };
+  const anterior  = () => { if (i > 0) setI(i - 1); };
+
+  // Posición del tooltip: debajo del elemento resaltado, o arriba si no entra.
+  const vw = window.innerWidth, vh = window.innerHeight;
+  const margin = 12;
+  const tw = Math.min(320, vw - margin * 2);
+  let tooltipStyle = { width: tw, left: margin, top: vh / 2 - 80 };
+  if (rect) {
+    const arriba = rect.top > vh * 0.55;
+    const left = Math.max(margin, Math.min(rect.left, vw - tw - margin));
+    tooltipStyle = arriba
+      ? { width: tw, left, bottom: vh - rect.top + margin }
+      : { width: tw, left, top: rect.bottom + margin };
+  }
+
+  return (
+    <div className="tour-overlay">
+      {rect && (
+        <div className="tour-spotlight" style={{
+          top: rect.top - 6, left: rect.left - 6,
+          width: rect.width + 12, height: rect.height + 12,
+        }} />
+      )}
+      <div className="tour-tooltip" style={tooltipStyle}>
+        <div className="tour-tooltip-title">{NAV.find(n=>n.id===paso.id)?.icon} {NAV.find(n=>n.id===paso.id)?.label}</div>
+        <div className="tour-tooltip-desc">{paso.descripcion}</div>
+        <div className="tour-tooltip-foot">
+          <span className="tour-tooltip-progress">{i+1} / {pasos.length}</span>
+          <div style={{display:'flex',gap:8,marginLeft:'auto'}}>
+            <button className="tour-btn-skip" onClick={onSkip}>Saltar tour</button>
+            {i > 0 && <button className="tour-btn-prev" onClick={anterior}>← Atrás</button>}
+            <button className="tour-btn-next" onClick={siguiente}>
+              {i < pasos.length - 1 ? 'Siguiente →' : '¡Listo! 🎉'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── PANEL DE AYUDA / TIPS POR SECCIÓN ──────────────────────────────────────────
+// Ícono ❓ fijo arriba a la derecha de cada sección. Al tocarlo despliega la
+// descripción de esa sección + tips de uso. El usuario puede ocultar los tips
+// para siempre ("No mostrar más tips"); esa preferencia se guarda en localStorage
+// (es una preferencia liviana de UI, no un dato que necesite viajar entre dispositivos).
+function AyudaSeccion({ section }) {
+  const [abierto, setAbierto] = useState(false);
+  const [oculto,  setOculto]  = useState(() => localStorage.getItem('epm_tips_ocultos') === '1');
+  const info = SECCION_INFO[section];
+
+  if (!info || oculto) return null;
+
+  const noMostrarMas = () => {
+    localStorage.setItem('epm_tips_ocultos', '1');
+    setOculto(true);
+  };
+
+  return (
+    <>
+      <button className="ayuda-fab" onClick={() => setAbierto(a => !a)} title="Ayuda de esta sección">
+        {abierto ? '✕' : '❓'}
+      </button>
+      {abierto && (
+        <div className="ayuda-panel">
+          <div className="ayuda-panel-header">
+            <strong>{NAV.find(n=>n.id===section)?.icon} {NAV.find(n=>n.id===section)?.label}</strong>
+            <button className="ayuda-panel-close" onClick={() => setAbierto(false)}>✕</button>
+          </div>
+          <p className="ayuda-panel-desc">{info.descripcion}</p>
+          {info.tips?.length > 0 && (
+            <ul className="ayuda-panel-tips">
+              {info.tips.map((t, idx) => <li key={idx}>{t}</li>)}
+            </ul>
+          )}
+          <button className="ayuda-panel-hide" onClick={noMostrarMas}>No mostrar más tips</button>
+        </div>
+      )}
+    </>
+  );
+}
+
 function Layout({ user, onUserUpdate }) {
   const [section, setSection] = useHashSection('dashboard');
   const [menuOpen, setMenuOpen] = useState(false);
   const [deepLink, setDeepLink] = useState(null); // { tipo, id, ts } — destino de una notificación
+  const [tourActivo, setTourActivo] = useState(false);
   const title = NAV.find(n => n.id === section)?.label || 'Dashboard';
   const puede = (p) => !p || user.permisos?.includes(p);
+
+  // Tour guiado de bienvenida: se dispara solo la primera vez (usuarios.tour_completado=0).
+  useEffect(() => {
+    if (!user.tour_completado) setTourActivo(true);
+  }, []);
+
+  const tourPasos = TOUR_ORDEN
+    .filter(id => puede(NAV.find(n => n.id === id)?.permiso))
+    .map(id => ({ id, descripcion: SECCION_INFO[id]?.descripcion || '' }));
+
+  const cerrarTour = () => {
+    setTourActivo(false);
+    apiFetch(`/api/usuarios/${user.id}/tour`, { method:'PUT' }).catch(() => {});
+    onUserUpdate?.({ tour_completado: true });
+  };
 
   // Click en una notificación con entidad asociada → navega a la sección correspondiente.
   const irANotificacion = (tipo, id) => {
@@ -7772,12 +8077,14 @@ function Layout({ user, onUserUpdate }) {
           <span className="topbar-title">{title}</span>
           <NotificacionesBell user={user} onNavigate={irANotificacion} />
         </div>
+        <AyudaSeccion section={section} />
         <div className="page">
           {section === 'dashboard'
             ? <Dashboard user={user} onSection={setSection} />
             : section === 'mi-perfil'
             ? <PerfilUsuario usuarioId={user.id} user={user} puede={puede}
-                onVolver={() => setSection('dashboard')} onSelfUpdate={onUserUpdate} titulo="👤 Mi perfil" />
+                onVolver={() => setSection('dashboard')} onSelfUpdate={onUserUpdate} titulo="👤 Mi perfil"
+                onIniciarTour={() => setTourActivo(true)} />
             : section === 'estudiantes'
             ? <Estudiantes user={user} deepLink={deepLink} />
             : section === 'asistencia'
@@ -7809,6 +8116,15 @@ function Layout({ user, onUserUpdate }) {
             : <Placeholder id={section} />}
         </div>
       </div>
+      {tourActivo && tourPasos.length > 0 && (
+        <TourGuiado
+          pasos={tourPasos}
+          onAbrirSidebar={() => setMenuOpen(true)}
+          onCerrarSidebar={() => setMenuOpen(false)}
+          onFinish={cerrarTour}
+          onSkip={cerrarTour}
+        />
+      )}
     </div>
   );
 }

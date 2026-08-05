@@ -305,6 +305,17 @@ router.put('/:id/mi-password', verifyToken, async (req, res) => {
   } catch(e) { res.status(500).json({ error:'Error al cambiar contraseña' }); }
 });
 
+// ── PUT /api/usuarios/:id/tour — marca el tour guiado de bienvenida como visto ──
+// Exclusiva del propio usuario (no tiene sentido que un admin marque el tour de otro).
+router.put('/:id/tour', verifyToken, async (req, res) => {
+  const id = Number(req.params.id);
+  if (req.user.id !== id) return res.status(403).json({ error:'Solo podés marcar tu propio tour' });
+  try {
+    await db.execute({ sql:"UPDATE usuarios SET tour_completado=1,updated_at=datetime('now') WHERE id=?", args:[id] });
+    res.json({ success:true });
+  } catch(e) { res.status(500).json({ error:'Error al guardar el estado del tour' }); }
+});
+
 // ── PUT /api/usuarios/:id/cursos ─────────────────────────────────────────────
 router.put('/:id/cursos', ...admin, async (req, res) => {
   const { cursos } = req.body;
