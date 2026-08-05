@@ -3,6 +3,27 @@ const router  = express.Router();
 const db      = require('../db');
 const { verifyToken }    = require('../middleware/auth');
 const { requirePermiso } = require('../middleware/permission');
+const { nuevasMenciones, crearNotificacionesMenciones } = require('../utils/menciones');
+
+async function getUsuariosInstitucion(institucionId) {
+  const { rows } = await db.execute({
+    sql: 'SELECT id, nombre, apellido FROM usuarios WHERE institucion_id=? AND activo=1',
+    args: [institucionId],
+  });
+  return rows;
+}
+
+async function notificarMencionesReunion(req, reunionId, motivo, textoAnterior, textoNuevo) {
+  const usuarios = await getUsuariosInstitucion(req.user.institucion_id);
+  const ids = nuevasMenciones(usuarios, textoAnterior, textoNuevo, req.user.id);
+  if (ids.length === 0) return;
+  await crearNotificacionesMenciones(db, ids, {
+    titulo: `Te mencionaron en la reunión: ${motivo}`,
+    mensaje: `${req.user.nombre} te mencionó en el resumen de una reunión.`,
+    entidadTipo: 'reunion',
+    entidadId: reunionId,
+  });
+}
 
 async function getParticipantes(reunionId) {
   const { rows } = await db.execute({
@@ -121,6 +142,7 @@ router.post('/', verifyToken, requirePermiso('crear_reuniones'), async (req, res
     }
     await tx.commit();
     const participantesOut = await getParticipantes(id);
+    notificarMencionesReunion(req, id, motivo.trim(), '', resumen || '').catch(e => console.error('Error notificando menciones:', e.message));
     res.status(201).json({ id, fecha, hora: hora || null, motivo: motivo.trim(), resumen: resumen || null, participantes: participantesOut });
   } catch(e) {
     await tx.rollback();
@@ -134,7 +156,7 @@ router.put('/:id', verifyToken, requirePermiso('ver_reuniones'), async (req, res
   const { fecha, hora, motivo, resumen, participantes } = req.body;
   if (!fecha || !motivo?.trim()) return res.status(400).json({ error: 'Fecha y motivo son requeridos' });
   try {
-    const { rows: ex } = await db.execute({ sql: 'SELECT id FROM reuniones WHERE id=? AND institucion_id=?', args: [id, req.user.institucion_id] });
+    const { rows: ex } = await db.execute({ sql: 'SELECT id, resumen FROM reuniones WHERE id=? AND institucion_id=?', args: [id, req.user.institucion_id] });
     if (!ex[0]) return res.status(404).json({ error: 'Reunión no encontrada' });
 
     const participantesActuales = await getParticipantes(id);
@@ -160,6 +182,7 @@ router.put('/:id', verifyToken, requirePermiso('ver_reuniones'), async (req, res
     }
     const { rows } = await db.execute({ sql: 'SELECT * FROM reuniones WHERE id=?', args: [id] });
     const participantesOut = await getParticipantes(id);
+    notificarMencionesReunion(req, Number(id), motivo.trim(), ex[0].resumen || '', resumen || '').catch(e => console.error('Error notificando menciones:', e.message));
     res.json({ ...rows[0], id: Number(rows[0].id), participantes: participantesOut });
   } catch(e) {
     res.status(500).json({ error: 'Error al actualizar reunión' });

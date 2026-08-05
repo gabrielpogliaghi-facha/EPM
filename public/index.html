@@ -891,6 +891,40 @@
     }
     .emoji-picker-item:hover { background:var(--bg3); }
 
+    /* ── @MENCIONES ─────────────────────────────────────────────────────────── */
+    .mencion-input-wrap { position:relative; }
+    .mencion-dropdown {
+      position:absolute; top:calc(100% + 4px); left:0; right:0; z-index:30;
+      background:var(--card); border:1.5px solid var(--border); border-radius:10px;
+      box-shadow:0 8px 24px rgba(0,0,0,.18); max-height:220px; overflow-y:auto;
+      padding:4px;
+    }
+    .mencion-dropdown-item {
+      display:flex; align-items:center; gap:8px; width:100%; text-align:left;
+      border:none; background:none; padding:9px 8px; border-radius:8px; cursor:pointer;
+      font-size:13px; min-height:44px;
+    }
+    .mencion-dropdown-item:hover, .mencion-dropdown-item:focus { background:var(--bg3); }
+    .mencion-dropdown-avatar {
+      width:26px; height:26px; border-radius:50%; background:var(--primary);
+      color:#fff; display:flex; align-items:center; justify-content:center;
+      font-size:11px; font-weight:800; flex-shrink:0;
+    }
+    .mencion-dropdown-empty { padding:12px; font-size:12px; color:var(--text2); text-align:center; }
+    .mencion-chip {
+      display:inline-block; background:rgba(99,102,241,.14); color:#6366f1;
+      font-weight:700; border-radius:6px; padding:0 4px; cursor:pointer;
+    }
+    @media (prefers-color-scheme:dark) {
+      .mencion-chip { background:rgba(129,140,248,.22); color:#a5b4fc; }
+    }
+    .mencion-chip-wrap { position:relative; display:inline-block; }
+    .mencion-tooltip {
+      position:absolute; bottom:calc(100% + 4px); left:0; z-index:25; white-space:nowrap;
+      background:var(--text); color:var(--card); font-size:11px; font-weight:600;
+      padding:4px 8px; border-radius:6px;
+    }
+
     /* ── CUMPLEAÑOS ─────────────────────────────────────────────────────────── */
     .cumple-dot {
       width:8px; height:8px; border-radius:50%; background:#ec4899;
@@ -1621,6 +1655,7 @@ function CalendarioAsistencia({ estudianteId }) {
   const [asis,  setAsis]  = useState([]);
   const [loading, setLoading] = useState(false);
   const [selDay, setSelDay] = useState(null);
+  const mencionables = useMencionables();
 
   useEffect(() => {
     if (!estudianteId) return;
@@ -1736,7 +1771,7 @@ function CalendarioAsistencia({ estudianteId }) {
                     {selDay.a.estado==='ausente'&&'❌ Ausente'}
                     {selDay.a.estado==='tarde'&&'⏰ Tarde'}
                   </div>
-                  {selDay.a.observacion&&<div style={{fontSize:12,color:'var(--text2)'}}>💬 {selDay.a.observacion}</div>}
+                  {selDay.a.observacion&&<div style={{fontSize:12,color:'var(--text2)'}}>💬 <MencionesTexto texto={selDay.a.observacion} usuarios={mencionables} /></div>}
                 </>
               ) : (
                 <div style={{color:'var(--text2)'}}>Sin registro de asistencia este día.</div>
@@ -2179,7 +2214,7 @@ function InscripcionesPanel({ estudianteId, user }) {
 }
 
 // ── LEGAJO: componentes auxiliares ───────────────────────────────────────────────
-function HistorialItem({ entry }) {
+function HistorialItem({ entry, usuarios }) {
   const fecha = entry.fecha ? entry.fecha.split('-').reverse().join('/') : '—';
   const cuandoCargado = entry.created_at
     ? new Date(entry.created_at).toLocaleDateString('es-AR')
@@ -2189,7 +2224,9 @@ function HistorialItem({ entry }) {
       <div className="tl-dot" />
       <div className="tl-body">
         <div className="tl-fecha">{fecha}</div>
-        <div className="tl-desc">{entry.descripcion}</div>
+        <div className="tl-desc">
+          {usuarios ? <MencionesTexto texto={entry.descripcion} usuarios={usuarios} /> : entry.descripcion}
+        </div>
         <div className="tl-meta">
           {entry.autor ? `Cargado por ${entry.autor}` : 'Sistema'}
           {cuandoCargado ? ` · ${cuandoCargado}` : ''}
@@ -2199,7 +2236,8 @@ function HistorialItem({ entry }) {
   );
 }
 
-function HistorialInput({ onAdd, placeholder }) {
+// `usuarios` es opcional: si viene, habilita el picker de @menciones en la descripción.
+function HistorialInput({ onAdd, placeholder, usuarios }) {
   const hoy = new Date().toISOString().slice(0,10);
   const [fecha,  setFecha]  = useState(hoy);
   const [desc,   setDesc]   = useState('');
@@ -2216,8 +2254,11 @@ function HistorialInput({ onAdd, placeholder }) {
   return (
     <div className="tl-add">
       <input className="form-control" type="date" value={fecha} onChange={e=>setFecha(e.target.value)} />
-      <textarea className="form-control" rows={2} placeholder={placeholder||'Descripción…'}
-        value={desc} onChange={e=>setDesc(e.target.value)} />
+      {usuarios
+        ? <MencionInput as="textarea" rows={2} value={desc} usuarios={usuarios} onChange={setDesc}
+            placeholder={(placeholder||'Descripción…') + ' (@ para mencionar a alguien)'} />
+        : <textarea className="form-control" rows={2} placeholder={placeholder||'Descripción…'}
+            value={desc} onChange={e=>setDesc(e.target.value)} />}
       <button className="btn btn-primary btn-auto" onClick={agregar}
         disabled={saving || !desc.trim() || !fecha}>
         {saving ? 'Guardando…' : '＋ Agregar entrada'}
@@ -2241,6 +2282,7 @@ function LegajoTab({ estudianteId, user }) {
   const [saving,   setSaving]   = useState(false);
   const [toast,    setToast]    = useState('');
   const [error,    setError]    = useState('');
+  const mencionables = useMencionables(); // solo se usa en "Observaciones generales"
 
   const puede   = (p) => user.permisos?.includes(p);
   const setF    = (k, v) => setForm(prev => ({ ...prev, [k]: v }));
@@ -2394,10 +2436,11 @@ function LegajoTab({ estudianteId, user }) {
         <div className="tl-list">
           {obsH.length === 0
             ? <p className="tl-empty">Sin observaciones registradas.</p>
-            : obsH.map(e => <HistorialItem key={e.id} entry={e} />)
+            : obsH.map(e => <HistorialItem key={e.id} entry={e} usuarios={mencionables} />)
           }
         </div>
-        {editable && <HistorialInput onAdd={addObs} placeholder="Cualquier observación relevante sobre el estudiante." />}
+        {editable && <HistorialInput onAdd={addObs} usuarios={mencionables}
+          placeholder="Cualquier observación relevante sobre el estudiante." />}
       </div>
 
       {/* Botón guardar campos fijos */}
@@ -2425,7 +2468,7 @@ const AUTORIZACIONES = [
   { campo:'auth_boleto',  label:'Autorización Boleto Estudiantil', sub:'Solicitud del beneficio de boleto estudiantil de transporte.' },
 ];
 
-function Ficha({ user, estudianteId, onClose, onGuardarYCargarOtro, onCreado }) {
+function Ficha({ user, estudianteId, initialTab, onClose, onGuardarYCargarOtro, onCreado }) {
   const isNew = !estudianteId;
   const [form,         setForm]        = useState(FORM_VACIO);
   const [savedForm,    setSavedForm]   = useState(FORM_VACIO);
@@ -2437,7 +2480,7 @@ function Ficha({ user, estudianteId, onClose, onGuardarYCargarOtro, onCreado }) 
   const [fotoPend,     setFotoPend]    = useState(null);   // File object pendiente
   const [fotoPreview,  setFotoPreview] = useState(null);   // DataURL local
   const [fotoQuitada,  setFotoQuitada] = useState(false);
-  const [tab,          setTab]         = useState('datos');
+  const [tab,          setTab]         = useState(initialTab || 'datos');
 
   const puede = (p) => user.permisos?.includes(p);
   const set = (f, v) => setForm(prev => ({ ...prev, [f]: v }));
@@ -2666,20 +2709,32 @@ function Ficha({ user, estudianteId, onClose, onGuardarYCargarOtro, onCreado }) 
 }
 
 // ── ESTUDIANTES (contenedor) ──────────────────────────────────────────────────────
-function Estudiantes({ user }) {
-  const [view,     setView]     = useState('list');
-  const [fichaId,  setFichaId]  = useState(null);
-  const [fichaKey, setFichaKey] = useState(0);
+function Estudiantes({ user, deepLink }) {
+  const [view,        setView]       = useState('list');
+  const [fichaId,     setFichaId]    = useState(null);
+  const [fichaKey,    setFichaKey]   = useState(0);
+  const [fichaTabIni, setFichaTabIni]= useState('datos');
 
-  const abrirNuevo  = () => { setFichaId(null); setFichaKey(k=>k+1); setView('ficha'); };
-  const abrirEditar = (id) => { setFichaId(id); setFichaKey(k=>k+1); setView('ficha'); };
+  const abrirNuevo  = () => { setFichaId(null); setFichaTabIni('datos'); setFichaKey(k=>k+1); setView('ficha'); };
+  const abrirEditar = (id) => { setFichaId(id); setFichaTabIni('datos'); setFichaKey(k=>k+1); setView('ficha'); };
   const cargarOtro  = () => { setFichaId(null); setFichaKey(k=>k+1); };
   const onCreado    = (id) => { setFichaId(id); setFichaKey(k=>k+1); }; // queda en edit mode
+
+  // Llegada desde la campanita de notificaciones (mención en legajo o asistencia)
+  useEffect(() => {
+    if (deepLink?.tipo === 'legajo' || deepLink?.tipo === 'asistencia') {
+      setFichaId(deepLink.id);
+      setFichaTabIni(deepLink.tipo === 'legajo' ? 'legajo' : 'datos');
+      setFichaKey(k=>k+1);
+      setView('ficha');
+    }
+  }, [deepLink]);
 
   if (view === 'ficha') {
     return (
       <Ficha key={fichaKey} user={user}
         estudianteId={fichaId}
+        initialTab={fichaTabIni}
         onClose={() => setView('list')}
         onGuardarYCargarOtro={cargarOtro}
         onCreado={onCreado}
@@ -2785,6 +2840,7 @@ function TomarAsistencia({ user }) {
   const [saving,      setSaving]      = useState(false);
   const [saved,       setSaved]       = useState(false);
   const [error,       setError]       = useState('');
+  const mencionables = useMencionables();
 
   const puede = (p) => user.permisos?.includes(p);
 
@@ -2959,9 +3015,10 @@ function TomarAsistencia({ user }) {
                         onClick={() => setEst(e.id, 'tarde')}>⏰ Tarde</button>
                     </div>
                     {(a.estado === 'ausente' || a.estado === 'tarde' || a.observacion) && (
-                      <input className="asis-obs" placeholder="Observación opcional…"
-                        value={a.observacion}
-                        onChange={ev => setObs(e.id, ev.target.value)} />
+                      <MencionInput as="input" className="asis-obs"
+                        placeholder="Observación opcional… (@ para mencionar a alguien)"
+                        value={a.observacion} usuarios={mencionables}
+                        onChange={v => setObs(e.id, v)} />
                     )}
                   </div>
                 );
@@ -5259,7 +5316,7 @@ function ModalInvitar({ roles, cursos, onClose, onGenerado }) {
 }
 
 // ── NOTIFICACIONES BELL ─────────────────────────────────────────────────────────
-function NotificacionesBell({ user }) {
+function NotificacionesBell({ user, onNavigate }) {
   const [open,          setOpen]         = useState(false);
   const [notifs,        setNotifs]       = useState([]);
   const [noLeidas,      setNoLeidas]     = useState(0);
@@ -5337,6 +5394,10 @@ function NotificacionesBell({ user }) {
                   if (!n.leida) {
                     await apiFetch(`/api/notificaciones/${n.id}/leer`, { method:'PUT' });
                     setNotifs(ns => ns.map(x => x.id===n.id ? {...x,leida:1} : x));
+                  }
+                  if (n.entidad_tipo && n.entidad_id && onNavigate) {
+                    setOpen(false);
+                    onNavigate(n.entidad_tipo, n.entidad_id);
                   }
                 }}>
                 <div className="notif-item-header">
@@ -6392,482 +6453,6 @@ function ModalNuevoUsuario({ onClose, onCreado, titulo, rolFijo }) {
 
 // ── INVENTARIO ───────────────────────────────────────────────────────────────────
 const INV_ESTADOS = { disponible:'Disponible', en_uso:'En uso', en_reparacion:'En reparación', baja:'Baja' };
-  const [modo,       setModo]      = useState('crear'); // 'crear' | 'vincular'
-  const [nombre,     setNombre]    = useState('');
-  const [email,      setEmail]     = useState('');
-  const [password,   setPassword]  = useState('');
-  const [showPwd,    setShowPwd]   = useState(false);
-  const [usuarios,   setUsuarios]  = useState([]);  // para modo vincular
-  const [selUsuario, setSelUsuario]= useState('');
-  const [cargandoU,  setCargandoU] = useState(false);
-  const [saving,     setSaving]    = useState(false);
-  const [error,      setError]     = useState('');
-  const [resultado,  setResultado] = useState(null); // {usuario_id, nombre, password_temporal?}
-
-  // Carga usuarios sin ficha cuando se cambia a modo vincular
-  useEffect(() => {
-    if (modo !== 'vincular') return;
-    setCargandoU(true);
-    apiFetch('/api/docentes/usuarios-sin-ficha')
-      .then(setUsuarios)
-      .catch(e => setError(e.message))
-      .finally(() => setCargandoU(false));
-  }, [modo]);
-
-  const submit = async (e) => {
-    e.preventDefault();
-    setError(''); setSaving(true);
-    try {
-      const body = modo === 'crear'
-        ? { modo: 'crear', nombre, email, password: password || undefined }
-        : { modo: 'vincular', vincular_usuario_id: selUsuario };
-
-      const data = await apiFetch('/api/docentes', { method: 'POST', body });
-      setResultado(data);
-    } catch(err) {
-      setError(err.message);
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  // Pantalla de éxito — muestra contraseña temporal si la hay y permite ir a la ficha
-  if (resultado) {
-    return (
-      <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
-        <div className="modal" style={{maxWidth:420}}>
-          <div className="modal-header">
-            <span className="modal-title">✅ Profe {resultado.modo === 'creado' ? 'creado' : 'vinculado'}</span>
-            <button className="modal-close" onClick={onClose}>×</button>
-          </div>
-          <div className="alert alert-success" style={{marginBottom:12}}>
-            <strong>{resultado.nombre}</strong> fue {resultado.modo === 'creado' ? 'agregado al sistema' : 'vinculado'} correctamente.
-          </div>
-          {resultado.password_temporal && (
-            <div style={{background:'var(--bg3)',border:'1.5px solid var(--border)',borderRadius:10,padding:14,marginBottom:14}}>
-              <div style={{fontSize:12,fontWeight:700,color:'var(--text2)',marginBottom:6}}>
-                🔑 Contraseña temporal — guardala ahora
-              </div>
-              <div style={{fontFamily:'monospace',fontSize:17,fontWeight:800,letterSpacing:2,
-                           background:'var(--bg2)',borderRadius:7,padding:'8px 12px',
-                           display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-                <span>{resultado.password_temporal}</span>
-                <button className="btn btn-secondary btn-auto" style={{fontSize:12,padding:'4px 8px'}}
-                  onClick={() => navigator.clipboard?.writeText(resultado.password_temporal)}>
-                  Copiar
-                </button>
-              </div>
-              <div style={{fontSize:11,color:'var(--text2)',marginTop:6}}>
-                El profe deberá cambiarla desde su perfil. Email: <strong>{resultado.email}</strong>
-              </div>
-            </div>
-          )}
-          <div className="modal-footer">
-            <button className="btn btn-secondary btn-auto" onClick={onClose}>Cerrar</button>
-            <button className="btn btn-primary btn-auto" onClick={() => onCreado(resultado.usuario_id)}>
-              Abrir ficha del profe →
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
-      <div className="modal">
-        <div className="modal-header">
-          <span className="modal-title">👩‍🏫 Nuevo profe</span>
-          <button className="modal-close" onClick={onClose}>×</button>
-        </div>
-
-        {/* Toggle modo */}
-        <div className="alcance-btns" style={{marginBottom:18}}>
-          <button type="button" className={`alcance-btn ${modo==='crear'?'selected':''}`}
-            onClick={() => { setModo('crear'); setError(''); }}>
-            ✨ Crear usuario nuevo
-          </button>
-          <button type="button" className={`alcance-btn ${modo==='vincular'?'selected':''}`}
-            onClick={() => { setModo('vincular'); setError(''); }}>
-            🔗 Vincular usuario existente
-          </button>
-        </div>
-
-        {error && <div className="alert alert-error">{error}</div>}
-
-        <form onSubmit={submit}>
-          {modo === 'crear' ? (
-            <>
-              <div className="form-group">
-                <label className="form-label">Nombre completo *</label>
-                <input className="form-control" value={nombre} required
-                  onChange={e => setNombre(e.target.value)}
-                  placeholder="Ej: María González" />
-              </div>
-              <div className="form-group">
-                <label className="form-label">Email *</label>
-                <input className="form-control" type="email" value={email} required
-                  onChange={e => setEmail(e.target.value)}
-                  placeholder="profe@ejemplo.com" />
-              </div>
-              <div className="form-group">
-                <label className="form-label">
-                  Contraseña temporal
-                  <span style={{fontWeight:400,color:'var(--text2)',fontSize:11,marginLeft:6}}>
-                    (se auto-genera si la dejás vacía)
-                  </span>
-                </label>
-                <div style={{display:'flex',gap:6}}>
-                  <input className="form-control" type={showPwd ? 'text' : 'password'}
-                    value={password} onChange={e => setPassword(e.target.value)}
-                    placeholder="Mínimo 6 caracteres o dejar vacío" />
-                  <button type="button" className="btn btn-secondary btn-auto" style={{flexShrink:0,padding:'0 12px'}}
-                    onClick={() => setShowPwd(s => !s)}>
-                    {showPwd ? '🙈' : '👁'}
-                  </button>
-                </div>
-              </div>
-              <div className="alert alert-warning" style={{fontSize:12}}>
-                Se creará un usuario con rol <strong>Docente</strong>. Podés completar los demás datos (DNI, instrumentos, etc.) en la ficha.
-              </div>
-            </>
-          ) : (
-            <>
-              <div className="form-group">
-                <label className="form-label">Seleccioná el usuario a vincular *</label>
-                {cargandoU ? (
-                  <div style={{fontSize:13,color:'var(--text2)'}}>Cargando usuarios...</div>
-                ) : usuarios.length === 0 ? (
-                  <div className="alert alert-warning" style={{fontSize:13}}>
-                    Todos los usuarios ya tienen ficha docente, o no hay usuarios sin asignar. Podés crear uno nuevo desde la otra pestaña.
-                  </div>
-                ) : (
-                  <select className="form-control" value={selUsuario} required
-                    onChange={e => setSelUsuario(e.target.value)}>
-                    <option value="">— Seleccioná un usuario —</option>
-                    {usuarios.map(u => (
-                      <option key={u.id} value={u.id}>
-                        {u.nombre} ({u.email}) — {u.rol_nombre}
-                      </option>
-                    ))}
-                  </select>
-                )}
-              </div>
-              <div className="alert alert-warning" style={{fontSize:12}}>
-                Se creará una ficha docente para este usuario. Su usuario y contraseña no cambian.
-              </div>
-            </>
-          )}
-
-          <div className="modal-footer">
-            <button type="button" className="btn btn-secondary btn-auto" onClick={onClose}>Cancelar</button>
-            <button type="submit" className="btn btn-primary btn-auto" disabled={saving ||
-              (modo === 'vincular' && (usuarios.length === 0 || !selUsuario))}>
-              {saving ? 'Guardando...' : modo === 'crear' ? '+ Crear profe' : '🔗 Vincular'}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
-}
-
-function Docentes({ user }) {
-  const puede = (p) => user.permisos?.includes(p);
-  const [lista,       setLista]      = useState([]);
-  const [instrumentos,setInstrumentos]= useState([]);
-  const [cursos,      setCursos]     = useState([]);
-  const [busqueda,    setBusqueda]   = useState('');
-  const [filtroInst,  setFiltroInst] = useState('');
-  const [ficha,       setFicha]      = useState(null);
-  const [cargando,    setCargando]   = useState(true);
-  const [modalNuevo,  setModalNuevo] = useState(false);
-
-  const cargarLista = useCallback(async () => {
-    try { setLista(await apiFetch('/api/docentes')); } catch(e) {}
-  }, []);
-
-  useEffect(() => {
-    Promise.all([
-      apiFetch('/api/docentes'),
-      apiFetch('/api/instrumentos'),
-      apiFetch('/api/cursos'),
-    ]).then(([d, i, c]) => { setLista(d); setInstrumentos(i); setCursos(c); })
-      .catch(() => {})
-      .finally(() => setCargando(false));
-  }, []);
-
-  const cargarFicha = async (usuarioId) => {
-    try {
-      const d = await apiFetch(`/api/docentes/${usuarioId}`);
-      setFicha(d);
-    } catch(e) { alert(e.message); }
-  };
-
-  const listaFiltrada = lista.filter(d => {
-    const txt = `${d.nombre} ${d.instrumentos_nombres||''}`.toLowerCase();
-    if (busqueda && !txt.includes(busqueda.toLowerCase())) return false;
-    if (filtroInst && !(d.instrumentos_nombres||'').includes(filtroInst)) return false;
-    return true;
-  });
-
-  if (ficha) return (
-    <FichaDocente ficha={ficha} instrumentos={instrumentos} cursos={cursos}
-      user={user} puede={puede}
-      onVolver={() => { setFicha(null); cargarLista(); }}
-    />
-  );
-
-  return (
-    <div>
-      <div className="section-header">
-        <h2 style={{fontSize:18,fontWeight:800}}>👩‍🏫 Equipo Docente</h2>
-        <div style={{display:'flex',gap:8,alignItems:'center'}}>
-          <span className="badge-count">{listaFiltrada.length} profes</span>
-          {puede('editar_equipo_docente') && (
-            <button className="btn btn-primary btn-auto" onClick={() => setModalNuevo(true)}>
-              + Nuevo profe
-            </button>
-          )}
-        </div>
-      </div>
-      <div style={{display:'flex',gap:8,marginBottom:14,flexWrap:'wrap'}}>
-        <input className="form-control" style={{flex:1,minWidth:160}}
-          placeholder="Buscar por nombre o instrumento..."
-          value={busqueda} onChange={e => setBusqueda(e.target.value)} />
-        <select className="form-control" style={{width:'auto'}} value={filtroInst}
-          onChange={e => setFiltroInst(e.target.value)}>
-          <option value="">Todos los instrumentos</option>
-          {instrumentos.map(i => <option key={i.id} value={i.nombre}>{i.nombre}</option>)}
-        </select>
-      </div>
-      {cargando ? <div className="spinner"><div className="spin" /></div>
-        : listaFiltrada.length === 0
-        ? (
-          <div className="empty-state">
-            <div className="empty-state-icon">👩‍🏫</div>
-            <div>No hay profes registrados</div>
-            {puede('editar_equipo_docente') && (
-              <button className="btn btn-primary btn-auto" style={{marginTop:12}}
-                onClick={() => setModalNuevo(true)}>
-                + Agregar el primer profe
-              </button>
-            )}
-          </div>
-        )
-        : listaFiltrada.map(d => {
-            const iniciales = d.nombre.split(' ').map(p=>p[0]).join('').slice(0,2).toUpperCase();
-            return (
-              <div key={d.usuario_id} className="docente-card" onClick={() => cargarFicha(d.usuario_id)}>
-                <div className="docente-avatar">
-                  {d.foto_path ? <img src={d.foto_path} alt={d.nombre} /> : iniciales}
-                </div>
-                <div style={{flex:1,minWidth:0}}>
-                  <div className="docente-nombre">
-                    {d.nombre}
-                    {d.instrumento_principal_nombre && (
-                      <span style={{marginLeft:8,fontSize:12,fontWeight:600,color:'#92400e',
-                                    background:'#fef3c7',borderRadius:8,padding:'1px 8px'}}>
-                        ★ {d.instrumento_principal_nombre}
-                      </span>
-                    )}
-                  </div>
-                  <div className="docente-meta">
-                    {d.instrumentos_nombres
-                      ? d.instrumentos_nombres.split(',').map((i,k) => (
-                          <span key={k} style={{background:'var(--bg3)',borderRadius:8,padding:'1px 7px',fontSize:11,fontWeight:600}}>{i.trim()}</span>
-                        ))
-                      : <span style={{color:'var(--text2)'}}>Sin instrumentos cargados</span>
-                    }
-                    {d.cursos_nombres && <span>· {d.cursos_nombres}</span>}
-                  </div>
-                </div>
-              </div>
-            );
-          })
-      }
-      {modalNuevo && (
-        <ModalNuevoDocente
-          onClose={() => setModalNuevo(false)}
-          onCreado={(usuarioId) => {
-            setModalNuevo(false);
-            cargarLista();
-            cargarFicha(usuarioId);
-          }}
-        />
-      )}
-    </div>
-  );
-}
-
-function FichaDocente({ ficha, instrumentos, cursos, user, puede, onVolver }) {
-  const esPropio = user.id === ficha.usuario_id;
-  const puedeEd  = puede('editar_equipo_docente') || esPropio;
-
-  // Convertir todos los IDs a Number para evitar problemas de tipo (BigInt vs Number)
-  const [form, setForm] = useState({
-    dni:                       ficha.dni || '',
-    fecha_nacimiento:          ficha.fecha_nacimiento || '',
-    telefono:                  ficha.telefono || '',
-    formacion:                 ficha.formacion || '',
-    instrumento_ids:           (ficha.instrumentos || []).map(i => Number(i.id)),
-    instrumento_principal_id:  ficha.instrumento_principal_id ? Number(ficha.instrumento_principal_id) : null,
-  });
-  const [saving, setSaving] = useState(false);
-  const [msg,    setMsg]    = useState('');
-  const [foto,   setFoto]   = useState(ficha.foto_path);
-
-  const set = (k, v) => setForm(f => ({...f, [k]:v}));
-
-  const toggleInst = (nid) => {
-    const id = Number(nid);
-    setForm(f => {
-      const ids = f.instrumento_ids.includes(id)
-        ? f.instrumento_ids.filter(x => x !== id)
-        : [...f.instrumento_ids, id];
-      // Si se deselecciona el principal, limpiar el principal
-      const principal = ids.includes(f.instrumento_principal_id) ? f.instrumento_principal_id : null;
-      return { ...f, instrumento_ids: ids, instrumento_principal_id: principal };
-    });
-  };
-
-  const setPrincipal = (nid) => {
-    const id = Number(nid);
-    setForm(f => ({ ...f, instrumento_principal_id: f.instrumento_principal_id === id ? null : id }));
-  };
-
-  const guardar = async (e) => {
-    e.preventDefault(); setSaving(true); setMsg('');
-    try {
-      await apiFetch(`/api/docentes/${ficha.usuario_id}`, { method:'PUT', body: form });
-      setMsg('Ficha actualizada correctamente.');
-    } catch(err) { setMsg('Error: ' + err.message); }
-    finally { setSaving(false); }
-  };
-
-  const subirFoto = async (file) => {
-    if (!file) return;
-    const fd = new FormData();
-    fd.append('foto', file);
-    const token = localStorage.getItem('epm_token');
-    const res = await fetch(`/api/docentes/${ficha.usuario_id}/foto`, {
-      method:'POST', headers:{ Authorization:`Bearer ${token}` }, body:fd,
-    });
-    const d = await res.json();
-    if (res.ok) setFoto(d.foto_path);
-    else alert(d.error);
-  };
-
-  const iniciales = ficha.nombre.split(' ').map(p=>p[0]).join('').slice(0,2).toUpperCase();
-
-  return (
-    <div style={{maxWidth:640,margin:'0 auto'}}>
-      <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:18}}>
-        <button className="btn btn-secondary btn-auto" onClick={onVolver}>← Volver</button>
-        <h2 style={{fontSize:18,fontWeight:800}}>Ficha docente</h2>
-      </div>
-      <div className="ficha-section">
-        <div style={{display:'flex',alignItems:'center',gap:14,marginBottom:14}}>
-          <label style={{cursor: puedeEd ? 'pointer' : 'default', position:'relative'}}>
-            <div className="docente-avatar" style={{width:60,height:60,fontSize:22,borderRadius:14}}>
-              {foto ? <img src={foto} alt={ficha.nombre} style={{width:'100%',height:'100%',objectFit:'cover'}} />
-                    : iniciales}
-            </div>
-            {puedeEd && <input type="file" accept="image/*" style={{display:'none'}}
-              onChange={e => e.target.files[0] && subirFoto(e.target.files[0])} />}
-          </label>
-          <div>
-            <div style={{fontSize:18,fontWeight:800}}>{ficha.nombre}</div>
-            <div style={{fontSize:13,color:'var(--text2)'}}>{ficha.email}</div>
-            {ficha.cursos?.length > 0 && (
-              <div style={{fontSize:12,color:'var(--text2)',marginTop:2}}>
-                Cursos: {ficha.cursos.map(c=>c.nombre).join(', ')}
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-      {msg && <div className={`alert ${msg.startsWith('Error') ? 'alert-error' : 'alert-success'}`}>{msg}</div>}
-      <form onSubmit={guardar}>
-        <div className="ficha-section">
-          <div className="ficha-section-title">Datos personales</div>
-          <div className="form-grid">
-            <div className="form-group">
-              <label className="form-label">DNI</label>
-              <input className="form-control" value={form.dni} disabled={!puedeEd}
-                onChange={e => set('dni', e.target.value)} placeholder="12345678" />
-            </div>
-            <div className="form-group">
-              <label className="form-label">Fecha de nacimiento</label>
-              <input className="form-control" type="date" value={form.fecha_nacimiento} disabled={!puedeEd}
-                onChange={e => set('fecha_nacimiento', e.target.value)} />
-            </div>
-            <div className="form-group col-full">
-              <label className="form-label">Teléfono</label>
-              <input className="form-control" value={form.telefono} disabled={!puedeEd}
-                onChange={e => set('telefono', e.target.value)} placeholder="+54 11..." />
-            </div>
-          </div>
-        </div>
-        <div className="ficha-section">
-          <div className="ficha-section-title">Instrumentos que enseña</div>
-          <div className="curso-checks" style={{marginBottom: form.instrumento_ids.length > 0 ? 12 : 0}}>
-            {instrumentos.map(i => {
-              const id = Number(i.id);
-              const sel = form.instrumento_ids.includes(id);
-              return (
-                <button key={id} type="button" disabled={!puedeEd}
-                  className={`curso-check-btn ${sel ? 'selected' : ''}`}
-                  onClick={() => puedeEd && toggleInst(id)}>
-                  {i.nombre}
-                </button>
-              );
-            })}
-          </div>
-          {form.instrumento_ids.length > 0 && (
-            <div>
-              <div style={{fontSize:12,color:'var(--text2)',fontWeight:700,marginBottom:6}}>
-                ★ Instrumento principal (visible en el listado)
-              </div>
-              <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
-                {instrumentos.filter(i => form.instrumento_ids.includes(Number(i.id))).map(i => {
-                  const id = Number(i.id);
-                  const esPrincipal = form.instrumento_principal_id === id;
-                  return (
-                    <button key={id} type="button" disabled={!puedeEd}
-                      onClick={() => puedeEd && setPrincipal(id)}
-                      style={{padding:'5px 12px',borderRadius:20,fontSize:12,fontWeight:700,cursor:puedeEd?'pointer':'default',
-                              border:`2px solid ${esPrincipal ? '#f59e0b' : 'var(--border)'}`,
-                              background: esPrincipal ? '#fef3c7' : 'var(--card)',
-                              color: esPrincipal ? '#92400e' : 'var(--text2)'}}>
-                      {esPrincipal ? '★' : '☆'} {i.nombre}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-        </div>
-        <div className="ficha-section">
-          <div className="ficha-section-title">Formación y experiencia</div>
-          <textarea className="form-control" rows={5} value={form.formacion} disabled={!puedeEd}
-            onChange={e => set('formacion', e.target.value)}
-            placeholder="Estudios, trayectoria, experiencia docente..." />
-        </div>
-        {puedeEd && (
-          <div style={{display:'flex',justifyContent:'flex-end',padding:'6px 0'}}>
-            <button type="submit" className="btn btn-primary btn-auto" disabled={saving}>
-              {saving ? 'Guardando...' : '💾 Guardar ficha'}
-            </button>
-          </div>
-        )}
-      </form>
-    </div>
-  );
-}
-
-// ── INVENTARIO ───────────────────────────────────────────────────────────────────
-const INV_ESTADOS = { disponible:'Disponible', en_uso:'En uso', en_reparacion:'En reparación', baja:'Baja' };
 
 function Inventario({ user }) {
   const puede = (p) => user.permisos?.includes(p);
@@ -7293,6 +6878,141 @@ function DetalleProy({ proyId, user, puede, onVolver }) {
   );
 }
 
+// ── @MENCIONES (reutilizable: reuniones, legajo personal, asistencia) ─────────────
+// Las menciones viven como texto plano dentro del campo ("...@Laura Martínez...").
+// No hay marcado especial guardado — se detectan comparando contra los nombres
+// completos de la lista de usuarios pasada al componente (misma lógica que el backend
+// en utils/menciones.js).
+function nombreCompletoUsuario(u) { return `${u.nombre || ''} ${u.apellido || ''}`.trim(); }
+
+function useMencionables() {
+  const [usuarios, setUsuarios] = useState([]);
+  useEffect(() => { apiFetch('/api/usuarios/mencionables').then(setUsuarios).catch(() => {}); }, []);
+  return usuarios;
+}
+
+function parseMenciones(texto, usuarios) {
+  if (!texto) return [{ texto: '', mencion: null }];
+  const candidatos = (usuarios || [])
+    .map(u => ({ id: Number(u.id), nombre: nombreCompletoUsuario(u), rol_nombre: u.rol_nombre }))
+    .filter(u => u.nombre)
+    .sort((a, b) => b.nombre.length - a.nombre.length);
+  if (candidatos.length === 0) return [{ texto, mencion: null }];
+
+  const alt = candidatos.map(u => u.nombre.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|');
+  const re = new RegExp(`@(${alt})(?![\\p{L}\\p{N}])`, 'gu');
+  const partes = [];
+  let last = 0, m;
+  while ((m = re.exec(texto))) {
+    if (m.index > last) partes.push({ texto: texto.slice(last, m.index), mencion: null });
+    partes.push({ texto: '@' + m[1], mencion: candidatos.find(u => u.nombre === m[1]) || null });
+    last = re.lastIndex;
+  }
+  if (last < texto.length) partes.push({ texto: texto.slice(last), mencion: null });
+  return partes;
+}
+
+function MencionChip({ nombre, usuario }) {
+  const [open, setOpen] = useState(false);
+  useEffect(() => {
+    if (!open) return;
+    const cerrar = () => setOpen(false);
+    document.addEventListener('mousedown', cerrar);
+    return () => document.removeEventListener('mousedown', cerrar);
+  }, [open]);
+  return (
+    <span className="mencion-chip-wrap">
+      <span className="mencion-chip" onClick={e => { e.stopPropagation(); setOpen(o => !o); }}>{nombre}</span>
+      {open && (
+        <span className="mencion-tooltip" onClick={e => e.stopPropagation()}>
+          {usuario?.rol_nombre || 'Usuario del sistema'}
+        </span>
+      )}
+    </span>
+  );
+}
+
+// Renderiza texto con las @menciones como chips clickeables.
+function MencionesTexto({ texto, usuarios, className, style }) {
+  const partes = parseMenciones(texto, usuarios);
+  return (
+    <span className={className} style={{whiteSpace:'pre-wrap', wordBreak:'break-word', ...style}}>
+      {partes.map((p, i) => p.mencion
+        ? <MencionChip key={i} nombre={p.texto} usuario={p.mencion} />
+        : <React.Fragment key={i}>{p.texto}</React.Fragment>)}
+    </span>
+  );
+}
+
+// Input (textarea o input de una línea) con autocompletado de @menciones.
+// `inputRef` es opcional — pasalo si otro control (ej. emoji picker) necesita
+// escribir en el mismo campo manteniendo la posición del cursor.
+function MencionInput({ value, onChange, usuarios, placeholder, rows, as, className, inputRef }) {
+  const localRef = React.useRef(null);
+  const ref = inputRef || localRef;
+  const [dropdown, setDropdown] = useState(null); // { query, start }
+
+  const detectarTrigger = (val, pos) => {
+    const uptoCursor = val.slice(0, pos);
+    const m = uptoCursor.match(/@([^\s@]*)$/);
+    setDropdown(m ? { query: m[1], start: pos - m[1].length - 1 } : null);
+  };
+
+  const handleChange = (e) => {
+    onChange(e.target.value);
+    detectarTrigger(e.target.value, e.target.selectionStart);
+  };
+
+  const seleccionar = (u) => {
+    const nombre = nombreCompletoUsuario(u);
+    const el = ref.current;
+    const pos = el ? el.selectionStart : value.length;
+    const before = value.slice(0, dropdown.start);
+    const after  = value.slice(pos);
+    const inserted = `@${nombre} `;
+    onChange(before + inserted + after);
+    setDropdown(null);
+    requestAnimationFrame(() => {
+      if (!el) return;
+      el.focus();
+      const p = before.length + inserted.length;
+      el.selectionStart = el.selectionEnd = p;
+    });
+  };
+
+  const filtrados = dropdown
+    ? (usuarios || []).filter(u => nombreCompletoUsuario(u).toLowerCase().includes((dropdown.query || '').toLowerCase())).slice(0, 6)
+    : [];
+
+  const Tag = as === 'input' ? 'input' : 'textarea';
+  const extra = as === 'input' ? {} : { rows: rows || 3 };
+
+  return (
+    <div className="mencion-input-wrap">
+      <Tag ref={ref} className={className || 'form-control'} value={value} placeholder={placeholder}
+        onChange={handleChange}
+        onBlur={() => setTimeout(() => setDropdown(null), 150)}
+        {...extra} />
+      {dropdown && (
+        <div className="mencion-dropdown">
+          {filtrados.length === 0
+            ? <div className="mencion-dropdown-empty">Sin coincidencias</div>
+            : filtrados.map(u => (
+              <button type="button" key={u.id} className="mencion-dropdown-item"
+                onMouseDown={e => e.preventDefault()} onClick={() => seleccionar(u)}>
+                <span className="mencion-dropdown-avatar">{iniciales(u.nombre, u.apellido)}</span>
+                <span>
+                  <div style={{fontWeight:700}}>{nombreCompletoUsuario(u)}</div>
+                  {u.rol_nombre && <div style={{fontSize:11,color:'var(--text2)'}}>{u.rol_nombre}</div>}
+                </span>
+              </button>
+            ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── REUNIONES ─────────────────────────────────────────────────────────────────────
 const EMOJIS_REUNION = ['😊','👍','🎉','📌','✅','❌','⚠️','💡','📝','🎵','🎸','🥁','🎤','🎹',
   '📅','⏰','🙌','🤝','💬','❤️','🔥','😀','🙂','🤔','😅','👏','🚀','⭐','📷','🗒️','✏️','📞'];
@@ -7318,7 +7038,7 @@ function EmojiPicker({ onPick }) {
   );
 }
 
-function Reuniones({ user }) {
+function Reuniones({ user, deepLink }) {
   const puede = (p) => user.permisos?.includes(p);
   const [lista,      setLista]      = useState([]);
   const [cargando,   setCargando]   = useState(true);
@@ -7330,6 +7050,11 @@ function Reuniones({ user }) {
   useEffect(() => {
     apiFetch('/api/reuniones/participantes-disponibles').then(setUsuarios).catch(() => {});
   }, []);
+
+  // Llegada desde la campanita de notificaciones ("Te mencionaron en la reunión...")
+  useEffect(() => {
+    if (deepLink?.tipo === 'reunion' && deepLink.id) setDetalleId(deepLink.id);
+  }, [deepLink]);
 
   const cargar = useCallback(async () => {
     setCargando(true);
@@ -7486,9 +7211,9 @@ function ModalReunion({ reunion, usuarios, user, onClose, onGuardado }) {
               <label className="form-label" style={{marginBottom:0}}>Resumen / Acta</label>
               <EmojiPicker onPick={insertarEmoji} />
             </div>
-            <textarea ref={textareaRef} className="form-control" rows={8} value={form.resumen}
-              onChange={e=>set('resumen',e.target.value)}
-              placeholder="Escribí el resumen de la reunión, como un mensaje de WhatsApp..." />
+            <MencionInput inputRef={textareaRef} rows={8} value={form.resumen} usuarios={usuarios}
+              onChange={v=>set('resumen',v)}
+              placeholder="Escribí el resumen de la reunión, como un mensaje de WhatsApp... (@ para mencionar a alguien)" />
           </div>
           <div className="modal-footer">
             <button type="button" className="btn btn-secondary btn-auto" onClick={onClose}>Cancelar</button>
@@ -7568,7 +7293,7 @@ function DetalleReunion({ reunionId, user, puede, onVolver }) {
       <div className="ficha-section">
         <div className="ficha-section-title">📝 Resumen / Acta</div>
         {reunion.resumen
-          ? <div className="resumen-box">{reunion.resumen}</div>
+          ? <div className="resumen-box"><MencionesTexto texto={reunion.resumen} usuarios={usuarios} /></div>
           : <div style={{color:'var(--text2)',fontSize:13}}>Sin resumen cargado</div>}
       </div>
 
@@ -7605,7 +7330,16 @@ function Finanzas() {
 function Layout({ user }) {
   const [section, setSection] = useState('dashboard');
   const [menuOpen, setMenuOpen] = useState(false);
+  const [deepLink, setDeepLink] = useState(null); // { tipo, id, ts } — destino de una notificación
   const title = NAV.find(n => n.id === section)?.label || 'Dashboard';
+
+  // Click en una notificación con entidad asociada → navega a la sección correspondiente.
+  const irANotificacion = (tipo, id) => {
+    const destino = { reunion:'reuniones', legajo:'estudiantes', asistencia:'estudiantes' }[tipo];
+    if (!destino) return; // ej: 'evento' no tiene vista de detalle propia todavía
+    setSection(destino);
+    setDeepLink({ tipo, id: Number(id), ts: Date.now() });
+  };
 
   return (
     <div className="layout">
@@ -7618,13 +7352,13 @@ function Layout({ user }) {
         <div className="topbar">
           <button className="topbar-menu" onClick={() => setMenuOpen(o => !o)}>☰</button>
           <span className="topbar-title">{title}</span>
-          <NotificacionesBell user={user} />
+          <NotificacionesBell user={user} onNavigate={irANotificacion} />
         </div>
         <div className="page">
           {section === 'dashboard'
             ? <Dashboard user={user} onSection={setSection} />
             : section === 'estudiantes'
-            ? <Estudiantes user={user} />
+            ? <Estudiantes user={user} deepLink={deepLink} />
             : section === 'asistencia'
             ? <AsistenciasView user={user} />
             : section === 'reportes'
@@ -7648,7 +7382,7 @@ function Layout({ user }) {
             : section === 'proyectos'
             ? <Proyectos user={user} />
             : section === 'reuniones'
-            ? <Reuniones user={user} />
+            ? <Reuniones user={user} deepLink={deepLink} />
             : section === 'finanzas'
             ? <Finanzas />
             : <Placeholder id={section} />}

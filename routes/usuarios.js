@@ -55,6 +55,25 @@ const SELECT_USUARIO = `
   LEFT JOIN instrumentos ip ON ip.id = u.instrumento_principal_id
 `;
 
+// ── GET /api/usuarios/mencionables ────────────────────────────────────────────
+// Lista liviana de usuarios activos de la institución para el picker de @menciones.
+// Cualquier usuario autenticado puede pedirla (no requiere administrar_usuarios_roles).
+// Debe ir ANTES de GET /:id para que Express no la interprete como un id.
+router.get('/mencionables', verifyToken, async (req, res) => {
+  try {
+    const { rows } = await db.execute({
+      sql: `SELECT u.id, u.nombre, u.apellido, r.nombre AS rol_nombre
+            FROM usuarios u JOIN roles r ON r.id = u.rol_id
+            WHERE u.institucion_id=? AND u.activo=1
+            ORDER BY u.apellido, u.nombre`,
+      args: [req.user.institucion_id],
+    });
+    res.json(rows.map(u => ({ ...u, id: Number(u.id) })));
+  } catch(e) {
+    res.status(500).json({ error: 'Error al obtener usuarios' });
+  }
+});
+
 // ── GET /api/usuarios ─────────────────────────────────────────────────────────
 // ?inactivos=1  →  solo inactivos
 // ?rol=Docente  →  filtrar por nombre de rol

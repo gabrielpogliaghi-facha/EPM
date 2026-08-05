@@ -3,6 +3,7 @@ const router  = express.Router();
 const db      = require('../db');
 const { verifyToken }    = require('../middleware/auth');
 const { requirePermiso } = require('../middleware/permission');
+const { nuevasMenciones, crearNotificacionesMenciones } = require('../utils/menciones');
 
 async function verificarEstudiante(estId, institucionId, res) {
   const { rows } = await db.execute({
@@ -136,6 +137,25 @@ router.post('/:id/observacion', verifyToken, requirePermiso('editar_legajo_perso
       args: [estId, fecha, descripcion.trim(), req.user.id],
     });
     res.status(201).json({ id: Number(r.lastInsertRowid) });
+
+    // Notificar a usuarios mencionados en la observación (@Nombre Apellido)
+    (async () => {
+      try {
+        const [{ rows: usuarios }, { rows: est }] = await Promise.all([
+          db.execute({ sql: 'SELECT id, nombre, apellido FROM usuarios WHERE institucion_id=? AND activo=1', args: [req.user.institucion_id] }),
+          db.execute({ sql: 'SELECT nombre, apellido FROM estudiantes WHERE id=?', args: [estId] }),
+        ]);
+        const ids = nuevasMenciones(usuarios, '', descripcion.trim(), req.user.id);
+        if (ids.length === 0) return;
+        const nombreEst = est[0] ? `${est[0].apellido}, ${est[0].nombre}` : 'un estudiante';
+        await crearNotificacionesMenciones(db, ids, {
+          titulo: `Te mencionaron en el legajo de ${nombreEst}`,
+          mensaje: `${req.user.nombre} te mencionó en una observación del legajo personal.`,
+          entidadTipo: 'legajo',
+          entidadId: estId,
+        });
+      } catch(e) { console.error('Error notificando menciones:', e.message); }
+    })();
   } catch (e) {
     res.status(500).json({ error: 'Error al agregar entrada' });
   }

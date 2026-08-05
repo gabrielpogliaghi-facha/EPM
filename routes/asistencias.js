@@ -3,6 +3,28 @@ const router  = express.Router();
 const db      = require('../db');
 const { verifyToken }    = require('../middleware/auth');
 const { requirePermiso } = require('../middleware/permission');
+const { nuevasMenciones, crearNotificacionesMenciones } = require('../utils/menciones');
+
+// Notifica menciones nuevas (@Nombre Apellido) en una observación de asistencia.
+// entidad_id = estudiante_id (para poder llevar al usuario a la ficha del alumno).
+async function notificarMencionesAsistencia(req, estudianteId, observacionAnterior, observacionNueva) {
+  if (!observacionNueva) return;
+  try {
+    const [{ rows: usuarios }, { rows: est }] = await Promise.all([
+      db.execute({ sql: 'SELECT id, nombre, apellido FROM usuarios WHERE institucion_id=? AND activo=1', args: [req.user.institucion_id] }),
+      db.execute({ sql: 'SELECT nombre, apellido FROM estudiantes WHERE id=?', args: [estudianteId] }),
+    ]);
+    const ids = nuevasMenciones(usuarios, observacionAnterior || '', observacionNueva, req.user.id);
+    if (ids.length === 0) return;
+    const nombreEst = est[0] ? `${est[0].apellido}, ${est[0].nombre}` : 'un estudiante';
+    await crearNotificacionesMenciones(db, ids, {
+      titulo: `Te mencionaron en una observación de asistencia de ${nombreEst}`,
+      mensaje: `${req.user.nombre} te mencionó en una observación de asistencia.`,
+      entidadTipo: 'asistencia',
+      entidadId: estudianteId,
+    });
+  } catch(e) { console.error('Error notificando menciones:', e.message); }
+}
 
 // GET /api/asistencias/estudiante/:id
 router.get('/estudiante/:id', verifyToken, requirePermiso('ver_asistencias'), async (req, res) => {
@@ -54,10 +76,11 @@ router.post('/bulk', verifyToken, requirePermiso('cargar_asistencias'), async (r
   }
 
   const tx = await db.transaction('write');
+  const menciones = []; // { estudianteId, anterior, nueva } — se procesan después del commit
   try {
     for (const a of asistencias) {
       const { rows } = await tx.execute({
-        sql: `SELECT id FROM asistencias WHERE estudiante_id=? AND fecha=? AND tipo_asistencia='general'`,
+        sql: `SELECT id, observacion FROM asistencias WHERE estudiante_id=? AND fecha=? AND tipo_asistencia='general'`,
         args: [Number(a.estudiante_id), fecha],
       });
       if (rows[0]) {
@@ -65,15 +88,18 @@ router.post('/bulk', verifyToken, requirePermiso('cargar_asistencias'), async (r
           sql: `UPDATE asistencias SET estado=?, observacion=?, registrado_por=?, updated_at=datetime('now') WHERE id=?`,
           args: [a.estado, a.observacion || null, req.user.id, rows[0].id],
         });
+        menciones.push({ estudianteId: Number(a.estudiante_id), anterior: rows[0].observacion, nueva: a.observacion });
       } else {
         await tx.execute({
           sql: `INSERT INTO asistencias (institucion_id, estudiante_id, curso_id, fecha, estado, observacion, tipo_asistencia, registrado_por) VALUES (?,?,?,?,?,?,'general',?)`,
           args: [req.user.institucion_id, Number(a.estudiante_id), Number(curso_id), fecha, a.estado, a.observacion || null, req.user.id],
         });
+        menciones.push({ estudianteId: Number(a.estudiante_id), anterior: '', nueva: a.observacion });
       }
     }
     await tx.commit();
     res.json({ success: true, count: asistencias.length });
+    for (const m of menciones) notificarMencionesAsistencia(req, m.estudianteId, m.anterior, m.nueva);
   } catch (e) {
     await tx.rollback();
     res.status(500).json({ error: 'Error al guardar asistencias' });
@@ -86,7 +112,7 @@ router.put('/:id', verifyToken, requirePermiso('justificar_ausencias'), async (r
   if (!estado) return res.status(400).json({ error: 'Estado requerido' });
   try {
     const { rows } = await db.execute({
-      sql: 'SELECT id FROM asistencias WHERE id=? AND institucion_id=?',
+      sql: 'SELECT id, estudiante_id, observacion FROM asistencias WHERE id=? AND institucion_id=?',
       args: [Number(req.params.id), req.user.institucion_id],
     });
     if (!rows[0]) return res.status(404).json({ error: 'Asistencia no encontrada' });
@@ -96,6 +122,7 @@ router.put('/:id', verifyToken, requirePermiso('justificar_ausencias'), async (r
       args: [estado, observacion || null, req.user.id, Number(req.params.id)],
     });
     res.json({ success: true });
+    notificarMencionesAsistencia(req, Number(rows[0].estudiante_id), rows[0].observacion, observacion);
   } catch (e) {
     res.status(500).json({ error: 'Error al actualizar asistencia' });
   }
