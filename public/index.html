@@ -1730,11 +1730,20 @@ function useCumpleaniosProximos() {
 
 // Ícono(s) de nivel/curso para una tarjeta de cumpleaños. Un estudiante puede estar en
 // más de un curso (varios instrumentos) — en ese caso se muestran todos juntos (ej: 🐟🐬).
-// El equipo (docentes/operadores/gestión) no tiene curso: ícono fijo de "equipo".
-const NIVEL_EMOJI = { Mojarritas:'🐟', Delfines:'🐬', Tiburones:'🦈', Pulpos:'🐙' };
-const NIVEL_ORDEN = { Mojarritas:1, Delfines:2, Tiburones:3, Pulpos:4 };
+// El equipo (docentes/operadores/gestión) no tiene curso: en vez de un único ícono fijo
+// (repetitivo si hay varios cumpleaños de adultos en la lista), se elige entre un puñado
+// de "personitas" variadas — determinístico por nombre, así la misma persona siempre
+// muestra el mismo ícono entre renders/recargas, pero personas distintas se ven distintas.
+const NIVEL_EMOJI  = { Mojarritas:'🐟', Delfines:'🐬', Tiburones:'🦈', Pulpos:'🐙' };
+const NIVEL_ORDEN  = { Mojarritas:1, Delfines:2, Tiburones:3, Pulpos:4 };
+const EQUIPO_EMOJIS = ['👩‍🏫','👨‍🏫','🧑‍🏫','👩‍🎤','👨‍🎤','🧑‍🎨','👩‍💼','👨‍💼'];
+function emojiEquipo(nombre) {
+  let hash = 0;
+  for (let i = 0; i < nombre.length; i++) hash = (hash * 31 + nombre.charCodeAt(i)) >>> 0;
+  return EQUIPO_EMOJIS[hash % EQUIPO_EMOJIS.length];
+}
 function cumpleIconos(c) {
-  if (c.tipo === 'usuario') return '👩‍🏫';
+  if (c.tipo === 'usuario') return emojiEquipo(c.nombre);
   if (!c.cursos?.length) return '🎵'; // estudiante sin inscripción activa todavía
   return [...c.cursos]
     .sort((a, b) => (NIVEL_ORDEN[a]||99) - (NIVEL_ORDEN[b]||99))
