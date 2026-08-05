@@ -22,3 +22,6 @@ backups/
 .DS_Store
 Thumbs.db
 desktop.ini
+
+# Archivos personales / notas locales
+PERSONAL/
