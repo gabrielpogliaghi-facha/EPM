@@ -11,6 +11,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Si se encuentra un error, corregirlo solo y seguir.
 - Consultar al usuario solo si hay una acción irreversible que podría hacerle perder datos sin forma razonable de inferir qué prefiere.
 
+## Reglas de economía de tokens
+
+- NO leer archivos completos si solo necesitás modificar una parte. Usá búsqueda por patrón.
+- NO releer archivos que ya leíste en la misma sesión salvo que hayan cambiado.
+- NO correr verificaciones completas en cada cambio chico. Solo verificar al final de un bloque de cambios.
+- NO actualizar el CLAUDE.md en cada tarea menor. Solo actualizarlo cuando se agrega un módulo nuevo o se hace un cambio estructural.
+- Commits: agrupar cambios relacionados en un solo commit, no hacer un commit por cada línea.
+- Ser conciso en las respuestas: no repetir el código completo de un archivo si solo cambiaron unas líneas.
+
 ## Contexto del proyecto
 
 - Sistema de gestión escolar para la **EPM**. Los cursos (**Mojarritas, Delfines, Tiburones, Pulpos**) son **niveles de experiencia por instrumento**.
@@ -65,6 +74,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 | 30b | **Fix: íconos PWA con el logo real** | 2026-08-05 | Los íconos del módulo 30 eran un diseño genérico hecho a mano (fondo violeta + "EPM" + espiral decorativa) — el pedido era usar el logo real (`public/logo-epm.jpg`, 1080×1080). Regenerados los 9 tamaños con el mismo método (`<canvas>` en el navegador, sin librerías): fondo blanco + el logo real dibujado "contain" con ~6% de margen. A 512/384/192px se ve nítido y fiel al original; a 72/96px el detalle fino del logo (textura de huella digital + texto curvo) se pierde bastante — es un trade-off inherente a usar un logo con mucho detalle como ícono de app, no un bug; se mantiene así porque fue lo pedido explícitamente. Favicon (`<link rel="icon">`) y `apple-touch-icon` ya apuntaban a `logo-epm.jpg`/`icons/icon-*.png` desde el módulo 30, así que quedaron actualizados automáticamente sin tocar el `<head>`. El "splash screen" en Android se arma solo a partir del manifest (íconos + `background_color` + `name`), así que también quedó actualizado sin cambios de código — no se agregaron imágenes de splash dedicadas para iOS (requeriría un juego de imágenes por resolución de dispositivo, fuera de alcance). **`CACHE_VERSION` subido a `v2` en `sw.js`** — sin este paso, cualquiera que ya hubiera visitado la app se habría quedado con los íconos viejos cacheados indefinidamente. |
 | 31 | **Rediseño: card de cumpleaños del mes (Dashboard)** | 2026-08-05 | `CumpleaniosMes` reescrito: antes agrupaba en 3 secciones fijas (Hoy / Próximos 7 días / "+X más este mes" colapsado sin poder expandirse). Ahora es una lista única ordenada por cercanía (hoy con distancia 0 primero, después ascendente por día restante del mes, los que ya pasaron al final) con los **2 más próximos siempre visibles** + botón `▼ Ver todos los de este mes (N)` que expande/colapsa el resto (`▲ Ver menos`). Grilla `.cumple-mes-grid`: 1 columna en mobile, 2 columnas desde 600px. Cada card (`CumpleMesCard`) muestra nombre, fecha (`día/mes`) y **ícono(s) de nivel/curso** en vez de una torta genérica: `NIVEL_EMOJI` (🐟 Mojarritas / 🐬 Delfines / 🦈 Tiburones / 🐙 Pulpos) — si el estudiante tiene más de una inscripción activa (varios instrumentos en niveles distintos, ver módulo 25) se muestran todos los íconos juntos, ordenados por `NIVEL_ORDEN` (no alfabético). Equipo (docentes/operadores/gestión) elige entre 8 "personitas" variadas (`EQUIPO_EMOJIS`) vía un hash simple del nombre (`emojiEquipo`) — determinístico, así la misma persona siempre muestra el mismo ícono, pero personas distintas no se ven todas iguales; estudiante sin inscripción activa usa 🎵 de fallback. El de hoy se resalta con fondo degradé rosa/dorado + borde + 🎂 extra junto al nombre. **Backend** (`GET /api/cumpleanios`): ahora también trae `cursos` (array de nombres de curso) por cada estudiante, vía una segunda query a `inscripciones` con los ids de los estudiantes del mes consultado (antes el endpoint no exponía ni el `id` del estudiante ni sus cursos, solo nombre/fecha). Esta card sigue usando su propio fetch directo (no el hook `useCumpleaniosProximos` que usa el ícono 🎂 del header) porque su alcance es distinto a propósito: "cumpleaños de este mes" (scope calendario) vs. "próximos 7 días" (scope rolling que puede cruzar de mes) — mezclarlos en un solo hook habría confundido las dos semánticas. |
 | 32 | **Fix: badges de inscripción duplicados + clickeables en Estudiantes** | 2026-08-05 | El listado de estudiantes mostraba la misma info de inscripciones dos veces: como texto debajo del nombre ("Tiburones (Canto) · Mojarritas (Kongas)") y como badges a la derecha. Eliminado el texto — `.est-sub` ahora solo muestra "DNI ...". Los badges (`.est-tag`) ahora son clickeables (`.est-tag-link`: cursor pointer, `text-decoration-color` transparente → sólido en hover, fondo `var(--primary)` en hover) y navegan al tab "Por nivel / curso" de Reportes con ese curso+instrumento pre-filtrados — reusa `ReportePorNivel` (módulo 6) en vez de crear una vista nueva. **Backend**: `GET /api/reportes/nivel` ahora acepta `instrumento_id` además de `curso_id` — el `JOIN` a `inscripciones` usa el mismo alias para ambas condiciones, así el `AND` exige que sea la MISMA inscripción (ese curso Y ese instrumento juntos), no cualquier curso + cualquier instrumento sueltos del estudiante. **Deep-link**: mismo patrón que `deepLink` (notificaciones) pero paralelo — `Layout` tiene un segundo estado `filtroNivel` (`{curso_id, instrumento_id, ts}`) porque el destino y la forma del filtro son distintos; `verReporteNivel()` hace `setSection('reportes')` + `setFiltroNivel(...)`, `Reportes` cambia de tab a 'nivel' automáticamente cuando llega un `filtroNivel`, y `ReportePorNivel` sincroniza sus selects de curso/instrumento vía un `useEffect` con `filtroInicial?.ts` como dependencia (el `ts` único por click permite reaccionar aunque se clickee el mismo badge dos veces seguidas). El click en el badge usa `stopPropagation()` para no disparar también el `onClick` de la fila (que abre la ficha del estudiante). |
+| 33 | **Split del frontend en `public/js/`** | 2026-08-06 | El único `<script>` de ~7400 líneas en `index.html` se partió en 22 archivos por módulo (ver sección "Frontend: public/js/" más arriba) — sin bundler, cada uno como `<script type="text/babel" src="/js/Archivo.js">` transpilado en el navegador igual que antes. De paso se completó el botón "🎓 Repetir tour de bienvenida" del panel de ayuda (❓) — el prop `onIniciarTour` ya existía en `AyudaSeccion` pero el call site en `Layout` no se lo pasaba, así que el botón nunca reaparecía el tour; ahora ambos puntos de entrada (Mi Perfil y el ❓ de cada sección) están probados y funcionan. |
 
 ### Estado general
 
@@ -171,10 +181,47 @@ routes/
   reportes.js              # /api/reportes          (skeleton 501)
   backup.js                # /api/backup            (skeleton 501)
 public/
-  index.html               # React 18 SPA (CDN + Babel standalone, mobile-first)
+  index.html               # Shell: <head>/<style>, meta PWA, div#root, <script src> a public/js/*.js en orden
+  manifest.json, sw.js, offline.html, icons/  # PWA (ver módulo 30)
+  js/                       # Componentes React, un archivo por módulo (ver "Frontend: public/js/" abajo)
 epm.db                     # SQLite con WAL mode + foreign keys
 escuela_v1.db              # Backup del DB anterior (v1 monolítica)
 ```
+
+### Frontend: `public/js/`
+
+Desde el módulo 33, el código React (antes un único `<script>` de ~7400 líneas dentro de `index.html`) está partido en 22 archivos bajo `public/js/`, cada uno cargado como `<script type="text/babel" data-presets="react" src="/js/Archivo.js">` — **sin bundler**: Babel standalone (ya cargado por CDN) transpila cada archivo en el navegador al vuelo, igual que antes. `index.html` solo tiene el `<head>`, el `<style>` (sin partir — no era el pedido), el `div#root`, y la lista de `<script src>` en orden.
+
+**El orden de los `<script>` importa poco pero no es arbitrario**: `utils.js` va primero (define `NAV_GROUPS`, `apiFetch`, helpers usados por todos los demás) y `App.js` va último (define `Layout`/`App` y termina con `ReactDOM.createRoot(...).render(<App />)`). Entre esos dos extremos el orden real no importa — todos los componentes son `function Nombre(){}` a nivel de archivo, y ninguno se **ejecuta** hasta que React los renderiza (mucho después de que los 22 scripts ya terminaron de cargar), así que una referencia "hacia adelante" a un componente definido en un archivo que carga después funciona sin problema.
+
+Mapa de archivos (orden de carga = orden de esta lista):
+
+| Archivo | Contenido |
+|---|---|
+| `utils.js` | `NAV_GROUPS`/`NAV`/`SECCION_INFO`/`TOUR_ORDEN`, helpers de fecha/CSV, `apiFetch`, `getToken`/`getUser` |
+| `Shell.js` | `PasswordInput`, `LoginPage`, `Sidebar` |
+| `Dashboard.js` | `ProximosEventos`, cumpleaños (hook + card del Dashboard), `UltimaReunion`, `Dashboard`, `Placeholder` |
+| `Estudiantes.js` | `ModalImport`, `CalendarioAsistencia`, `ListaEstudiantes`, `InscripcionesPanel`, legajo, `Ficha`, `Estudiantes` |
+| `Asistencia.js` | `HistorialAsistencia`, `AsistenciasView`, `TomarAsistencia` |
+| `Reportes.js` | `PieChart`, `Reportes`, `ReportePorNivel` |
+| `Usuarios.js` | `GestionUsuarios`, `GestionRoles`, `UsuariosYRoles` |
+| `Planificaciones.js` | períodos, `ListaPlanifs`, `FichaPlanif`, `Planificaciones` |
+| `Backup.js` | `Backup` |
+| `Cursos.js` | `Cursos`, `Instrumentos` |
+| `Invitaciones.js` | `InvitacionPage`, `GestionInvitaciones` y modales relacionados |
+| `Notificaciones.js` | `NotificacionesBell`, `CumpleanosBell` |
+| `Calendario.js` | `ModalEvento`, `ModalCambioEvento`, `ModalDetalleEvento`, `Calendario` |
+| `PerfilUsuario.js` | `PerfilUsuario` (autoservicio + uso admin) |
+| `Docentes.js` | `Docentes`, `ModalNuevoUsuario` |
+| `Inventario.js` | `Inventario`, `ModalInventario` |
+| `Proyectos.js` | `Proyectos`, `ModalProy`, `DetalleProy` |
+| `Menciones.js` | `@Menciones`: `useMencionables`, `MencionInput`, `MencionChip`, etc. |
+| `Reuniones.js` | `EmojiPicker`, `Reuniones`, `ModalReunion`, `DetalleReunion` |
+| `Finanzas.js` | `Finanzas` (placeholder) |
+| `Tour.js` | `useHashSection`, `TourGuiado`, `AyudaSeccion` |
+| `App.js` | `Layout`, `esMobileOTablet`, `InstallBanner`, `App`, y el `ReactDOM.createRoot(...).render(...)` final |
+
+**Al agregar un módulo nuevo**: crear su archivo en `public/js/`, agregar el `<script src="/js/Archivo.js">` en `index.html` (en cualquier punto entre `utils.js` y `App.js`), y listo — no hace falta tocar los demás archivos salvo que el componente nuevo necesite ser llamado desde `Layout` (`App.js`).
 
 ## Modelo de datos
 
