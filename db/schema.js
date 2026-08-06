@@ -559,16 +559,23 @@ async function runSchema(db) {
   `);
 
   // ── INVENTARIO DE INSTRUMENTOS ────────────────────────────────────────────
+  // asignado_tipo: 'estudiante' | 'usuario' (a quién se prestó, solo si estado='a_prestamo')
   await db.execute(`
     CREATE TABLE IF NOT EXISTS inventario (
       id             INTEGER PRIMARY KEY AUTOINCREMENT,
       institucion_id INTEGER NOT NULL REFERENCES instituciones(id),
       nombre         TEXT NOT NULL,
       instrumento_id INTEGER REFERENCES instrumentos(id),
-      estado         TEXT NOT NULL DEFAULT 'disponible' CHECK(estado IN ('disponible','en_uso','en_reparacion','baja')),
+      estado         TEXT NOT NULL DEFAULT 'disponible' CHECK(estado IN ('disponible','en_uso','a_reparar','a_prestamo','en_reparacion','baja')),
       asignado_tipo  TEXT,
       asignado_id    INTEGER,
       numero_serie   TEXT,
+      tiene_funda    INTEGER DEFAULT 0,
+      tiene_correa   INTEGER DEFAULT 0,
+      reparacion_fecha_envio   TEXT,
+      reparacion_lugar         TEXT,
+      reparacion_telefono      TEXT,
+      reparacion_observaciones TEXT,
       observaciones  TEXT,
       fecha_alta     TEXT DEFAULT (date('now')),
       created_at     TEXT DEFAULT (datetime('now')),
@@ -778,6 +785,67 @@ async function runSchema(db) {
       }
     }
   } catch(e) { console.error('❌ Migración instrumentos Teclado/Chancha:', e.message); }
+
+  // ── MIGRACIÓN INSTRUMENTOS: "Guitarra" genérico → Criolla/Eléctrica ──────
+  // Renombra el registro existente (preserva su id → no rompe inscripciones/inventario
+  // que ya lo referenciaban) y agrega "Guitarra Eléctrica" como tipo nuevo.
+  try {
+    const { rows: instituciones } = await db.execute('SELECT id FROM instituciones');
+    for (const inst of instituciones) {
+      await db.execute({
+        sql: `UPDATE instrumentos SET nombre='Guitarra Criolla' WHERE institucion_id=? AND nombre='Guitarra'`,
+        args: [inst.id],
+      });
+      await db.execute({
+        sql: 'INSERT OR IGNORE INTO instrumentos (institucion_id, nombre) VALUES (?, ?)',
+        args: [inst.id, 'Guitarra Eléctrica'],
+      });
+    }
+  } catch(e) { console.error('❌ Migración Guitarra Criolla/Eléctrica:', e.message); }
+
+  // ── MIGRACIÓN INVENTARIO: nuevos estados (a_reparar/a_prestamo) + campos
+  // (funda/correa/datos de reparación). CHECK inline requiere recrear la tabla.
+  try {
+    const { rows: schRows } = await db.execute({
+      sql: "SELECT sql FROM sqlite_master WHERE type='table' AND name='inventario'",
+      args: [],
+    });
+    if (schRows.length > 0 && schRows[0].sql && !/tiene_funda/i.test(schRows[0].sql)) {
+      console.log('🔄 Migrando inventario: nuevos estados + campos de funda/correa/reparación...');
+      await db.execute(`ALTER TABLE inventario RENAME TO inventario_pre_v2`);
+      await db.execute(`
+        CREATE TABLE inventario (
+          id             INTEGER PRIMARY KEY AUTOINCREMENT,
+          institucion_id INTEGER NOT NULL REFERENCES instituciones(id),
+          nombre         TEXT NOT NULL,
+          instrumento_id INTEGER REFERENCES instrumentos(id),
+          estado         TEXT NOT NULL DEFAULT 'disponible' CHECK(estado IN ('disponible','en_uso','a_reparar','a_prestamo','en_reparacion','baja')),
+          asignado_tipo  TEXT,
+          asignado_id    INTEGER,
+          numero_serie   TEXT,
+          tiene_funda    INTEGER DEFAULT 0,
+          tiene_correa   INTEGER DEFAULT 0,
+          reparacion_fecha_envio   TEXT,
+          reparacion_lugar         TEXT,
+          reparacion_telefono      TEXT,
+          reparacion_observaciones TEXT,
+          observaciones  TEXT,
+          fecha_alta     TEXT DEFAULT (date('now')),
+          created_at     TEXT DEFAULT (datetime('now')),
+          updated_at     TEXT DEFAULT (datetime('now'))
+        )
+      `);
+      await db.execute(`
+        INSERT INTO inventario (id,institucion_id,nombre,instrumento_id,estado,asignado_tipo,asignado_id,numero_serie,observaciones,fecha_alta,created_at,updated_at)
+        SELECT id,institucion_id,nombre,instrumento_id,estado,
+               CASE WHEN asignado_tipo='docente' THEN 'usuario' ELSE asignado_tipo END,
+               asignado_id,numero_serie,observaciones,fecha_alta,created_at,updated_at
+        FROM inventario_pre_v2
+      `);
+      await db.execute(`DROP TABLE inventario_pre_v2`);
+      console.log('✅ Migración inventario completada.');
+    }
+  } catch(e) { console.error('❌ Error en migración inventario:', e.message); }
 
   // ── MIGRACIÓN PERMISOS reuniones (idempotente) ────────────────────────────
   for (const p of [
