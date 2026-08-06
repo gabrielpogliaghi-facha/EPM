@@ -1299,13 +1299,11 @@ const SECCION_INFO = {
   },
 };
 
-// Orden curado del tour de bienvenida (no necesariamente el orden del sidebar).
-// `permiso: null` en el NAV correspondiente = visible para cualquier usuario logueado.
-const TOUR_ORDEN = [
-  'dashboard', 'estudiantes', 'asistencia', 'reportes', 'calendario',
-  'planificaciones', 'reuniones', 'docentes', 'inventario', 'proyectos',
-  'mi-perfil', 'usuarios', 'backup',
-];
+// Orden del tour de bienvenida: el mismo orden de arriba hacia abajo del sidebar
+// (derivado de NAV, no una lista aparte a mano — así nunca puede desincronizarse si
+// el menú cambia). Solo incluye ids que tengan contenido en SECCION_INFO (deja afuera
+// Cursos/Instrumentos/Finanzas, que hoy no forman parte del tour).
+const TOUR_ORDEN = NAV.map(n => n.id).filter(id => SECCION_INFO[id]);
 
 // ── HELPERS EVENTOS ────────────────────────────────────────────────────────────
 const TIPO_EVENTO = {
@@ -8201,27 +8199,45 @@ function TourGuiado({ pasos, onAbrirSidebar, onCerrarSidebar, onFinish, onSkip }
   }, [paso.id]);
 
   useEffect(() => {
-    // Pequeña espera: en mobile el sidebar recién se está abriendo (transición CSS),
-    // y necesitamos medir su posición final, no la de mitad de camino.
-    const t = setTimeout(medir, esMobile ? 350 : 60);
+    // Se limpia el rect anterior para no mostrar el tooltip un instante en la posición
+    // del paso viejo mientras el nuevo elemento todavía se está scrolleando a la vista.
+    setRect(null);
+    let t2;
+    const t1 = setTimeout(() => {
+      // Scrollea el elemento resaltado al centro de su contenedor (el sidebar tiene su
+      // propio scroll interno, `.sidebar-nav{overflow-y:auto}`) ANTES de medir su posición
+      // — si no, un ítem lejos en la lista (ej. "Backup") puede quedar fuera del área
+      // visible y el tooltip se calcula mal / queda cortado.
+      const el = document.querySelector(`[data-tour="${paso.id}"]`);
+      el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      t2 = setTimeout(medir, 350); // espera a que termine el scroll suave antes de medir
+    }, esMobile ? 350 : 60); // en mobile primero espera a que el sidebar termine de abrirse
     window.addEventListener('resize', medir);
-    return () => { clearTimeout(t); window.removeEventListener('resize', medir); };
+    return () => { clearTimeout(t1); clearTimeout(t2); window.removeEventListener('resize', medir); };
   }, [medir]);
 
   const siguiente = () => { if (i < pasos.length - 1) setI(i + 1); else onFinish(); };
   const anterior  = () => { if (i > 0) setI(i - 1); };
 
-  // Posición del tooltip: debajo del elemento resaltado, o arriba si no entra.
+  // Posición del tooltip: SIEMPRE dentro del viewport. Se elige el lado (arriba/abajo)
+  // según cuál tenga más espacio libre, y se limita con max-height + scroll interno como
+  // red de seguridad final para que nunca quede cortado, ni siquiera en un viewport chico.
   const vw = window.innerWidth, vh = window.innerHeight;
   const margin = 12;
   const tw = Math.min(320, vw - margin * 2);
   let tooltipStyle = { width: tw, left: margin, top: vh / 2 - 80 };
   if (rect) {
-    const arriba = rect.top > vh * 0.55;
+    const espacioAbajo  = vh - rect.bottom - margin;
+    const espacioArriba = rect.top - margin;
+    const vaAbajo = espacioAbajo >= 170 || espacioAbajo >= espacioArriba;
     const left = Math.max(margin, Math.min(rect.left, vw - tw - margin));
-    tooltipStyle = arriba
-      ? { width: tw, left, bottom: vh - rect.top + margin }
-      : { width: tw, left, top: rect.bottom + margin };
+    if (vaAbajo) {
+      const top = Math.min(rect.bottom + margin, vh - margin - 60);
+      tooltipStyle = { width: tw, left, top, maxHeight: Math.max(120, vh - top - margin), overflowY: 'auto' };
+    } else {
+      const bottom = Math.max(vh - rect.top + margin, margin + 60);
+      tooltipStyle = { width: tw, left, bottom, maxHeight: Math.max(120, vh - bottom - margin), overflowY: 'auto' };
+    }
   }
 
   return (
