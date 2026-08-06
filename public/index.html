@@ -8407,12 +8407,22 @@ function Layout({ user, onUserUpdate }) {
 // preferencia de "ya lo vi"), pero se puede cerrar y desaparece por el resto de esa
 // visita — sin tocar ningún storage, así que la próxima vez que se entre (nueva
 // pestaña, recarga, o abrir la app instalada/agregada) vuelve a aparecer.
+// Solo tiene sentido en celulares/tablets — en desktop no se muestra nunca (doble
+// chequeo: user agent Y ancho de pantalla, para cubrir tanto un desktop angosto
+// como una tablet grande que no matchee el user agent).
+function esMobileOTablet() {
+  const uaMovil = /android|iphone|ipad|ipod|mobile|tablet/i.test(navigator.userAgent);
+  const pantallaChica = window.innerWidth < 768;
+  return uaMovil || pantallaChica;
+}
 function InstallBanner() {
   const [prompt,  setPrompt]  = useState(null);
   const [visible, setVisible] = useState(false);
   const [esIOS,   setEsIOS]   = useState(false);
 
   useEffect(() => {
+    if (!esMobileOTablet()) return;
+
     const yaInstalada = window.matchMedia('(display-mode: standalone)').matches
       || window.navigator.standalone === true; // iOS
     if (yaInstalada) return;
