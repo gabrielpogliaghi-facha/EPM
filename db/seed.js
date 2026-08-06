@@ -99,7 +99,7 @@ async function runSeed(db) {
     }
 
     // Instrumentos iniciales
-    for (const nombre of ['Guitarra Criolla', 'Guitarra Eléctrica', 'Canto', 'Batería', 'Bajo', 'Piano', 'Violín', 'Flauta', 'Teclado', 'Chancha']) {
+    for (const nombre of ['Guitarra Criolla', 'Guitarra eléctrica', 'Canto', 'Batería', 'Bajo', 'Piano', 'Violín', 'Flauta', 'Teclado', 'Chancha']) {
       await db.execute({ sql: 'INSERT INTO instrumentos (institucion_id, nombre) VALUES (?,?)', args: [epmId, nombre] });
     }
 

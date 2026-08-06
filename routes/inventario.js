@@ -19,11 +19,13 @@ function normalizar(body) {
     numero_serie:   body.numero_serie || null,
     tiene_funda:    body.tiene_funda  ? 1 : 0,
     tiene_correa:   body.tiene_correa ? 1 : 0,
-    // reparacion_* solo tiene sentido con estado='a_reparar'; se limpia en cualquier otro caso
-    reparacion_fecha_envio:   body.estado === 'a_reparar' ? (body.reparacion_fecha_envio || null) : null,
-    reparacion_lugar:         body.estado === 'a_reparar' ? (body.reparacion_lugar || null) : null,
-    reparacion_telefono:      body.estado === 'a_reparar' ? (body.reparacion_telefono || null) : null,
-    reparacion_observaciones: body.estado === 'a_reparar' ? (body.reparacion_observaciones || null) : null,
+    // reparacion_fecha_envio/lugar/telefono solo tienen sentido con estado='en_reparacion'
+    // (ya se mandó al taller). reparacion_observaciones se usa en ambos estados: en 'a_reparar'
+    // describe el daño detectado, en 'en_reparacion' describe detalles de la reparación en curso.
+    reparacion_fecha_envio:   body.estado === 'en_reparacion' ? (body.reparacion_fecha_envio || null) : null,
+    reparacion_lugar:         body.estado === 'en_reparacion' ? (body.reparacion_lugar || null) : null,
+    reparacion_telefono:      body.estado === 'en_reparacion' ? (body.reparacion_telefono || null) : null,
+    reparacion_observaciones: (body.estado === 'a_reparar' || body.estado === 'en_reparacion') ? (body.reparacion_observaciones || null) : null,
     observaciones:  body.observaciones || null,
     fecha_alta:     body.fecha_alta || new Date().toISOString().slice(0,10),
   };

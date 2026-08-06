@@ -4,7 +4,7 @@ const INV_ESTADOS = {
   en_reparacion:'En reparación', baja:'Baja',
 };
 // Instrumentos que usan correa (guitarras y bajo) — el resto no muestra el checkbox.
-const INV_CON_CORREA = ['Guitarra Criolla','Guitarra Eléctrica','Bajo'];
+const INV_CON_CORREA = ['Guitarra Criolla','Guitarra eléctrica','Bajo'];
 
 const COLS_CSV_INV = ['Marca','Tipo de instrumento','Estado','Número de serie','Tiene funda','Tiene correa','Fecha de alta','Observaciones'];
 
@@ -431,6 +431,15 @@ function ModalInventario({ item, instrumentos, estudiantes, equipo, onClose, onG
             )}
 
             {form.estado === 'a_reparar' && (
+              <div className="form-group col-full" style={{background:'var(--bg3)',borderRadius:8,padding:10}}>
+                <label className="form-label">Descripción del daño</label>
+                <textarea className="form-control" rows={2} value={form.reparacion_observaciones}
+                  onChange={e=>set('reparacion_observaciones',e.target.value)}
+                  placeholder="¿Qué le pasa al instrumento?" />
+              </div>
+            )}
+
+            {form.estado === 'en_reparacion' && (
               <div className="form-group col-full" style={{background:'var(--bg3)',borderRadius:8,padding:10,display:'grid',gap:10}}>
                 <div className="form-grid">
                   <div className="form-group">

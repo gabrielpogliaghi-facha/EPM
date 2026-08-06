@@ -786,9 +786,9 @@ async function runSchema(db) {
     }
   } catch(e) { console.error('❌ Migración instrumentos Teclado/Chancha:', e.message); }
 
-  // ── MIGRACIÓN INSTRUMENTOS: "Guitarra" genérico → Criolla/Eléctrica ──────
+  // ── MIGRACIÓN INSTRUMENTOS: "Guitarra" genérico → Criolla/eléctrica ──────
   // Renombra el registro existente (preserva su id → no rompe inscripciones/inventario
-  // que ya lo referenciaban) y agrega "Guitarra Eléctrica" como tipo nuevo.
+  // que ya lo referenciaban) y agrega "Guitarra eléctrica" como tipo nuevo.
   try {
     const { rows: instituciones } = await db.execute('SELECT id FROM instituciones');
     for (const inst of instituciones) {
@@ -798,10 +798,51 @@ async function runSchema(db) {
       });
       await db.execute({
         sql: 'INSERT OR IGNORE INTO instrumentos (institucion_id, nombre) VALUES (?, ?)',
-        args: [inst.id, 'Guitarra Eléctrica'],
+        args: [inst.id, 'Guitarra eléctrica'],
       });
     }
-  } catch(e) { console.error('❌ Migración Guitarra Criolla/Eléctrica:', e.message); }
+  } catch(e) { console.error('❌ Migración Guitarra Criolla/eléctrica:', e.message); }
+
+  // ── MIGRACIÓN INSTRUMENTOS: unificar duplicados de "Guitarra eléctrica" ──
+  // La migración anterior insertaba "Guitarra Eléctrica" (E mayúscula); si alguien
+  // además había cargado "Guitarra eléctrica" (e minúscula) a mano, SQLite los trata
+  // como dos filas distintas (UNIQUE es case-sensitive). Se conserva la fila más
+  // antigua de cada institución, se reasignan todas las referencias de las demás
+  // y se normaliza el nombre final a "Guitarra eléctrica".
+  try {
+    const { rows: instituciones } = await db.execute('SELECT id FROM instituciones');
+    for (const inst of instituciones) {
+      const { rows: dups } = await db.execute({
+        sql: `SELECT id FROM instrumentos WHERE institucion_id=? AND LOWER(nombre)='guitarra eléctrica' ORDER BY id`,
+        args: [inst.id],
+      });
+      if (dups.length === 0) continue;
+      const canonicalId = dups[0].id;
+      for (const dup of dups.slice(1)) {
+        // Tablas sin restricción única sobre instrumento_id: reasignar directo.
+        for (const tabla of ['inventario', 'historial_inscripciones']) {
+          try { await db.execute({ sql: `UPDATE ${tabla} SET instrumento_id=? WHERE instrumento_id=?`, args: [canonicalId, dup.id] }); } catch(e) {}
+        }
+        // usuario_instrumentos tiene PK (usuario_id, instrumento_id): insertar+ignorar y borrar el resto.
+        try {
+          await db.execute({ sql: `INSERT OR IGNORE INTO usuario_instrumentos (usuario_id, instrumento_id) SELECT usuario_id, ? FROM usuario_instrumentos WHERE instrumento_id=?`, args: [canonicalId, dup.id] });
+          await db.execute({ sql: `DELETE FROM usuario_instrumentos WHERE instrumento_id=?`, args: [dup.id] });
+        } catch(e) {}
+        // inscripciones tiene índice único parcial (estudiante,instrumento,curso) activo=1:
+        // reasignar fila por fila, si choca con una inscripción activa ya existente para el
+        // instrumento canónico se descarta la duplicada (desactivándola) en vez de abortar.
+        try {
+          const { rows: insc } = await db.execute({ sql: `SELECT id FROM inscripciones WHERE instrumento_id=?`, args: [dup.id] });
+          for (const i of insc) {
+            try { await db.execute({ sql: `UPDATE inscripciones SET instrumento_id=? WHERE id=?`, args: [canonicalId, i.id] }); }
+            catch(e) { await db.execute({ sql: `UPDATE inscripciones SET activo=0 WHERE id=?`, args: [i.id] }); }
+          }
+        } catch(e) {}
+        await db.execute({ sql: 'DELETE FROM instrumentos WHERE id=?', args: [dup.id] });
+      }
+      await db.execute({ sql: `UPDATE instrumentos SET nombre='Guitarra eléctrica' WHERE id=?`, args: [canonicalId] });
+    }
+  } catch(e) { console.error('❌ Migración duplicados Guitarra eléctrica:', e.message); }
 
   // ── MIGRACIÓN INVENTARIO: nuevos estados (a_reparar/a_prestamo) + campos
   // (funda/correa/datos de reparación). CHECK inline requiere recrear la tabla.
