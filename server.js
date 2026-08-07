@@ -1,4 +1,5 @@
 require('dotenv').config();
+require('dotenv').config({ path: '.env.local', override: true }); // secretos locales que no van al repo (ej. STATUS_API_KEY)
 
 const express = require('express');
 const cors    = require('cors');
@@ -26,6 +27,7 @@ app.use(express.static(path.join(__dirname, 'public'), {
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // ── RUTAS API ──────────────────────────────────────────────────────────────────
+app.use('/api/status',          require('./routes/status'));
 app.use('/api/auth',            require('./routes/auth'));
 app.use('/api/instrumentos',    require('./routes/instrumentos'));
 app.use('/api/legajo',          require('./routes/legajo'));

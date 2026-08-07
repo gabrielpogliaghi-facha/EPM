@@ -492,6 +492,7 @@ async function runSchema(db) {
     ['instrumento_principal_id', 'INTEGER'],
     ['formacion',                'TEXT'],
     ['tour_completado',          'INTEGER DEFAULT 0'],
+    ['ultimo_login',             'TEXT'],
   ]) {
     try { await db.execute(`ALTER TABLE usuarios ADD COLUMN ${col} ${type}`); } catch(e) {}
   }

@@ -26,6 +26,11 @@ router.post('/login', async (req, res) => {
     if (!user || !bcrypt.compareSync(password, user.password_hash))
       return res.status(401).json({ error: 'Credenciales incorrectas' });
 
+    await db.execute({
+      sql: `UPDATE usuarios SET ultimo_login = datetime('now') WHERE id = ?`,
+      args: [user.id],
+    });
+
     const { rows: permRows } = await db.execute({
       sql: `SELECT p.codigo FROM roles_permisos rp JOIN permisos p ON rp.permiso_id = p.id WHERE rp.rol_id = ?`,
       args: [user.rol_id],

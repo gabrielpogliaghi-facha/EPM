@@ -25,3 +25,4 @@ desktop.ini
 
 # Archivos personales / notas locales
 PERSONAL/
+.env.local
