@@ -2,13 +2,21 @@ const express = require('express');
 const router  = express.Router();
 const db      = require('../db');
 
-const STATUS_API_KEY = process.env.STATUS_API_KEY;
+// .trim() por si Render guardó la variable con un \n o espacio de más al pegarla
+// en el dashboard (muy común) — sin esto, una key "igual a simple vista" nunca matchea.
+const STATUS_API_KEY = (process.env.STATUS_API_KEY || '').trim();
 
 // Endpoint de estado para un panel de control externo. Protegido por header
 // "Authorization: Bearer <STATUS_API_KEY>" — no requiere sesión de usuario.
 router.get('/', async (req, res) => {
   const auth = req.headers.authorization || '';
-  const token = auth.startsWith('Bearer ') ? auth.slice(7).trim() : null;
+  // Case-insensitive en "Bearer" y tolerante a espacios extra entre el prefijo y la key.
+  const match = auth.match(/^Bearer\s+(.+)$/i);
+  const token = match ? match[1].trim() : null;
+
+  // TEMPORAL — debug de longitudes para descartar caracteres invisibles de más/menos.
+  // No loguea el valor de ninguna de las dos claves, solo su longitud.
+  console.log(`[/api/status] longitud esperada=${STATUS_API_KEY.length} recibida=${token ? token.length : 'null'}`);
 
   if (!STATUS_API_KEY || !token || token !== STATUS_API_KEY) {
     return res.status(401).json({ error: 'No autorizado' });
